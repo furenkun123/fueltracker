@@ -1,0 +1,29 @@
+<!-- res/drawable/ic_fuel_monochrome.xml -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <group
+        android:scaleX="0.58"
+        android:scaleY="0.58"
+        android:translateX="108"
+        android:translateY="108">
+
+    <!-- 默认黑色，背景全透明；镂空部分也是透明的 -->
+    <path
+        android:fillColor="#FFFFF0"
+        android:fillType="evenOdd"
+        android:pathData="
+            M123,446 L123,155 L145,135 L156,135 L156,70 L220,70 L220,135 L298,70 L389,70 L389,446 Z
+            M178,92h22v22h-22z
+            M300,112h67v23h-67z
+            M145,200h222v178h-222z
+            M145,400h222v24h-222z
+            M256,226 C256,226 208,280 208,312 A48,48 0 0,0 304,312 C304,280 256,226 256,226 Z
+            M256,260 C256,260 234,292 234,312 A22,22 0 0,0 278,312 C278,292 256,260 256,260 Z" />
+
+    </group>
+
+</vector>

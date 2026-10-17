@@ -1,0 +1,97 @@
+### 📁 `com.fueltracker` (根目录)
+
+*   **`FuelTrackerApp.kt`** - **★ 全局导航中心**。根据状态分发页面、处理系统返回键。
+*   **`MainActivity.kt`** - **App 入口**。初始化主题、加载根 Composable。
+
+---
+
+### 📁 `com.fueltracker.data` (数据层)
+
+*   **`AppDatabase.kt`** - **Room 数据库主配置**。定义表、版本号（Migration）。
+*   **`CarBrand.kt`** - **车型品牌**数据类（用于选择器）。
+*   **`CarCatalog.kt`** - **车型目录**结构数据类（包含 `tree` 级联结构）。
+*   **`CarDatabase.kt`** - **本地车型库管理**。从 `assets/car_brands.json` 读取并解析。
+*   **`ExpenseCategoryStore.kt`** - **费用分类存储**。用 SharedPreferences 存取用户自定义的标签。
+*   **`ExpenseDao.kt`** - **费用表操作**。查询、插入、修改费用记录。
+*   **`ExpenseRecord.kt`** - **费用实体类**。定义停车、高速、保养等字段。
+*   **`FuelDao.kt`** - **加油表操作**。查询、插入、修改加油记录。
+*   **`FuelRecord.kt`** - **加油实体类**。定义油量、金额、里程、漏记等字段。
+*   **`Vehicle.kt`** - **车辆实体类**。定义品牌、型号、油箱容量等。
+*   **`VehicleDao.kt`** - **车辆表操作**。增删改查车辆及切换当前车辆。
+
+---
+
+### 📁 `com.fueltracker.notif` (通知层)
+
+*   **`ParkingActionReceiver.kt`** - **通知栏动作接收器**。处理点通知上的“已取车”、“忽略”按钮。
+*   **`ParkingNotification.kt`** - **停车通知管理**。发送常驻通知、取消通知。
+
+---
+
+### 📁 `com.fueltracker.util` (工具层)
+
+*   **`BackupManager.kt`** - **备份与恢复**。把数据库转成 JSON，以及从 JSON 恢复。
+*   **`FuelCalculator.kt`** - **★ 核心油耗算法**。满箱计算、异常/漏记推演、离群检测。
+*   **`LocationHelper.kt`** - **定位工具**。调用系统 `LocationManager` 和 `Geocoder` 获取地理位置。
+*   **`UpdateLogManager.kt`** - **更新日志管理**。控制首启隐私弹窗、版本更新弹窗。
+
+---
+
+### 📁 `com.fueltracker.viewmodel` (状态层)
+
+*   **`MainViewModel.kt`** - **★ 全局状态中心**。持有所有 Flow（车辆/记录/费用/导航状态），提供增删改查业务方法。
+
+---
+
+### 📁 `com.fueltracker.ui` (视图/页面层)
+
+*   **`BrandSelectorScreen.kt`** - **品牌选择页**。右侧带 A-Z 索引栏。
+*   **`CarPickerFlow.kt`** - **车型选择流**。控制品牌->车系->年款->车型的级联跳转。
+*   **`CarPickerPages.kt`** - **车系/年款/车型选择页**。
+*   **`ExpenseEditScreen.kt`** - **记费用/编辑费用页**。选分类、填金额、时间。
+*   **`ExpenseScreen.kt`** - **费用页**。油费卡片、总支出汇总、图表、费用明细。
+*   **`FuelScreen.kt`** - **★ 记加油/编辑加油页**。核心表单，含联动计算。
+*   **`HomeScreen.kt`** - **★ 首页**。车辆卡片、当前油耗、停车卡片、统计、趋势图。
+*   **`InitialRecordScreen.kt`** - **提车初始记录页**。添加第一辆车后录入初始里程/油量。
+*   **`ParkingScreen.kt`** - **记停车/编辑停车页**。自动定位、输入楼层、车位号。
+*   **`RecordsScreen.kt`** - **加油记录列表页**。显示全部历史，支持搜索和编辑。
+*   **`SettingsScreen.kt`** - **设置页**。车辆管理、数据备份、主题、关于/隐私、更新历史。
+*   **`VehicleScreen.kt`** - **添加/编辑车辆页**。调用车型选择器。
+
+#### 📁 `com.fueltracker.ui.components` (通用 UI 组件)
+
+*   **`DatePickerDialog.kt`** - **日期时间选择弹窗**。月历 + 滚轮。
+*   **`WheelList.kt`** - **通用滚轮选择器**。支持自定义样式、吸附。
+
+#### 📁 `com.fueltracker.ui.miui` (MIUI 风格组件)
+
+*   **`MiuiButton.kt`** - **按钮组件**。普通按钮、带图标按钮。
+*   **`MiuiCard.kt`** - **卡片底座**。统一的圆角、背景色。
+*   **`MiuiColors.kt`** - **颜色常量**。
+*   **`MiuiComponents.kt`** - **杂项组合组件**（如确认弹窗）。
+*   **`MiuiNavigationBar.kt`** - **底部导航栏**。
+*   **`MiuiTopBar.kt`** - **顶部栏**。
+*   **`VehicleCard.kt`** - **首页专属车辆卡片**。
+
+#### 📁 `com.fueltracker.ui.theme` (主题配置)
+
+*   **`Color.kt`** - **色板定义**。
+*   **`Theme.kt`** - **Compose 主题包装**。
+*   **`ThemeMode.kt`** - **主题模式枚举**（浅色/深色/跟随系统）。
+*   **`ThemePreferences.kt`** - **主题持久化存储**。
+*   **`Type.kt`** - **字体排版**。
+
+---
+
+### 📁 其他资源
+
+*   **`assets/car_brands.json`** - 本地存放的所有车型、车系、配置数据。
+*   **`java (generated)`** - **不用管**。这是 Room / KSP 自动生成的底层代码（如 `AppDatabase_Impl`）。
+*   **`res/values/*.xml`** - 字符串、颜色、基础主题定义。
+*   **`res/xml/*.xml`** - 备份规则（`data_extraction_rules` 等）。
+
+---
+
+**总结记忆口诀**：
+*   改**数据表**找 `data`，改**计算逻辑**找 `util`，改**控制流程**找 `App` 和 `ViewModel`。
+*   改**具体页面**找 `ui` 下的 `XxxScreen.kt`，改**公共外观**找 `ui/miui` 或 `ui/components`。

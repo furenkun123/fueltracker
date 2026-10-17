@@ -1,0 +1,33 @@
+*.iml
+.idea/
+.gradle/
+
+# Local Android configuration
+local.properties
+keystore.properties
+
+# Build outputs
+build/
+**/build/
+
+# Release outputs
+**/release/
+
+# APK / AAB
+*.apk
+*.aab
+
+# Native build
+.externalNativeBuild/
+.cxx/
+
+# Captures
+/captures/
+
+# macOS
+.DS_Store
+
+# Signing files
+*.jks
+*.keystore
+*.p12
