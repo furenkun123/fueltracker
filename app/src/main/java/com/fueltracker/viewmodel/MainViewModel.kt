@@ -143,6 +143,7 @@ class MainViewModel(
         editingExpense = null
     }
 
+
     // =========================
     // 数据流
     // =========================
@@ -567,6 +568,69 @@ class MainViewModel(
                 isJsonFileUri(getApplication(), uri)
             }
             onResult(isJson)
+        }
+    }
+
+    fun importFuelRecords(
+        recordsToImport: List<FuelRecord>, // 为了避免重名，把参数名改一下
+        onResult: (Result<Int>) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                // 直接拿当前车辆已有的记录进行对比
+                val existingRecords = records.value
+                var importCount = 0
+
+                recordsToImport.forEach { newRecord ->
+                    // 去重规则：时间戳相同，且里程相同，且实际支付金额相同
+                    val isDuplicate = existingRecords.any {
+                        it.timestamp == newRecord.timestamp &&
+                                it.odometer == newRecord.odometer &&
+                                it.actualPaidAmount == newRecord.actualPaidAmount
+                    }
+
+                    if (!isDuplicate) {
+                        fuelDao.insert(newRecord)
+                        importCount++
+                    }
+                }
+                // 返回实际插入的条数
+                onResult(Result.success(importCount))
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "导入加油记录失败", e)
+                onResult(Result.failure(e))
+            }
+        }
+    }
+
+    fun importExpenseRecords(
+        recordsToImport: List<ExpenseRecord>,
+        onResult: (Result<Int>) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                // 直接拿当前车辆已有的费用记录进行对比
+                val existingRecords = expenses.value
+                var importCount = 0
+
+                recordsToImport.forEach { newRecord ->
+                    // 去重规则：时间戳相同，且金额相同，且分类相同
+                    val isDuplicate = existingRecords.any {
+                        it.timestamp == newRecord.timestamp &&
+                                it.amount == newRecord.amount &&
+                                it.category == newRecord.category
+                    }
+
+                    if (!isDuplicate) {
+                        expenseDao.insert(newRecord)
+                        importCount++
+                    }
+                }
+                onResult(Result.success(importCount))
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "导入费用记录失败", e)
+                onResult(Result.failure(e))
+            }
         }
     }
 

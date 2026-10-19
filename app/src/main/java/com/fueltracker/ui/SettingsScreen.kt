@@ -92,6 +92,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewModelScope
 import com.fueltracker.BuildConfig
 import com.fueltracker.data.Vehicle
 import com.fueltracker.ui.miui.MiuiCard
@@ -102,6 +103,8 @@ import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.launch
+import com.fueltracker.util.XiaoxiongCsvImporter
 
 // ============================================================
 // 动画规格
@@ -157,6 +160,7 @@ fun SettingsScreen(
     var isDataExpanded by rememberSaveable { mutableStateOf(false) }
     var isThemeExpanded by rememberSaveable { mutableStateOf(false) }
     var isAboutExpanded by rememberSaveable { mutableStateOf(false) }
+    var isXiaoxiongExpanded by rememberSaveable { mutableStateOf(false) }
 
     var currentThemeMode by remember { mutableStateOf(ThemePreferences.mode) }
 
@@ -181,6 +185,9 @@ fun SettingsScreen(
     }
 
     val listState = rememberLazyListState()
+    LaunchedEffect(isDataExpanded) {
+        if (!isDataExpanded) isXiaoxiongExpanded = false
+    }
 
     // 导出备份
     val exportLauncher = rememberLauncherForActivityResult(
@@ -215,6 +222,74 @@ fun SettingsScreen(
                     context,
                     "请选择 JSON 格式的备份文件",
                     Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    // 加油记录导入
+    val fuelImporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val vehicle = viewModel.currentVehicle.value ?: return@rememberLauncherForActivityResult
+
+        viewModel.viewModelScope.launch {
+            val result = XiaoxiongCsvImporter.parseFuelCsv(context, uri, vehicle.id)
+            val records = result.getOrNull()
+            if (records != null) {
+                viewModel.importFuelRecords(records) { importResult ->
+                    importResult.getOrNull()?.let { count ->
+                        if (count > 0) {
+                            Toast.makeText(context, "成功导入 $count 条加油记录", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "没有新记录，数据已存在", Toast.LENGTH_SHORT).show()
+                        }
+                    } ?: Toast.makeText(
+                        context,
+                        "导入失败：${importResult.exceptionOrNull()?.localizedMessage}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } else {
+                Toast.makeText(
+                    context,
+                    "CSV 解析失败：${result.exceptionOrNull()?.localizedMessage ?: "请确认是小熊导出的加油 CSV"}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    // 费用记录导入
+    val expenseImporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val vehicle = viewModel.currentVehicle.value ?: return@rememberLauncherForActivityResult
+
+        viewModel.viewModelScope.launch {
+            val result = XiaoxiongCsvImporter.parseExpenseCsv(context, uri, vehicle.id)
+            val records = result.getOrNull()
+            if (records != null) {
+                viewModel.importExpenseRecords(records) { importResult ->
+                    importResult.getOrNull()?.let { count ->
+                        if (count > 0) {
+                            Toast.makeText(context, "成功导入 $count 条费用记录", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "没有新记录，数据已存在", Toast.LENGTH_SHORT).show()
+                        }
+                    } ?: Toast.makeText(
+                        context,
+                        "导入失败：${importResult.exceptionOrNull()?.localizedMessage}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } else {
+                Toast.makeText(
+                    context,
+                    "CSV 解析失败：${result.exceptionOrNull()?.localizedMessage ?: "请确认是小熊导出的费用 CSV"}",
+                    Toast.LENGTH_LONG
                 ).show()
             }
         }
@@ -368,6 +443,65 @@ fun SettingsScreen(
                         }
                     )
 
+                    // ===== 小熊油耗数据（子菜单） =====
+                    NestedExpandableGroup(
+                        icon = Icons.Default.CloudDownload,
+                        expanded = isXiaoxiongExpanded,
+                        enabled = !viewModel.isBackupOperationRunning,
+                        onExpandedChange = { isXiaoxiongExpanded = !isXiaoxiongExpanded }
+                    ) {
+                        NestedActionRow(
+                            icon = Icons.Default.FileDownload,
+                            title = "导入加油 CSV",
+                            subtitle = "从小熊油耗导出的 fuel-eco-*.csv 导入",
+                            enabled = !viewModel.isBackupOperationRunning,
+                            onClick = {
+                                fuelImporter.launch(
+                                    arrayOf("text/csv", "text/comma-separated-values", "*/*")
+                                )
+                            }
+                        )
+
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            thickness = 0.6.dp,
+                            modifier = Modifier.padding(start = 48.dp)
+                        )
+
+                        NestedActionRow(
+                            icon = Icons.Default.FileDownload,
+                            title = "导入费用 CSV",
+                            subtitle = "从小熊油耗导出的 expense-*.csv 导入",
+                            enabled = !viewModel.isBackupOperationRunning,
+                            onClick = {
+                                expenseImporter.launch(
+                                    arrayOf("text/csv", "text/comma-separated-values", "*/*")
+                                )
+                            }
+                        )
+
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            thickness = 0.6.dp,
+                            modifier = Modifier.padding(start = 48.dp)
+                        )
+
+                        NestedActionRow(
+                            icon = Icons.Default.CloudDownload,
+                            title = "前往小熊网页导出",
+                            subtitle = "登录小熊油耗网页版导出 CSV，再回到本应用导入",
+                            enabled = !viewModel.isBackupOperationRunning,
+                            onClick = {
+                                val url = "https://www.xiaoxiongyouhao.com/carowner/page_data_mgr.php"
+                                try {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                                } catch (_: Exception) {
+                                    Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
+
                     if (viewModel.isBackupOperationRunning) {
                         HorizontalDivider(
                             color = MaterialTheme.colorScheme.surfaceVariant,
@@ -377,6 +511,7 @@ fun SettingsScreen(
                     }
                 }
             }
+
 
             // 主题设置
             item(key = KeyThemeSection) {
@@ -649,6 +784,7 @@ fun SettingsScreen(
     AutoScrollOnExpand(isDataExpanded, KeyDataSection, listState)
     AutoScrollOnExpand(isThemeExpanded, KeyThemeSection, listState)
     AutoScrollOnExpand(isAboutExpanded, KeyAboutSection, listState)
+    AutoScrollOnExpand(isXiaoxiongExpanded, KeyDataSection, listState)
     // 删除车辆确认弹窗
     vehicles.firstOrNull { it.id == vehicleToDeleteId }?.let { vehicle ->
         MiuiConfirmDialog(
@@ -1018,6 +1154,123 @@ private fun SettingActionRow(
         Text(
             text = "›",
             fontSize = 22.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun NestedExpandableGroup(
+    icon: ImageVector,
+    expanded: Boolean,
+    enabled: Boolean = true,
+    onExpandedChange: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled, onClick = onExpandedChange)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    // 👇 这里直接写死
+                    Text(
+                        text = "小熊油耗数据",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    // 👇 这里直接写死
+                    Text(
+                        text = "导入小熊导出的加油 / 费用 CSV，或前往网页导出",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowUp
+                else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) "收起" else "展开",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = ExpandSpec + FadeInSpec,
+            exit = ShrinkSpec + FadeOutSpec
+        ) {
+            Column { content() }
+        }
+    }
+}
+
+@Composable
+private fun NestedActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(start = 48.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Text(
+            text = "›",
+            fontSize = 20.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 8.dp)
         )
