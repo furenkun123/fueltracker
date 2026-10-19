@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,6 +69,7 @@ import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
+import com.fueltracker.ui.components.scrollToHideBottomBar
 import com.fueltracker.ui.miui.MiuiButton
 import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.ui.miui.MiuiTextIconButton
@@ -75,6 +77,7 @@ import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.ui.miui.VehicleCard
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.StatisticsSummary
+import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.flow.firstOrNull
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -93,8 +96,10 @@ private val homeRecordDateFormat by lazy {
     SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
 }
 
+// ★ 签名新增 viewModel
 @Composable
 fun HomeScreen(
+    viewModel: MainViewModel,
     vehicle: Vehicle?,
     records: List<FuelRecord>,
     latestConsumption: Double? = null,
@@ -156,11 +161,9 @@ fun HomeScreen(
     var customYear by remember {
         mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR))
     }
-    // customMonth: 0 = 全年，1-12 = 具体月份
     var customMonth by remember { mutableIntStateOf(0) }
     var showYearMonthPicker by remember { mutableStateOf(false) }
 
-    // 只显示已有记录的年份（从加油记录中提取）
     val availableYears = remember(sortedRecords) {
         val years = sortedRecords
             .map {
@@ -194,6 +197,9 @@ fun HomeScreen(
     }
     // ------------------------------------------------
 
+    val listState = rememberLazyListState()
+
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             MiuiTopBar {
@@ -205,9 +211,11 @@ fun HomeScreen(
             }
 
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .weight(1f)
+                    .scrollToHideBottomBar(listState, viewModel),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(top = 12.dp, bottom = 100.dp)
             ) {
@@ -230,7 +238,6 @@ fun HomeScreen(
                             )
                         }
                     }
-
 
                     item {
                         ConsumptionCard(
@@ -283,54 +290,61 @@ fun HomeScreen(
             }
         }
 
+        // ★ 修复了大括号和多余的 align
         if (vehicle != null) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.End
+            AnimatedVisibility(
+                visible = viewModel.isBottomBarVisible,
+                enter = fadeIn() + scaleIn(initialScale = 0.8f),
+                exit = fadeOut() + scaleOut(targetScale = 0.8f),
+                modifier = Modifier.align(Alignment.BottomEnd)
             ) {
-                // 展开后的两个子按钮
-                AnimatedVisibility(
-                    visible = fabExpanded,
-                    enter = fadeIn() + scaleIn(initialScale = 0.8f),
-                    exit = fadeOut() + scaleOut(targetScale = 0.8f)
+                Column(
+                    modifier = Modifier
+                        .padding(end = 16.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.End
                 ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalAlignment = Alignment.End
+                    // 展开后的两个子按钮
+                    AnimatedVisibility(
+                        visible = fabExpanded,
+                        enter = fadeIn() + scaleIn(initialScale = 0.8f),
+                        exit = fadeOut() + scaleOut(targetScale = 0.8f)
                     ) {
-                        FabActionItem(
-                            icon = "🅿",
-                            label = "停车",
-                            onClick = {
-                                fabExpanded = false
-                                onAddParking()
-                            }
-                        )
-                        FabActionItem(
-                            icon = "⛽",
-                            label = "加油",
-                            onClick = {
-                                fabExpanded = false
-                                onAddFuel()
-                            }
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            FabActionItem(
+                                icon = "🅿",
+                                label = "停车",
+                                onClick = {
+                                    fabExpanded = false
+                                    onAddParking()
+                                }
+                            )
+                            FabActionItem(
+                                icon = "⛽",
+                                label = "加油",
+                                onClick = {
+                                    fabExpanded = false
+                                    onAddFuel()
+                                }
+                            )
+                        }
+                    }
+
+                    // 主按钮
+                    FloatingActionButton(
+                        onClick = { fabExpanded = !fabExpanded },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            imageVector = if (fabExpanded) Icons.Default.Close else Icons.Default.Add,
+                            contentDescription = if (fabExpanded) "收起" else "展开"
                         )
                     }
-                }
-
-                // 主按钮
-                FloatingActionButton(
-                    onClick = { fabExpanded = !fabExpanded },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        imageVector = if (fabExpanded) Icons.Default.Close else Icons.Default.Add,
-                        contentDescription = if (fabExpanded) "收起" else "展开"
-                    )
                 }
             }
         }
@@ -351,6 +365,7 @@ fun HomeScreen(
         )
     }
 }
+
 
 // =================================================
 // 无车辆

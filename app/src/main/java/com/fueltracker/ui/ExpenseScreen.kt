@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,6 +72,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import com.fueltracker.ui.components.scrollToHideBottomBar
+
 private val expenseDateFormat by lazy {
     SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
 }
@@ -197,6 +200,9 @@ fun ExpenseScreen(
 
     val isEmpty = expenses.isEmpty() && fuelRecords.none { !it.isInitialRecord }
 
+    val listState = rememberLazyListState()
+
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -233,11 +239,12 @@ fun ExpenseScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        top = 8.dp,
-                        bottom = 100.dp
-                    ),
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxSize()
+                        .scrollToHideBottomBar(listState, viewModel),                     // ★ 放到最后
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item(key = "summary") {
@@ -338,6 +345,7 @@ fun ExpenseScreen(
                                         onDelete = { deletingFuel = item.record }
                                     )
                                 }
+
                                 is ExpenseListItem.Expense -> {
                                     ExpenseItemCard(
                                         record = item.record,
@@ -351,19 +359,30 @@ fun ExpenseScreen(
                 }
             }
 
-            FloatingActionButton(
-                onClick = onAddExpense,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 24.dp),
-                containerColor = Color(0xFFFF9500),
-                contentColor = Color.White,
-                shape = CircleShape
+            androidx.compose.animation.AnimatedVisibility(
+                visible = viewModel.isBottomBarVisible,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(
+                    initialScale = 0.8f
+                ),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(
+                    targetScale = 0.8f
+                ),
+                modifier = Modifier.align(Alignment.BottomEnd)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Receipt,
-                    contentDescription = "记费用"
-                )
+                FloatingActionButton(
+                    onClick = onAddExpense,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 24.dp),
+                    containerColor = Color(0xFFFF9500),
+                    contentColor = Color.White,
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Receipt,
+                        contentDescription = "记费用"
+                    )
+                }
             }
         }
     }

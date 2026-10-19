@@ -161,27 +161,34 @@ fun FuelTrackerApp(
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             bottomBar = {
-                MiuiNavigationBar {
-                    MiuiNavigationItem(
-                        selected = screen == AppScreen.HOME,
-                        onClick = { viewModel.navigateTo(AppScreen.HOME) },
-                        icon = Icons.Default.Home,
-                        label = "首页"
-                    )
+                // 包裹底栏，加平滑动画
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = viewModel.isBottomBarVisible,
+                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                ) {
+                    MiuiNavigationBar {
+                        MiuiNavigationItem(
+                            selected = screen == AppScreen.HOME,
+                            onClick = { viewModel.navigateTo(AppScreen.HOME) },
+                            icon = Icons.Default.Home,
+                            label = "首页"
+                        )
 
-                    MiuiNavigationItem(
-                        selected = screen == AppScreen.RECORDS,
-                        onClick = { viewModel.navigateTo(AppScreen.RECORDS) },
-                        icon = Icons.Default.LocalGasStation,
-                        label = "记录"
-                    )
+                        MiuiNavigationItem(
+                            selected = screen == AppScreen.RECORDS,
+                            onClick = { viewModel.navigateTo(AppScreen.RECORDS) },
+                            icon = Icons.Default.LocalGasStation,
+                            label = "记录"
+                        )
 
-                    MiuiNavigationItem(
-                        selected = screen == AppScreen.EXPENSES,
-                        onClick = { viewModel.navigateTo(AppScreen.EXPENSES) },
-                        icon = Icons.Default.Receipt,
-                        label = "费用"
-                    )
+                        MiuiNavigationItem(
+                            selected = screen == AppScreen.EXPENSES,
+                            onClick = { viewModel.navigateTo(AppScreen.EXPENSES) },
+                            icon = Icons.Default.Receipt,
+                            label = "费用"
+                        )
+                    }
                 }
             }
         ) { padding ->
@@ -198,6 +205,7 @@ fun FuelTrackerApp(
                         val average by viewModel.averageConsumption.collectAsState()
 
                         HomeScreen(
+                            viewModel = viewModel,
                             vehicle = vehicle,
                             records = records,
                             latestConsumption = latest,
@@ -259,11 +267,12 @@ fun FuelTrackerApp(
                                     AppScreen.EXPENSES
                                 )
                             },
-                            onEditFuel = { record ->
-                                viewModel.editFuel(record, AppScreen.EXPENSES)
-                            }
-                        )
+                        onEditFuel = { record ->
+                            viewModel.editFuel(record, AppScreen.EXPENSES)
+                        })
                     }
+
+
 
                     else -> {
                         // 理论不可达（showBottomBar 已过滤），兜底不做任何事

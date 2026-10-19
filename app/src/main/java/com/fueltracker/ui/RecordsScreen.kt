@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,12 +30,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.fueltracker.data.FuelRecord
+import com.fueltracker.ui.components.scrollToHideBottomBar
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.IntervalConfidence
@@ -69,7 +68,6 @@ private val RECORD_DATE_FORMAT by lazy {
     SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordsScreen(
     viewModel: MainViewModel,
@@ -78,12 +76,12 @@ fun RecordsScreen(
     val records by viewModel.records.collectAsState()
     val vehicle by viewModel.currentVehicle.collectAsState()
 
-    // 油耗结果统一只计算一次，后面的统计和卡片全部复用
+    val listState = rememberLazyListState()
+
     val consumptionMap: Map<Long, ConsumptionResult> = remember(records, vehicle) {
         FuelCalculator.calculateMap(records, vehicle)
     }
 
-    // 当前系统时间与可选年份
     val now = remember { Calendar.getInstance() }
     val currentYear = remember(now) { now.get(Calendar.YEAR) }
 
@@ -92,7 +90,7 @@ fun RecordsScreen(
 
     var selectedYear by remember { mutableIntStateOf(currentYear) }
     var selectedMonth by remember { mutableIntStateOf(now.get(Calendar.MONTH) + 1) }
-    var selectedDay by remember { mutableIntStateOf(0) } // 0 = 全月
+    var selectedDay by remember { mutableIntStateOf(0) }
 
     val availableYears = remember(records, currentYear, selectedYear) {
         val recordYears = records.map {
@@ -101,7 +99,6 @@ fun RecordsScreen(
         (recordYears + currentYear + selectedYear).distinct().sortedDescending()
     }
 
-    // 筛选后的记录（按时间倒序）
     val displayRecords = remember(records, filterType, selectedYear, selectedMonth, selectedDay) {
         val sorted = records.sortedByDescending { it.timestamp }
 
@@ -127,79 +124,72 @@ fun RecordsScreen(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "全部加油记录",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
+    // ★ 核心改动：外层用 Column 包裹
+    Column(modifier = Modifier.fillMaxSize()) {
 
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
-        }
-    ) { padding ->
-        Column(
+        // 1. 固定不动的标题
+        Text(
+            text = "全部加油记录",
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+                .statusBarsPadding() // 留出状态栏空间
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+        )
+
+        // 2. 剩下的部分放进 LazyColumn，并加上 weight(1f) 占满剩余空间
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f) // 必须有这个，它才能占满下方剩余空间
+                .scrollToHideBottomBar(listState, viewModel),
+            contentPadding = PaddingValues(bottom = 100.dp)
         ) {
-            // 1. 顶部筛选胶囊条
-            RecordFilterBar(
-                filterType = filterType,
-                year = selectedYear,
-                month = selectedMonth,
-                day = selectedDay,
-                onFilterChange = { filterType = it },
-                onMonthClick = { showDatePicker = true }
-            )
+            // 筛选条
+            item(key = "filter_bar") {
+                RecordFilterBar(
+                    filterType = filterType,
+                    year = selectedYear,
+                    month = selectedMonth,
+                    day = selectedDay,
+                    onFilterChange = { filterType = it },
+                    onMonthClick = { showDatePicker = true }
+                )
+            }
 
-            // 2. 统计概览卡片
-            RecordStatistics(
-                displayRecords = displayRecords,
-                consumptionMap = consumptionMap
-            )
+            // 统计概览卡片
+            item(key = "statistics") {
+                RecordStatistics(
+                    displayRecords = displayRecords,
+                    consumptionMap = consumptionMap
+                )
+            }
 
-            Spacer(modifier = Modifier.height(2.dp))
+            item(key = "spacer") { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // 3. 记录列表或空状态
+            // 记录列表或空状态
             if (displayRecords.isEmpty()) {
-                EmptyRecordsState(modifier = Modifier.weight(1f))
+                item(key = "empty_state") {
+                    EmptyRecordsState(modifier = Modifier.fillMaxWidth().height(300.dp))
+                }
             } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    item { Spacer(modifier = Modifier.height(2.dp)) }
-
-                    items(
-                        items = displayRecords,
-                        key = { it.id }
-                    ) { record ->
-                        FuelRecordCard(
-                            record = record,
-                            calculationResult = consumptionMap[record.id],
-                            onDelete = { viewModel.deleteRecord(record) },
-                            onEdit = { onEdit(record) }
-                        )
-                    }
-
-                    item { Spacer(modifier = Modifier.height(16.dp)) }
+                items(
+                    items = displayRecords,
+                    key = { it.id }
+                ) { record ->
+                    FuelRecordCard(
+                        record = record,
+                        calculationResult = consumptionMap[record.id],
+                        onDelete = { viewModel.deleteRecord(record) },
+                        onEdit = { onEdit(record) }
+                    )
                 }
             }
         }
     }
 
-    // 时间选择底部弹窗
     if (showDatePicker) {
         DatePicker3WheelSheet(
             initialYear = selectedYear,
@@ -217,6 +207,11 @@ fun RecordsScreen(
         )
     }
 }
+
+// =================================================
+// 以下组件（MiuixCard、RecordStatistics、RecordFilterBar 等）
+// 保持你原来的代码即可，完全不用动。
+// =================================================
 
 // =================================================
 // 基础卡片封装 (MIUI / HyperOS 风格)

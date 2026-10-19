@@ -89,10 +89,22 @@ class MainViewModel(
     var isBackupOperationRunning by mutableStateOf(false)
         private set
 
+    // 控制底栏和悬浮按钮是否显示
+    var isBottomBarVisible by mutableStateOf(true)
+        private set
+
+    fun updateBottomBarVisibility(visible: Boolean) {
+        if (isBottomBarVisible != visible) {
+            isBottomBarVisible = visible
+        }
+    }
+
     // ---------- 导航方法 ----------
 
     fun navigateTo(screen: AppScreen) {
         currentScreen = screen
+        // 切换页面时，强制显示底栏和 FAB
+        isBottomBarVisible = true
     }
 
     fun updateExpenseSelectedCategory(category: String?) {
