@@ -491,8 +491,7 @@ private fun UpdateLogDialog(
             color = MaterialTheme.colorScheme.surface,
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 16.dp, vertical = 48.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -511,7 +510,7 @@ private fun UpdateLogDialog(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .weight(1f,fill = false),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     entries.forEach { entry ->

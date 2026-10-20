@@ -497,7 +497,6 @@ fun FuelScreen(
                             if (checked && tankCapacity > 0) {
                                 remainingFuel = formatNumber(tankCapacity)
                             } else if (!checked) {
-                                // 修复：取消勾选时清空剩余油量，防止产生矛盾数据
                                 remainingFuel = ""
                             }
                         }
