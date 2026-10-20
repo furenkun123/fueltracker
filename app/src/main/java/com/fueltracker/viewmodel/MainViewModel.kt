@@ -1,6 +1,8 @@
 package com.fueltracker.viewmodel
 
 import android.app.Application
+import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,10 +13,12 @@ import androidx.room.withTransaction
 import com.fueltracker.AppScreen
 import com.fueltracker.data.AppDatabase
 import com.fueltracker.data.CATEGORY_PARKING
+import com.fueltracker.data.ExpenseCategoryStore
 import com.fueltracker.data.ExpenseDao
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
+import com.fueltracker.util.BackupManager
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.StatisticsSummary
 import kotlinx.coroutines.Dispatchers
@@ -24,15 +28,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import android.net.Uri
-import android.content.Context
-import com.fueltracker.util.BackupManager
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 
 class MainViewModel(
     application: Application
@@ -43,53 +45,50 @@ class MainViewModel(
     private val fuelDao = database.fuelDao()
     private val expenseDao: ExpenseDao = database.expenseDao()
 
-    // 内存即时临时状态（用于消除切车/加车时的 UI 延迟）
+    companion object {
+        private const val TAG = "MainViewModel"
+    }
+
+    /**
+     * 临时车辆状态，用于降低切换车辆时的 UI 延迟。
+     *
+     * 注意：数据库提交成功后，最终状态仍以数据库为准。
+     */
     private val _currentVehicleOverride = MutableStateFlow<Vehicle?>(null)
 
-    // StateFlow 统一订阅超时策略（切后台 5 秒后切断 DB 监听，节省系统资源）
     private val stopTimeout = 5_000L
 
-    // =========================
-    // 导航状态（配置变更时保留）
-    // =========================
+    // =========================================================
+    // 导航状态
+    // =========================================================
 
-    /** 当前显示的页面 */
     var currentScreen by mutableStateOf(AppScreen.HOME)
         private set
 
-    /** 费用页选中的分类（null = 不筛选） */
     var expenseSelectedCategory by mutableStateOf<String?>(null)
         private set
 
-    /** 编辑加油的"来源"页面，返回时回到这里 */
     var editFuelOrigin by mutableStateOf(AppScreen.RECORDS)
         private set
 
-    /** 编辑费用的"来源"页面（EDIT_EXPENSE 回 EXPENSES，EDIT_PARKING 回 HOME） */
     var editExpenseOrigin by mutableStateOf(AppScreen.EXPENSES)
         private set
 
-    /** 添加车辆的来源页面（首页 or 设置页） */
     var addVehicleOrigin by mutableStateOf(AppScreen.HOME)
         private set
 
-    /** 当前正在编辑的加油记录 */
     var editingRecord by mutableStateOf<FuelRecord?>(null)
         private set
 
-    /** 当前正在编辑的车辆 */
     var editingVehicle by mutableStateOf<Vehicle?>(null)
         private set
 
-    /** 当前正在编辑的费用记录（含停车） */
     var editingExpense by mutableStateOf<ExpenseRecord?>(null)
         private set
 
-    /** 备份/恢复正在运行 */
     var isBackupOperationRunning by mutableStateOf(false)
         private set
 
-    // 控制底栏和悬浮按钮是否显示
     var isBottomBarVisible by mutableStateOf(true)
         private set
 
@@ -99,11 +98,8 @@ class MainViewModel(
         }
     }
 
-    // ---------- 导航方法 ----------
-
     fun navigateTo(screen: AppScreen) {
         currentScreen = screen
-        // 切换页面时，强制显示底栏和 FAB
         isBottomBarVisible = true
     }
 
@@ -143,43 +139,40 @@ class MainViewModel(
         editingExpense = null
     }
 
-
-    // =========================
+    // =========================================================
     // 数据流
-    // =========================
+    // =========================================================
 
-    // 所有已添加的车辆列表
     val vehicles: StateFlow<List<Vehicle>> = vehicleDao
         .observeAllVehicles()
         .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(stopTimeout),
-            emptyList()
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeout),
+            initialValue = emptyList()
         )
 
-    // 当前选中的车辆
     val currentVehicle: StateFlow<Vehicle?> = combine(
         vehicleDao.observeCurrentVehicle(),
         _currentVehicleOverride,
         vehicles
-    ) { dbVehicle: Vehicle?, overrideVehicle: Vehicle?, allVehicles: List<Vehicle> ->
-        val resolved = overrideVehicle ?: dbVehicle
-        ?: allVehicles.find { it.isCurrent }
-        ?: allVehicles.firstOrNull()
+    ) { dbVehicle, overrideVehicle, allVehicles ->
 
-        // 当数据库返回的新状态与内存 Override 的 ID 相符时，清除 Override，恢复单源真理 (SSOT)
-        if (overrideVehicle != null && dbVehicle?.id == overrideVehicle.id) {
-            _currentVehicleOverride.value = null
-        }
+        val resolved = overrideVehicle
+            ?: dbVehicle
+            ?: allVehicles.firstOrNull { it.isCurrent }
+            ?: allVehicles.firstOrNull()
 
+        /*
+         * 不在 combine 转换函数中修改 MutableStateFlow。
+         * 这里仅返回最终展示值，避免转换过程产生额外状态写入。
+         */
         resolved
     }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(stopTimeout),
-        null
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(stopTimeout),
+        initialValue = null
     )
 
-    // 加油记录（依据当前选中的车辆动态响应）
     @OptIn(ExperimentalCoroutinesApi::class)
     val records: StateFlow<List<FuelRecord>> = currentVehicle
         .flatMapLatest { vehicle ->
@@ -190,12 +183,11 @@ class MainViewModel(
             }
         }
         .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(stopTimeout),
-            emptyList()
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeout),
+            initialValue = emptyList()
         )
 
-    // 费用记录
     @OptIn(ExperimentalCoroutinesApi::class)
     val expenses: StateFlow<List<ExpenseRecord>> = currentVehicle
         .flatMapLatest { vehicle ->
@@ -206,14 +198,11 @@ class MainViewModel(
             }
         }
         .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(stopTimeout),
-            emptyList()
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeout),
+            initialValue = emptyList()
         )
 
-    /**
-     * 当前激活的停车记录（最多一条），首页"当前车位"卡片用。
-     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val activeParking: StateFlow<ExpenseRecord?> = currentVehicle
         .flatMapLatest { vehicle ->
@@ -224,18 +213,15 @@ class MainViewModel(
             }
         }
         .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(stopTimeout),
-            null
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeout),
+            initialValue = null
         )
 
-    // =========================
-    // 油耗计算 StateFlow
-    // =========================
+    // =========================================================
+    // 油耗统计
+    // =========================================================
 
-    /**
-     * 完整统计指标汇总对象（提供给 UI 统计大卡片使用）
-     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val statisticsSummary: StateFlow<StatisticsSummary?> = currentVehicle
         .flatMapLatest { vehicle ->
@@ -256,14 +242,11 @@ class MainViewModel(
         }
         .flowOn(Dispatchers.Default)
         .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(stopTimeout),
-            null
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeout),
+            initialValue = null
         )
 
-    /**
-     * 最新油耗（优先返回非离群、置信度不低于 LOW 的真实油耗）
-     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val latestConsumption: StateFlow<Double?> = currentVehicle
         .flatMapLatest { vehicle ->
@@ -280,99 +263,281 @@ class MainViewModel(
         }
         .flowOn(Dispatchers.Default)
         .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(stopTimeout),
-            null
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeout),
+            initialValue = null
         )
 
-    /**
-     * 平均油耗
-     */
     val averageConsumption: StateFlow<Double?> = statisticsSummary
         .map { it?.averageConsumption }
         .flowOn(Dispatchers.Default)
         .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(stopTimeout),
-            null
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeout),
+            initialValue = null
         )
 
-    // =========================
-    // 车辆操作
-    // =========================
+    // =========================================================
+    // 通用校验辅助方法
+    // =========================================================
 
-    /**
-     * 添加新车辆并将新车辆设为当前车辆
-     */
-    fun addVehicle(vehicle: Vehicle, onComplete: (() -> Unit)? = null) {
-        viewModelScope.launch {
-            val newId = vehicleDao.insertAsCurrent(vehicle)
-            val newVehicle = vehicle.copy(id = newId, isCurrent = true)
-            _currentVehicleOverride.value = newVehicle
-            onComplete?.invoke()
+    private fun requireFiniteNonNegative(
+        value: Double,
+        fieldName: String
+    ) {
+        require(value.isFinite() && value >= 0.0) {
+            "${fieldName}必须是有效的非负数"
+        }
+    }
+
+    private fun requireNullableFiniteNonNegative(
+        value: Double?,
+        fieldName: String
+    ) {
+        if (value != null) {
+            requireFiniteNonNegative(value, fieldName)
         }
     }
 
     /**
-     * 切换当前激活的车辆
+     * 校验加油记录的数值。
+     *
+     * 初始记录允许油量、金额和单价为 0；
+     * 普通加油记录要求加油量大于 0。
+     */
+    private fun validateFuelRecord(record: FuelRecord) {
+        require(record.timestamp > 0L) {
+            "加油时间无效"
+        }
+
+        requireFiniteNonNegative(record.volume, "加油量")
+        requireFiniteNonNegative(record.actualPaidAmount, "实付金额")
+        requireFiniteNonNegative(record.unitPrice, "单价")
+
+        requireNullableFiniteNonNegative(record.odometer, "里程")
+        requireNullableFiniteNonNegative(record.totalAmount, "原价")
+        requireNullableFiniteNonNegative(record.discount, "优惠金额")
+        requireNullableFiniteNonNegative(record.remainingFuel, "剩余油量")
+        requireNullableFiniteNonNegative(record.initialFuel, "初始油量")
+        requireNullableFiniteNonNegative(record.missedOdometer, "漏记里程")
+        requireNullableFiniteNonNegative(record.missedVolume, "漏记加油量")
+        requireNullableFiniteNonNegative(record.consumption, "油耗")
+
+        if (!record.isInitialRecord) {
+            require(record.volume > 0.0) {
+                "加油量必须大于 0"
+            }
+        }
+
+        if (record.hasMissedRecord) {
+            require(
+                record.missedOdometer == null ||
+                        record.missedOdometer.isFinite()
+            ) {
+                "漏记里程无效"
+            }
+
+            require(
+                record.missedVolume == null ||
+                        record.missedVolume.isFinite()
+            ) {
+                "漏记加油量无效"
+            }
+        }
+    }
+
+    /**
+     * 直接查询数据库，而不是依赖可能尚未订阅或尚未刷新的 StateFlow。
+     */
+    private suspend fun getCurrentVehicleFromDatabase(): Vehicle? {
+        val allVehicles = vehicleDao.getAllVehicles()
+
+        return allVehicles.firstOrNull { it.isCurrent }
+            ?: currentVehicle.value?.let { current ->
+                allVehicles.firstOrNull { it.id == current.id }
+            }
+            ?: allVehicles.firstOrNull()
+    }
+
+    private suspend fun requireVehicleExists(vehicleId: Long): Vehicle {
+        require(vehicleId > 0L) {
+            "车辆 ID 无效"
+        }
+
+        return vehicleDao.getVehicleById(vehicleId)
+            ?: throw IllegalArgumentException("车辆不存在：$vehicleId")
+    }
+
+    // =========================================================
+    // 车辆操作
+    // =========================================================
+
+    /**
+     * 添加车辆并将其设为当前车辆。
+     *
+     * 保留原有回调签名。失败时记录日志，不会让协程异常直接崩溃。
+     */
+    fun addVehicle(
+        vehicle: Vehicle,
+        onComplete: (() -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                val newId = vehicleDao.insertAsCurrent(
+                    vehicle.copy(isCurrent = true)
+                )
+
+                val newVehicle = vehicle.copy(
+                    id = newId,
+                    isCurrent = true
+                )
+
+                _currentVehicleOverride.value = newVehicle
+                onComplete?.invoke()
+            } catch (e: Exception) {
+                Log.e(TAG, "addVehicle failed", e)
+            }
+        }
+    }
+
+    /**
+     * 切换当前车辆。
      */
     fun setCurrentVehicle(targetVehicle: Vehicle) {
-        if (targetVehicle.isCurrent || currentVehicle.value?.id == targetVehicle.id) return
         viewModelScope.launch {
-            _currentVehicleOverride.value = targetVehicle.copy(isCurrent = true)
-            vehicleDao.setCurrentVehicle(targetVehicle.id)
+            val previousOverride = _currentVehicleOverride.value
+
+            try {
+                val actualVehicle = vehicleDao.getVehicleById(targetVehicle.id)
+                    ?: throw IllegalArgumentException(
+                        "目标车辆不存在：${targetVehicle.id}"
+                    )
+
+                if (
+                    actualVehicle.isCurrent &&
+                    currentVehicle.value?.id == actualVehicle.id
+                ) {
+                    _currentVehicleOverride.value = null
+                    return@launch
+                }
+
+                // 先更新 UI，减少切车延迟。
+                _currentVehicleOverride.value = actualVehicle.copy(
+                    isCurrent = true
+                )
+
+                vehicleDao.setCurrentVehicle(actualVehicle.id)
+
+                /*
+                 * 不在这里立即清空 override。
+                 * 等数据库车辆流返回一致状态后，再由下方的同步逻辑清理。
+                 */
+                clearOverrideWhenDatabaseMatches(actualVehicle.id)
+            } catch (e: Exception) {
+                Log.e(TAG, "setCurrentVehicle failed", e)
+                _currentVehicleOverride.value = previousOverride
+            }
         }
     }
 
     /**
-     * 修改/更新车辆基本信息
+     * 当数据库确认目标车辆已成为当前车辆时，清理临时覆盖状态。
+     */
+    private suspend fun clearOverrideWhenDatabaseMatches(vehicleId: Long) {
+        val actualVehicle = vehicleDao.getVehicleById(vehicleId) ?: return
+
+        if (actualVehicle.isCurrent) {
+            _currentVehicleOverride.value = null
+        }
+    }
+
+    /**
+     * 修改车辆信息。
      */
     fun updateVehicle(vehicle: Vehicle) {
         viewModelScope.launch {
-            if (currentVehicle.value?.id == vehicle.id || _currentVehicleOverride.value?.id == vehicle.id) {
-                _currentVehicleOverride.value = vehicle
+            val previousOverride = _currentVehicleOverride.value
+
+            try {
+                val oldVehicle = vehicleDao.getVehicleById(vehicle.id)
+                    ?: throw IllegalArgumentException(
+                        "车辆不存在：${vehicle.id}"
+                    )
+
+                val updatedVehicle = vehicle.copy(
+                    isCurrent = oldVehicle.isCurrent
+                )
+
+                if (
+                    currentVehicle.value?.id == vehicle.id ||
+                    previousOverride?.id == vehicle.id
+                ) {
+                    _currentVehicleOverride.value = updatedVehicle
+                }
+
+                vehicleDao.update(updatedVehicle)
+            } catch (e: Exception) {
+                Log.e(TAG, "updateVehicle failed", e)
+                _currentVehicleOverride.value = previousOverride
             }
-            vehicleDao.update(vehicle)
         }
     }
 
     /**
-     * 删除车辆及其关联的所有加油记录
+     * 删除车辆及其加油、费用记录。
+     *
+     * 查询待接替车辆、删除关联数据和更新当前车辆均在同一个事务中完成。
      */
     fun deleteVehicle(vehicle: Vehicle) {
         viewModelScope.launch {
-            val isDeletingCurrent = (currentVehicle.value?.id == vehicle.id) ||
-                    (_currentVehicleOverride.value?.id == vehicle.id) ||
-                    vehicle.isCurrent
+            val oldOverride = _currentVehicleOverride.value
 
-            // 先把下一辆候选拿出来（事务外查询，减少锁窗口）
-            val nextVehicle = if (isDeletingCurrent) {
-                vehicleDao.getAnotherVehicle(vehicle.id)
-            } else {
-                null
-            }
+            try {
+                val result = database.withTransaction {
+                    val actualVehicle = vehicleDao.getVehicleById(vehicle.id)
+                        ?: return@withTransaction Pair(false, null)
 
-            // 删除 + 切换 current，放在一个事务里
-            database.withTransaction {
-                fuelDao.deleteByVehicleId(vehicle.id)
-                expenseDao.deleteByVehicleId(vehicle.id)
-                vehicleDao.delete(vehicle)
+                    val wasCurrent =
+                        actualVehicle.isCurrent ||
+                                currentVehicle.value?.id == actualVehicle.id ||
+                                oldOverride?.id == actualVehicle.id
 
-                if (isDeletingCurrent && nextVehicle != null) {
-                    vehicleDao.setCurrentVehicle(nextVehicle.id)
+                    // 必须在事务内部查询候选车辆，避免使用事务外的过期数据。
+                    val nextVehicle = if (wasCurrent) {
+                        vehicleDao.getAnotherVehicle(actualVehicle.id)
+                    } else {
+                        null
+                    }
+
+                    fuelDao.deleteByVehicleId(actualVehicle.id)
+                    expenseDao.deleteByVehicleId(actualVehicle.id)
+                    vehicleDao.delete(actualVehicle)
+
+                    if (wasCurrent && nextVehicle != null) {
+                        vehicleDao.setCurrentVehicle(nextVehicle.id)
+                    }
+
+                    Pair(wasCurrent, nextVehicle)
                 }
-            }
 
-            // 事务提交后再同步内存 override
-            if (isDeletingCurrent) {
-                _currentVehicleOverride.value = nextVehicle?.copy(isCurrent = true)
+                val wasCurrent = result.first
+                val nextVehicle = result.second
+
+                if (wasCurrent) {
+                    _currentVehicleOverride.value = nextVehicle?.copy(
+                        isCurrent = true
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "deleteVehicle failed", e)
+                _currentVehicleOverride.value = oldOverride
             }
         }
     }
 
-    // =========================
+    // =========================================================
     // 加油记录操作
-    // =========================
+    // =========================================================
 
     fun addFuelRecord(
         record: FuelRecord,
@@ -380,19 +545,25 @@ class MainViewModel(
     ) {
         viewModelScope.launch {
             try {
-                val vehicle = currentVehicle.value
+                validateFuelRecord(record)
+
+                val vehicle = getCurrentVehicleFromDatabase()
                     ?: throw IllegalStateException("没有当前车辆")
 
                 val defaultFuelGrade = vehicle.fuelGrade
-                fuelDao.insert(
-                    record.copy(
-                        vehicleId = vehicle.id,
-                        fuelGrade = record.fuelGrade.ifBlank { defaultFuelGrade }
-                    )
+                val recordToInsert = record.copy(
+                    id = 0L,
+                    vehicleId = vehicle.id,
+                    fuelGrade = record.fuelGrade.ifBlank {
+                        defaultFuelGrade
+                    }
                 )
+
+                fuelDao.insert(recordToInsert)
+
                 onComplete(Result.success(Unit))
             } catch (e: Exception) {
-                Log.e("MainViewModel", "addFuelRecord failed", e)
+                Log.e(TAG, "addFuelRecord failed", e)
                 onComplete(Result.failure(e))
             }
         }
@@ -404,10 +575,29 @@ class MainViewModel(
     ) {
         viewModelScope.launch {
             try {
+                require(record.id > 0L) {
+                    "加油记录 ID 无效"
+                }
+
+                validateFuelRecord(record)
+
+                val existing = fuelDao.getRecordById(record.id)
+                    ?: throw IllegalArgumentException(
+                        "加油记录不存在：${record.id}"
+                    )
+
+                // 防止编辑时意外把记录移动到另一辆车。
+                require(record.vehicleId == existing.vehicleId) {
+                    "不能通过编辑加油记录更改所属车辆"
+                }
+
+                requireVehicleExists(existing.vehicleId)
+
                 fuelDao.update(record)
+
                 onComplete(Result.success(Unit))
             } catch (e: Exception) {
-                Log.e("MainViewModel", "updateFuelRecord failed", e)
+                Log.e(TAG, "updateFuelRecord failed", e)
                 onComplete(Result.failure(e))
             }
         }
@@ -415,17 +605,24 @@ class MainViewModel(
 
     fun deleteRecord(record: FuelRecord) {
         viewModelScope.launch {
-            fuelDao.delete(record)
+            try {
+                val existing = fuelDao.getRecordById(record.id) ?: return@launch
+                fuelDao.delete(existing)
+            } catch (e: Exception) {
+                Log.e(TAG, "deleteRecord failed", e)
+            }
         }
     }
 
-    // =========================
+    // =========================================================
     // 费用操作
-    // =========================
+    // =========================================================
 
     /**
-     * 添加费用记录。
-     * 停车且 isActive=true 时，会先把该车之前的激活停车记录清掉。
+     * 新增费用。
+     *
+     * 激活停车记录通过 DAO 事务方法写入，避免先停用旧停车记录、
+     * 后续插入失败导致当前停车状态丢失。
      */
     fun addExpense(
         record: ExpenseRecord,
@@ -433,17 +630,32 @@ class MainViewModel(
     ) {
         viewModelScope.launch {
             try {
-                val vehicle = currentVehicle.value
+                val vehicle = getCurrentVehicleFromDatabase()
                     ?: throw IllegalStateException("没有当前车辆")
 
-                if (record.category == CATEGORY_PARKING && record.isActive) {
-                    expenseDao.deactivateAllParking(vehicle.id)
+                require(record.timestamp > 0L) {
+                    "费用时间无效"
                 }
 
-                expenseDao.insert(record.copy(vehicleId = vehicle.id))
+                requireFiniteNonNegative(record.amount, "费用金额")
+
+                val recordToInsert = record.copy(
+                    id = 0L,
+                    vehicleId = vehicle.id
+                )
+
+                if (
+                    recordToInsert.category == CATEGORY_PARKING &&
+                    recordToInsert.isActive
+                ) {
+                    expenseDao.insertParkingAsActive(recordToInsert)
+                } else {
+                    expenseDao.insert(recordToInsert)
+                }
+
                 onComplete(Result.success(Unit))
             } catch (e: Exception) {
-                Log.e("MainViewModel", "addExpense failed", e)
+                Log.e(TAG, "addExpense failed", e)
                 onComplete(Result.failure(e))
             }
         }
@@ -455,10 +667,46 @@ class MainViewModel(
     ) {
         viewModelScope.launch {
             try {
-                expenseDao.update(record)
+                require(record.id > 0L) {
+                    "费用记录 ID 无效"
+                }
+
+                require(record.timestamp > 0L) {
+                    "费用时间无效"
+                }
+
+                requireFiniteNonNegative(record.amount, "费用金额")
+
+                val existing = expenseDao.getById(record.id)
+                    ?: throw IllegalArgumentException(
+                        "费用记录不存在：${record.id}"
+                    )
+
+                // 编辑记录不允许改变所属车辆。
+                require(record.vehicleId == existing.vehicleId) {
+                    "不能通过编辑费用记录更改所属车辆"
+                }
+
+                requireVehicleExists(existing.vehicleId)
+
+                if (
+                    record.category == CATEGORY_PARKING &&
+                    record.isActive
+                ) {
+                    expenseDao.updateParkingAsActive(record)
+                } else {
+                    val updatedRows = expenseDao.update(record)
+
+                    if (updatedRows != 1) {
+                        throw IllegalStateException(
+                            "费用记录不存在或更新失败：${record.id}"
+                        )
+                    }
+                }
+
                 onComplete(Result.success(Unit))
             } catch (e: Exception) {
-                Log.e("MainViewModel", "updateExpense failed", e)
+                Log.e(TAG, "updateExpense failed", e)
                 onComplete(Result.failure(e))
             }
         }
@@ -466,72 +714,218 @@ class MainViewModel(
 
     fun deleteExpense(record: ExpenseRecord) {
         viewModelScope.launch {
-            expenseDao.delete(record)
+            try {
+                val existing = expenseDao.getById(record.id) ?: return@launch
+                expenseDao.delete(existing)
+            } catch (e: Exception) {
+                Log.e(TAG, "deleteExpense failed", e)
+            }
+        }
+    }
+    // =========================================================
+    // 费用分类操作
+    // =========================================================
+
+    // 1. 改成小驼峰命名
+    private val defaultExpenseCategories = listOf(
+        "加油", "停车", "高速", "保养", "保险", "维修", "洗车", "其他"
+    )
+
+    /**
+     * 重命名自定义分类。
+     * 重点保障：前置校验必须与 ExpenseCategoryStore 内部规则绝对一致，
+     * 避免 database.withTransaction 成功，但 Store 静默失败导致数据不一致。
+     */
+    fun renameExpenseCategory(
+        oldName: String,
+        newName: String,
+        onComplete: (Result<Unit>) -> Unit
+    ) {
+        viewModelScope.launch {
+            // 切换到 IO 线程，防止同步 commit 阻塞 UI
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    val trimmed = newName.trim()
+                    val currentCustomList = ExpenseCategoryStore.getCustom()
+
+                    // 1. 前置校验
+                    // 修复 3：统一使用 ignoreCase 匹配原分类，消除规则差异
+                    val existingOldName = currentCustomList.find { it.equals(oldName, ignoreCase = true) }
+                    requireNotNull(existingOldName) { "原分类不存在" }
+
+                    require(trimmed.isNotEmpty()) { "分类名称不能为空" }
+                    require(!existingOldName.equals(trimmed, ignoreCase = true)) {
+                        "分类名称没有变化或仅大小写不同"
+                    }
+                    require(defaultExpenseCategories.none { it.equals(trimmed, ignoreCase = true) }) {
+                        "不能使用系统默认分类名称"
+                    }
+                    require(currentCustomList.none {
+                        !it.equals(existingOldName, ignoreCase = true) && it.equals(trimmed, ignoreCase = true)
+                    }) { "该分类名称已存在" }
+
+                    // 2. 更新本地 SP
+                    val updateSuccess = ExpenseCategoryStore.update(existingOldName, trimmed)
+                    if (!updateSuccess) {
+                        throw IllegalStateException("本地分类配置更新失败，可能重名或写入磁盘失败")
+                    }
+
+                    // 3. 更新数据库
+                    try {
+                        database.withTransaction {
+                            expenseDao.renameCategory(existingOldName, trimmed)
+                        }
+                    } catch (e: CancellationException) {
+                        // 修复 2：遇到协程取消，说明正在执行的 DB 事务被强制中断
+                        // 必须尽力尝试把 SP 改回去，然后再重新抛出取消信号
+                        Log.w(TAG, "协程取消：尝试恢复本地分类配置", e)
+                        try {
+                            ExpenseCategoryStore.update(trimmed, existingOldName)
+                        } catch (rollbackError: Exception) {
+                            rollbackError.addSuppressed(e)
+                            Log.e(TAG, "严重错误：协程取消且本地分类恢复失败", rollbackError)
+                        }
+                        throw e as Throwable // 必须重新抛出，不能吞掉取消信号
+                    } catch (e: Exception) {
+                        Log.w(TAG, "数据库更新失败，尝试恢复本地分类配置", e)
+
+                        // 4. 补偿回滚 SP
+                        try {
+                            val rollbackSuccess = ExpenseCategoryStore.update(trimmed, existingOldName)
+                            if (!rollbackSuccess) {
+                                throw IllegalStateException("补偿本地分类配置失败")
+                            }
+                        } catch (rollbackError: Exception) {
+                            if (rollbackError is CancellationException) {
+                                throw rollbackError
+                            }
+                            // 修复 1：将补偿异常作为 Suppressed 附加到原始数据库异常上，保留完整链路
+                            e.addSuppressed(rollbackError)
+                            Log.e(TAG, "严重错误：数据库更新失败，且本地分类配置恢复失败", e)
+                        }
+                        throw e
+                    }
+
+                    Result.success(Unit)
+                } catch (e: CancellationException) {
+                    throw e as Throwable
+                } catch (e: Exception) {
+                    Log.e(TAG, "renameExpenseCategory failed", e)
+                    Result.failure(e)
+                }
+            }
+
+            // 回到主线程回调
+            onComplete(result)
         }
     }
 
     /**
-     * 用户点"已取车"时调用。
+     * 用户点击“已取车”时调用。
      */
     fun clearActiveParking() {
         viewModelScope.launch {
-            val vehicle = currentVehicle.value ?: return@launch
-            expenseDao.deactivateAllParking(vehicle.id)
+            try {
+                val vehicle = getCurrentVehicleFromDatabase()
+                    ?: return@launch
+
+                expenseDao.deactivateAllParking(vehicle.id)
+            } catch (e: Exception) {
+                Log.e(TAG, "clearActiveParking failed", e)
+            }
         }
     }
 
     /**
-     * 用户点"忽略"时调用。
-     * 保留停车卡片，只标记通知已忽略（下次不再发通知）。
+     * 用户点击“忽略”时调用。
+     * 保留停车卡片，仅标记通知已忽略。
      */
     fun ignoreActiveParkingNotification() {
         viewModelScope.launch {
-            val vehicle = currentVehicle.value ?: return@launch
-            val parking = expenseDao.getActiveParking(vehicle.id) ?: return@launch
-            expenseDao.markNotificationIgnored(parking.id)
+            try {
+                val vehicle = getCurrentVehicleFromDatabase()
+                    ?: return@launch
+
+                val parking = expenseDao.getActiveParking(vehicle.id)
+                    ?: return@launch
+
+                expenseDao.markNotificationIgnored(parking.id)
+            } catch (e: Exception) {
+                Log.e(TAG, "ignoreActiveParkingNotification failed", e)
+            }
         }
     }
 
+    /**
+     * 新增初始记录。
+     *
+     * 初始记录允许加油量、金额、单价为 0，
+     * 用于建立后续油耗计算的起点。
+     */
     fun addInitialRecord(
         odometer: Double?,
         currentFuel: Double?
     ) {
         viewModelScope.launch {
-            val vehicle = currentVehicle.value ?: return@launch
-            fuelDao.insert(
-                FuelRecord(
-                    vehicleId = vehicle.id,
-                    fuelGrade = vehicle.fuelGrade,
-                    timestamp = System.currentTimeMillis(),
-                    odometer = odometer,
-                    volume = 0.0,
-                    actualPaidAmount = 0.0,
-                    unitPrice = 0.0,
-                    remainingFuel = currentFuel,
-                    isInitialRecord = true,
-                    initialFuel = currentFuel
+            try {
+                val vehicle = getCurrentVehicleFromDatabase()
+                    ?: return@launch
+
+                requireNullableFiniteNonNegative(odometer, "初始里程")
+                requireNullableFiniteNonNegative(currentFuel, "当前油量")
+
+                fuelDao.insert(
+                    FuelRecord(
+                        vehicleId = vehicle.id,
+                        fuelGrade = vehicle.fuelGrade,
+                        timestamp = System.currentTimeMillis(),
+                        odometer = odometer,
+                        volume = 0.0,
+                        actualPaidAmount = 0.0,
+                        unitPrice = 0.0,
+                        remainingFuel = currentFuel,
+                        isInitialRecord = true,
+                        initialFuel = currentFuel
+                    )
                 )
-            )
+            } catch (e: Exception) {
+                Log.e(TAG, "addInitialRecord failed", e)
+            }
         }
     }
-    // =========================
+
+    // =========================================================
     // 备份 / 恢复
-    // =========================
+    // =========================================================
 
     /**
      * 导出备份到指定 Uri。
-     * 完成后通过 onResult 回调结果（UI 层负责弹 Toast）。
      */
-    fun createBackup(uri: Uri, onResult: (Result<Unit>) -> Unit) {
-        if (isBackupOperationRunning) return
+    fun createBackup(
+        uri: Uri,
+        onResult: (Result<Unit>) -> Unit
+    ) {
+        if (isBackupOperationRunning) {
+            onResult(
+                Result.failure(
+                    IllegalStateException("备份或恢复操作正在进行")
+                )
+            )
+            return
+        }
+
         isBackupOperationRunning = true
 
         viewModelScope.launch {
             try {
-                BackupManager.writeBackupToUri(getApplication(), uri)
+                BackupManager.writeBackupToUri(
+                    getApplication(),
+                    uri
+                )
+
                 onResult(Result.success(Unit))
             } catch (e: Exception) {
-                Log.e("MainViewModel", "createBackup failed", e)
+                Log.e(TAG, "createBackup failed", e)
                 onResult(Result.failure(e))
             } finally {
                 isBackupOperationRunning = false
@@ -542,16 +936,37 @@ class MainViewModel(
     /**
      * 从指定 Uri 恢复备份。
      */
-    fun restoreBackup(uri: Uri, onResult: (Result<Unit>) -> Unit) {
-        if (isBackupOperationRunning) return
+    fun restoreBackup(
+        uri: Uri,
+        onResult: (Result<Unit>) -> Unit
+    ) {
+        if (isBackupOperationRunning) {
+            onResult(
+                Result.failure(
+                    IllegalStateException("备份或恢复操作正在进行")
+                )
+            )
+            return
+        }
+
         isBackupOperationRunning = true
 
         viewModelScope.launch {
             try {
-                BackupManager.restoreFromUri(getApplication(), uri)
+                BackupManager.restoreFromUri(
+                    getApplication(),
+                    uri
+                )
+
+                /*
+                 * 恢复操作可能替换了全部车辆。
+                 * 清除临时状态，避免旧车辆覆盖恢复后的数据库状态。
+                 */
+                _currentVehicleOverride.value = null
+
                 onResult(Result.success(Unit))
             } catch (e: Exception) {
-                Log.e("MainViewModel", "restoreBackup failed", e)
+                Log.e(TAG, "restoreBackup failed", e)
                 onResult(Result.failure(e))
             } finally {
                 isBackupOperationRunning = false
@@ -560,94 +975,211 @@ class MainViewModel(
     }
 
     /**
-     * 检查 Uri 是否是 JSON 文件（在 IO 线程）。
+     * 检查 Uri 是否是 JSON 文件。
      */
-    fun checkIsJsonFile(uri: Uri, onResult: (Boolean) -> Unit) {
+    fun checkIsJsonFile(
+        uri: Uri,
+        onResult: (Boolean) -> Unit
+    ) {
         viewModelScope.launch {
-            val isJson = withContext(Dispatchers.IO) {
-                isJsonFileUri(getApplication(), uri)
+            val isJson = try {
+                withContext(Dispatchers.IO) {
+                    isJsonFileUri(getApplication(), uri)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "checkIsJsonFile failed", e)
+                false
             }
+
             onResult(isJson)
         }
     }
 
+    // =========================================================
+    // 加油记录导入
+    // =========================================================
+
+    /**
+     * 导入到当前车辆。
+     *
+     * 去重条件沿用原逻辑：
+     * 时间戳、里程、实际支付金额均相同则视为重复。
+     *
+     * 使用数据库现有记录，而不是 records.value；
+     * 本次导入中的新记录也会加入去重集合。
+     */
     fun importFuelRecords(
-        recordsToImport: List<FuelRecord>, // 为了避免重名，把参数名改一下
+        recordsToImport: List<FuelRecord>,
         onResult: (Result<Int>) -> Unit
     ) {
         viewModelScope.launch {
             try {
-                // 直接拿当前车辆已有的记录进行对比
-                val existingRecords = records.value
-                var importCount = 0
+                val importedCount = database.withTransaction {
+                    val vehicle = getCurrentVehicleFromDatabase()
+                        ?: throw IllegalStateException("没有当前车辆")
 
-                recordsToImport.forEach { newRecord ->
-                    // 去重规则：时间戳相同，且里程相同，且实际支付金额相同
-                    val isDuplicate = existingRecords.any {
-                        it.timestamp == newRecord.timestamp &&
-                                it.odometer == newRecord.odometer &&
-                                it.actualPaidAmount == newRecord.actualPaidAmount
+                    val existingRecords =
+                        fuelDao.getRecordsByVehicleId(vehicle.id)
+
+                    val seen = existingRecords
+                        .map {
+                            Triple(
+                                it.timestamp,
+                                it.odometer,
+                                it.actualPaidAmount
+                            )
+                        }
+                        .toMutableSet()
+
+                    var count = 0
+
+                    recordsToImport.forEach { source ->
+                        validateFuelRecord(source)
+
+                        val key = Triple(
+                            source.timestamp,
+                            source.odometer,
+                            source.actualPaidAmount
+                        )
+
+                        if (seen.add(key)) {
+                            val recordToInsert = source.copy(
+                                id = 0L,
+                                vehicleId = vehicle.id,
+                                fuelGrade = source.fuelGrade.ifBlank {
+                                    vehicle.fuelGrade
+                                }
+                            )
+
+                            fuelDao.insert(recordToInsert)
+                            count++
+                        }
                     }
 
-                    if (!isDuplicate) {
-                        fuelDao.insert(newRecord)
-                        importCount++
-                    }
+                    count
                 }
-                // 返回实际插入的条数
-                onResult(Result.success(importCount))
+
+                onResult(Result.success(importedCount))
             } catch (e: Exception) {
-                Log.e("MainViewModel", "导入加油记录失败", e)
+                Log.e(TAG, "导入加油记录失败", e)
                 onResult(Result.failure(e))
             }
         }
     }
 
+    // =========================================================
+    // 费用记录导入
+    // =========================================================
+
+    /**
+     * 导入到当前车辆。
+     *
+     * 去重条件沿用原逻辑：
+     * 时间戳、金额、分类均相同则视为重复。
+     */
     fun importExpenseRecords(
         recordsToImport: List<ExpenseRecord>,
         onResult: (Result<Int>) -> Unit
     ) {
         viewModelScope.launch {
             try {
-                // 直接拿当前车辆已有的费用记录进行对比
-                val existingRecords = expenses.value
-                var importCount = 0
+                val importedCount = database.withTransaction {
+                    val vehicle = getCurrentVehicleFromDatabase()
+                        ?: throw IllegalStateException("没有当前车辆")
 
-                recordsToImport.forEach { newRecord ->
-                    // 去重规则：时间戳相同，且金额相同，且分类相同
-                    val isDuplicate = existingRecords.any {
-                        it.timestamp == newRecord.timestamp &&
-                                it.amount == newRecord.amount &&
-                                it.category == newRecord.category
+                    val existingRecords = expenseDao.getAll()
+                        .filter { it.vehicleId == vehicle.id }
+
+                    val seen = existingRecords
+                        .map {
+                            Triple(
+                                it.timestamp,
+                                it.amount,
+                                it.category
+                            )
+                        }
+                        .toMutableSet()
+
+                    var count = 0
+
+                    recordsToImport.forEach { source ->
+                        require(source.timestamp > 0L) {
+                            "费用时间无效"
+                        }
+                        requireFiniteNonNegative(source.amount, "费用金额")
+
+                        val key = Triple(
+                            source.timestamp,
+                            source.amount,
+                            source.category
+                        )
+
+                        if (seen.add(key)) {
+                            val recordToInsert = source.copy(
+                                id = 0L,
+                                vehicleId = vehicle.id
+                            )
+
+                            if (
+                                recordToInsert.category == CATEGORY_PARKING &&
+                                recordToInsert.isActive
+                            ) {
+                                expenseDao.insertParkingAsActive(
+                                    recordToInsert
+                                )
+                            } else {
+                                expenseDao.insert(recordToInsert)
+                            }
+
+                            count++
+                        }
                     }
 
-                    if (!isDuplicate) {
-                        expenseDao.insert(newRecord)
-                        importCount++
-                    }
+                    count
                 }
-                onResult(Result.success(importCount))
+
+                onResult(Result.success(importedCount))
             } catch (e: Exception) {
-                Log.e("MainViewModel", "导入费用记录失败", e)
+                Log.e(TAG, "导入费用记录失败", e)
                 onResult(Result.failure(e))
             }
         }
     }
 
-    private fun isJsonFileUri(context: Context, uri: Uri): Boolean {
+    // =========================================================
+    // Uri 辅助方法
+    // =========================================================
+
+    private fun isJsonFileUri(
+        context: Context,
+        uri: Uri
+    ): Boolean {
         val displayName = try {
             context.contentResolver.query(
                 uri,
-                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
-                null, null, null
+                arrayOf(
+                    android.provider.OpenableColumns.DISPLAY_NAME
+                ),
+                null,
+                null,
+                null
             )?.use { cursor ->
-                val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
+                val index = cursor.getColumnIndex(
+                    android.provider.OpenableColumns.DISPLAY_NAME
+                )
+
+                if (index >= 0 && cursor.moveToFirst()) {
+                    cursor.getString(index)
+                } else {
+                    null
+                }
             }
         } catch (e: Exception) {
-            Log.w("MainViewModel", "query displayName failed", e)
+            Log.w(TAG, "query displayName failed", e)
             null
         }
-        return displayName?.endsWith(".json", ignoreCase = true) == true
+
+        return displayName
+            ?.endsWith(".json", ignoreCase = true) == true
     }
 }

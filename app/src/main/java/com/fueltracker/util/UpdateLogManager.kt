@@ -45,6 +45,9 @@ object UpdateLogManager {
         ),
         41 to listOf(
             "油耗算法优化"
+        ),
+        42 to listOf(
+            "代码优化"
         )
         // 后续版本继续追加
     )
@@ -59,7 +62,8 @@ object UpdateLogManager {
         33 to "1.50",
         37 to "1.60",
         40 to "1.61",
-        41 to "1.62"
+        41 to "1.62",
+        42 to "1.63"
     )
 
     /**

@@ -79,11 +79,12 @@ data class StatisticsSummary(
     val outlierCount: Int = 0,
     val hasValidAnchor: Boolean = true,
     /** 原始输入包含非法数值或统计发生数值异常时为 false。 */
-    val isCalculationValid: Boolean = true
+    val isCalculationValid: Boolean = true,  /** 统计运算是否发生数值异常，例如溢出或非有限结果。 */
+    val hasInvalidRecords: Boolean = false /** 统计范围内是否存在关键字段无效的记录。 */
 )
 
 // ============================================================
-// FuelCalculator V4.8
+// FuelCalculator V4.9
 //
 // 设计原则：
 // 1. 仅由有效满箱记录闭合区间；不使用可撤销但未保存完整快照的暂存闭合。
@@ -214,12 +215,12 @@ object FuelCalculator {
     ): StatisticsSummary {
         val analysis = analyze(allRecords, vehicle)
         val visible = analysis.visible
+        val tankCapacity = vehicle?.tankCapacity?.takeIf { it.isFinite() && it > 0.0 }
 
         fun inPeriod(timestamp: Long): Boolean =
             (startTime == null || timestamp >= startTime) && (endTime == null || timestamp < endTime)
 
         val periodRecords = visible.filter { inPeriod(it.timestamp) }
-        // 保持原来的统计口径：只有起点和终点都在所选区间内，才把整个闭合区间计入。
         val rangeResults = analysis.results.filter {
             inPeriod(it.startTimestamp) && inPeriod(it.endTimestamp)
         }
@@ -231,8 +232,11 @@ object FuelCalculator {
         val missingOdometerCount = periodRecords.count { validOdometer(it) == null }
         val totalCount = periodRecords.size
         var isCalculationValid = true
+        var hasInvalidRecords = false
 
         fun safeAdd(a: Double, b: Double): Double {
+            if (!isCalculationValid) return 0.0
+
             if (!a.isFinite() || !b.isFinite()) {
                 isCalculationValid = false
                 return 0.0
@@ -245,34 +249,41 @@ object FuelCalculator {
             return sum
         }
 
-        for (record in periodRecords) {
-            if (!record.volume.isFinite() || record.volume <= 0.0 ||
-                !record.actualPaidAmount.isFinite() || record.actualPaidAmount < 0.0 ||
-                (record.odometer != null && validOdometer(record) == null) ||
-                (record.remainingFuel != null &&
-                        (!record.remainingFuel.isFinite() || record.remainingFuel < 0.0)) ||
-                (record.hasMissedRecord && record.missedVolume != null &&
-                        (!record.missedVolume.isFinite() || record.missedVolume < 0.0)) ||
-                (record.hasMissedRecord && record.missedOdometer != null &&
-                        (!record.missedOdometer.isFinite() || record.missedOdometer <= 0.0))
-            ) {
-                isCalculationValid = false
-            }
-        }
-
         var totalVolume = 0.0
         var totalMissedVolume = 0.0
         var totalCost = 0.0
         var pricedVolume = 0.0
         var pricedCost = 0.0
+
         for (record in periodRecords) {
-            val volume = safeFuelVolume(record)
-            val missedVolume = safeMissedVolume(record)
-            val cost = safeMoney(record.actualPaidAmount)
+            val rawVolume = record.volume
+            val volumeValid = isValidVolume(rawVolume, tankCapacity)
+
+            val rawMissedVolume = safeMissedVolume(record)
+            val missedVolumeValid = !record.hasMissedRecord ||
+                    isValidVolume(rawMissedVolume, tankCapacity)
+
+            val costValid = isValidMoney(record.actualPaidAmount)
+
+            // 新增：检查其他关键字段
+            val odometerValid = record.odometer == null || (record.odometer.isFinite() && record.odometer > 0.0)
+            val remainingValid = record.remainingFuel == null || (record.remainingFuel.isFinite() && record.remainingFuel >= 0.0)
+            val missedOdoValid = !record.hasMissedRecord || (record.missedOdometer != null && record.missedOdometer.isFinite() && record.missedOdometer > 0.0)
+
+            if (!volumeValid || !missedVolumeValid || !costValid || !odometerValid || !remainingValid || !missedOdoValid) {
+                hasInvalidRecords = true
+            }
+
+            val volume = if (volumeValid) rawVolume else 0.0
+            val missedVolume = if (missedVolumeValid) rawMissedVolume else 0.0
+            val cost = if (costValid) record.actualPaidAmount else 0.0
+
             totalVolume = safeAdd(totalVolume, volume)
             totalMissedVolume = safeAdd(totalMissedVolume, missedVolume)
             totalCost = safeAdd(totalCost, cost)
-            if (volume > 0.0) {
+
+            // 只有同时合法的金额和油量才能参与均价计算
+            if (volumeValid && costValid) {
                 pricedVolume = safeAdd(pricedVolume, volume)
                 pricedCost = safeAdd(pricedCost, cost)
             }
@@ -325,15 +336,12 @@ object FuelCalculator {
 
         return StatisticsSummary(
             totalCount = totalCount,
-            // 统计有效性是诊断标记，不应因为一条无关的非法记录就隐藏其他可计算结果。
-            // safeFuelVolume/safeMissedVolume/safeMoney 已将无法采信的单项排除。
             totalVolume = totalVolume,
             totalMissedVolume = totalMissedVolume,
             totalCost = totalCost,
             averagePrice = averagePrice,
             totalDistance = totalDistance,
             totalFuel = totalFuel,
-            // 平均油耗只由物理可用区间决定；单条无关记录的非法金额等不应令其变成 null。
             averageConsumption = averageConsumption,
             odometerSpanText = odometerSpanText,
             unclosedCount = unclosedCount,
@@ -346,7 +354,8 @@ object FuelCalculator {
             reliableResultCount = reliableResults.size,
             outlierCount = rangeResults.count { it.isOutlier },
             hasValidAnchor = analysis.hasValidAnchor,
-            isCalculationValid = isCalculationValid
+            isCalculationValid = isCalculationValid,
+            hasInvalidRecords = hasInvalidRecords
         )
     }
 
@@ -1170,8 +1179,6 @@ object FuelCalculator {
         return if (value.isFinite()) value else Double.NaN
     }
 
-    private fun safeMoney(value: Double): Double = if (value.isFinite() && value >= 0.0) value else 0.0
-
     private fun isPhysicallyUsable(result: ConsumptionResult): Boolean {
         if (!result.distance.isFinite() || result.distance <= 0.0) return false
         if (!result.fuelUsed.isFinite() || result.fuelUsed <= 0.0) return false
@@ -1189,4 +1196,17 @@ object FuelCalculator {
     private val RECORD_COMPARATOR = compareBy<FuelRecord> { it.timestamp }
         .thenBy { it.odometer ?: 0.0 }
         .thenBy { it.id }
+
+    private fun isValidMoney(value: Double): Boolean {
+        return value.isFinite() && value >= 0.0
+    }
+
+    private fun isValidVolume(volume: Double, tankCapacity: Double?): Boolean {
+        if (!volume.isFinite() || volume <= 0.0) return false
+        if (tankCapacity != null && tankCapacity > 0.0) {
+            if (volume > tankCapacity * SINGLE_FUEL_SEVERE_RATIO) return false
+        }
+        return true
+    }
 }
+

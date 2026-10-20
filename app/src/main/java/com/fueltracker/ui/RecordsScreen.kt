@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.fueltracker.data.FuelRecord
+import com.fueltracker.data.Vehicle
 import com.fueltracker.ui.components.scrollToHideBottomBar
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
@@ -163,7 +164,7 @@ fun RecordsScreen(
             item(key = "statistics") {
                 RecordStatistics(
                     displayRecords = displayRecords,
-                    consumptionMap = consumptionMap
+                    vehicle = vehicle
                 )
             }
 
@@ -240,7 +241,7 @@ private fun MiuixCard(
 @Composable
 private fun RecordStatistics(
     displayRecords: List<FuelRecord>,
-    consumptionMap: Map<Long, ConsumptionResult>
+    vehicle: Vehicle?
 ) {
     val totalMoney = remember(displayRecords) {
         displayRecords.sumOf { it.actualPaidAmount }
@@ -251,22 +252,15 @@ private fun RecordStatistics(
     }
 
     // 平均油耗修正：增加对 quality 的 safe call (?.), 修复编译报错
-    val averageConsumption = remember(displayRecords, consumptionMap) {
-        val validResults = displayRecords
-            .mapNotNull { consumptionMap[it.id] }
-            .filter { result ->
-                !result.isOutlier &&
-                        result.quality?.confidence != IntervalConfidence.LOW &&
-                        result.quality?.confidence != IntervalConfidence.UNRELIABLE
-            }
-
-        val totalDistance = validResults.sumOf { it.distance }
-        val totalFuel = validResults.sumOf { it.fuelUsed }
-
-        if (totalDistance > 0) {
-            totalFuel / totalDistance * 100.0
-        } else {
+    val averageConsumption = remember(displayRecords, vehicle) {
+        if (displayRecords.isEmpty()) {
             null
+        } else {
+            // 把筛选后的列表和当前车辆直接丢给底层的计算器
+            FuelCalculator.calculateSummary(
+                allRecords = displayRecords,
+                vehicle = vehicle
+            ).averageConsumption
         }
     }
 
@@ -632,11 +626,14 @@ private fun FuelRecordCard(
                     }
 
                     record.remainingFuel?.let { remaining ->
-                        Text(
-                            text = "加油后剩余: %.2f L".format(remaining),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (remaining.isFinite()) {
+                            Text(
+                                // 如果填的是 0，就正常显示 0.00，不隐藏也不显示乱码
+                                text = "加油后剩余: %.2f L".format(remaining),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     if (record.hasMissedRecord) {

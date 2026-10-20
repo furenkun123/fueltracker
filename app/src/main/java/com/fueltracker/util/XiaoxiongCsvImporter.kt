@@ -8,40 +8,18 @@ import com.fueltracker.data.FuelRecord
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-/**
- * 小熊油耗 CSV 导入器。
- *
- * 支持格式（无表头、逗号分隔、可能带 UTF-8 BOM）：
- *  - 加油：日期, 里程, 单价, 原价, 实付, 燃油标号, 是否加满, 是否亮灯（8 列）
- *  - 费用：日期, 金额, 类别（3 列）
- *
- * 解析失败的行会被跳过并记录日志，不会中断整个导入。
- * 全部行都失败时仍返回 [Result.success]（空列表），由调用方决定如何提示。
- */
 object XiaoxiongCsvImporter {
 
     private const val TAG = "XiaoxiongCsv"
+    private const val DEFAULTFUELGRADE = "92"
+    private const val FALLBACKUNITPRICE = 8.0
+    private const val MAXSANEUNITPRICE = 50.0
 
-    private const val DEFAULT_FUEL_GRADE = "92"
-    private const val FALLBACK_UNIT_PRICE = 8.0
-    private const val MAX_SANE_UNIT_PRICE = 50.0
-    private const val IMPORT_NOTE = "小熊导入"
-    private const val IMPORT_NOTE_WITH_WARNING = "小熊导入 · 油灯亮"
-
-    /** 兼容 "2026/10/19"、"2026-10-19" 以及单数字月份/日期 */
-    private val DatePatterns = listOf(
-        "yyyy/MM/dd",
-        "yyyy-MM-dd",
-        "yyyy/M/d",
-        "yyyy-M-d"
-    )
-
-    // ============================================================
-    // 加油 CSV
-    // ============================================================
+    private val DatePatterns = listOf("yyyy/MM/dd", "yyyy-MM-dd", "yyyy/M/d", "yyyy-M-d")
 
     suspend fun parseFuelCsv(
         context: Context,
@@ -51,55 +29,71 @@ object XiaoxiongCsvImporter {
         try {
             val lines = readCsvLines(context, uri)
             var skipCount = 0
-
-            // 第一阶段：文本 → XiaoxiongFuelRow
             val rows = mutableListOf<XiaoxiongFuelRow>()
-            lines.forEach { line ->
-                val cols = splitCsvLine(line)
-                if (cols.size < 8) {
-                    skipCount++
-                    Log.w(TAG, "加油行列数不足，跳过: $line")
-                    return@forEach
-                }
 
+            lines.forEachIndexed { index, line ->
                 try {
+                    val cols = splitCsvLine(line)
+                    if (cols.size < 8) throw IllegalArgumentException("列数不足")
+
+                    val odometer = cols[1].trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+                        ?: throw IllegalArgumentException("里程非法")
+                    val paidAmount = cols[4].trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+                        ?: throw IllegalArgumentException("金额非法")
+
+                    // 修复：原价增加有限性和正数校验，防止 Infinity 混入
+                    val originalPriceRaw = cols[3].trim().toDoubleOrNull()
+                        ?.takeIf { it.isFinite() && it > 0.0 } ?: 0.0
+
+                    val unitPriceRaw = cols[2].trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+
                     rows.add(
                         XiaoxiongFuelRow(
                             date = cols[0].trim(),
-                            odometer = cols[1].trim().toDoubleOrNull() ?: 0.0,
-                            unitPrice = cols[2].trim().toDoubleOrNull() ?: 0.0,
-                            originalPrice = cols[3].trim().toDoubleOrNull() ?: 0.0,
-                            paidAmount = cols[4].trim().toDoubleOrNull() ?: 0.0,
+                            odometer = odometer,
+                            unitPrice = unitPriceRaw ?: 0.0,
+                            originalPrice = originalPriceRaw,
+                            paidAmount = paidAmount,
                             fuelGrade = cols[5].trim(),
-                            isFull = parseFlag(cols[6], positive = "加满", negative = "没加满"),
-                            hasWarningLight = parseFlag(cols[7], positive = "亮", negative = "没亮")
+                            isFull = parseFlag(cols[6], "加满", "没加满"),
+                            hasWarningLight = parseFlag(cols[7], "亮", "没亮")
                         )
                     )
                 } catch (e: Exception) {
-                    Log.e(TAG, "解析加油行失败: $line", e)
+                    Log.w(TAG, "跳过第 ${index + 1} 个有效行数据: 格式异常", e)
                     skipCount++
                 }
             }
 
-            // 第二阶段：XiaoxiongFuelRow → FuelRecord（业务校验 + 字段映射）
             val records = rows.mapNotNull { row ->
                 val timestamp = parseDate(row.date)
                 if (timestamp == null) {
-                    Log.w(TAG, "日期解析失败，跳过: ${row.date}")
                     skipCount++
                     return@mapNotNull null
                 }
-
                 if (row.odometer <= 0 || row.paidAmount <= 0) {
-                    Log.w(TAG, "里程或实付金额无效，跳过: $row")
                     skipCount++
                     return@mapNotNull null
                 }
 
-                // 单价异常（缺失 / 离谱）时按 8 元/L 兜底，避免算出天文数字的升数
-                val unitPrice = row.unitPrice.takeIf { it in 0.01..MAX_SANE_UNIT_PRICE }
-                    ?: FALLBACK_UNIT_PRICE
+                var isEstimated = false
+                val unitPrice = row.unitPrice.takeIf { it in 0.01..MAXSANEUNITPRICE } ?: run {
+                    isEstimated = true
+                    FALLBACKUNITPRICE
+                }
+
+                // 修复：计算出的油量必须有限且大于 0，防止 Double.MAX_VALUE / 0.01 溢出
                 val volume = row.paidAmount / unitPrice
+                if (!volume.isFinite() || volume <= 0.0) {
+                    skipCount++
+                    return@mapNotNull null
+                }
+
+                // 修复：合并备注信息，避免“估算”覆盖“油灯亮”
+                val noteParts = mutableListOf("小熊导入")
+                if (isEstimated) noteParts.add("单价异常(油量估算)")
+                if (row.hasWarningLight) noteParts.add("油灯亮")
+                val finalNote = noteParts.joinToString(" · ")
 
                 FuelRecord(
                     vehicleId = vehicleId,
@@ -111,12 +105,12 @@ object XiaoxiongCsvImporter {
                     totalAmount = row.originalPrice.takeIf { it > 0 },
                     fuelGrade = normalizeFuelGrade(row.fuelGrade),
                     isFull = row.isFull,
-                    note = if (row.hasWarningLight) IMPORT_NOTE_WITH_WARNING else IMPORT_NOTE,
+                    note = finalNote,
                     hasMissedRecord = false
                 )
             }
 
-            Log.d(TAG, "加油记录解析完成: 成功 ${records.size}, 跳过 $skipCount")
+            Log.d(TAG, "加油解析完成: 成功 ${records.size}, 跳过 $skipCount")
             Result.success(records)
         } catch (e: CancellationException) {
             throw e
@@ -126,10 +120,6 @@ object XiaoxiongCsvImporter {
         }
     }
 
-    // ============================================================
-    // 费用 CSV
-    // ============================================================
-
     suspend fun parseExpenseCsv(
         context: Context,
         uri: Uri,
@@ -138,42 +128,32 @@ object XiaoxiongCsvImporter {
         try {
             val lines = readCsvLines(context, uri)
             var skipCount = 0
-
-            // 第一阶段：文本 → XiaoxiongExpenseRow
             val rows = mutableListOf<XiaoxiongExpenseRow>()
-            lines.forEach { line ->
-                val cols = splitCsvLine(line)
-                if (cols.size < 3) {
-                    skipCount++
-                    Log.w(TAG, "费用行列数不足，跳过: $line")
-                    return@forEach
-                }
 
+            lines.forEachIndexed { index, line ->
                 try {
+                    val cols = splitCsvLine(line)
+                    if (cols.size < 3) throw IllegalArgumentException("列数不足")
+
+                    val amount = cols[1].trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+                        ?: throw IllegalArgumentException("金额非法")
+
                     rows.add(
                         XiaoxiongExpenseRow(
                             date = cols[0].trim(),
-                            amount = cols[1].trim().toDoubleOrNull() ?: 0.0,
+                            amount = amount,
                             category = cols[2].trim()
                         )
                     )
                 } catch (e: Exception) {
-                    Log.e(TAG, "解析费用行失败: $line", e)
+                    Log.w(TAG, "跳过第 ${index + 1} 行费用数据: 格式异常", e)
                     skipCount++
                 }
             }
 
-            // 第二阶段：XiaoxiongExpenseRow → ExpenseRecord
             val records = rows.mapNotNull { row ->
                 val timestamp = parseDate(row.date)
-                if (timestamp == null) {
-                    Log.w(TAG, "日期解析失败，跳过: ${row.date}")
-                    skipCount++
-                    return@mapNotNull null
-                }
-
-                if (row.amount <= 0) {
-                    Log.w(TAG, "费用金额无效，跳过: $row")
+                if (timestamp == null || row.amount <= 0) {
                     skipCount++
                     return@mapNotNull null
                 }
@@ -183,11 +163,11 @@ object XiaoxiongCsvImporter {
                     timestamp = timestamp,
                     category = row.category.ifBlank { "其他" },
                     amount = row.amount,
-                    note = IMPORT_NOTE
+                    note = "小熊导入"
                 )
             }
 
-            Log.d(TAG, "费用记录解析完成: 成功 ${records.size}, 跳过 $skipCount")
+            Log.d(TAG, "费用解析完成: 成功 ${records.size}, 跳过 $skipCount")
             Result.success(records)
         } catch (e: CancellationException) {
             throw e
@@ -197,100 +177,65 @@ object XiaoxiongCsvImporter {
         }
     }
 
-    // ============================================================
-    // 内部工具
-    // ============================================================
-
-    /**
-     * 读取 CSV 文本行：
-     * - 去掉 UTF-8 BOM（[\\uFEFF]）
-     * - 逐行 trim
-     * - 过滤空行
-     */
     private fun readCsvLines(context: Context, uri: Uri): List<String> {
         val stream = context.contentResolver.openInputStream(uri)
             ?: throw IllegalStateException("无法打开文件")
-
         return stream.bufferedReader(Charsets.UTF_8).useLines { sequence ->
-            sequence
-                .map { it.removePrefix("\uFEFF").trim() }
-                .filter { it.isNotEmpty() }
-                .toList()
+            sequence.map { it.removePrefix("\uFEFF").trim() }.filter { it.isNotEmpty() }.toList()
         }
     }
 
-    /**
-     * 支持引号的 CSV 行切分。
-     * 小熊导出的类别名一般不含逗号，但加上这层保护成本很低，
-     * 以后遇到 "保养,洗车" 这类字段也不会错位。
-     */
     private fun splitCsvLine(line: String): List<String> {
         val result = mutableListOf<String>()
         val buffer = StringBuilder()
         var inQuotes = false
         var i = 0
-
         while (i < line.length) {
             when (val c = line[i]) {
                 '"' -> {
                     if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
-                        // 转义的 ""
-                        buffer.append('"')
-                        i++
+                        buffer.append('"'); i++
                     } else {
                         inQuotes = !inQuotes
                     }
                 }
                 ',' if !inQuotes -> {
-                    result.add(buffer.toString())
-                    buffer.clear()
+                    result.add(buffer.toString()); buffer.clear()
                 }
                 else -> buffer.append(c)
             }
             i++
         }
+        if (inQuotes) throw IllegalArgumentException("CSV 存在未闭合的双引号")
         result.add(buffer.toString())
         return result
     }
 
-    /**
-     * 依次尝试多种日期格式，全部失败返回 null。
-     * 使用 isLenient = false，避免 "2026/13/45" 这种越界日期被错误解析。
-     */
     private fun parseDate(raw: String): Long? {
         val value = raw.trim()
         if (value.isEmpty()) return null
-
         for (pattern in DatePatterns) {
-            val format = SimpleDateFormat(pattern, Locale.getDefault()).apply {
-                isLenient = false
-            }
-            try {
-                val date = format.parse(value)
-                if (date != null) return date.time
-            } catch (_: Exception) {
-                // 试下一种格式
+            val format = SimpleDateFormat(pattern, Locale.US).apply { isLenient = false }
+            val position = ParsePosition(0)
+            val date = format.parse(value, position)
+            if (date != null && position.index == value.length) {
+                return date.time
             }
         }
         return null
     }
 
-    /**
-     * 解析中文布尔字段，例如 "加满" / "没加满"、"亮" / "没亮"。
-     * 先判否定词再判肯定词，因为 "没加满" 包含 "加满"。
-     */
     private fun parseFlag(raw: String, positive: String, negative: String): Boolean {
         val value = raw.trim()
-        if (value.isEmpty()) return false
-        if (value.contains(negative)) return false
-        return value.contains(positive)
+        return when {
+            value.contains(negative) -> false
+            value.contains(positive) -> true
+            else -> throw IllegalArgumentException("无法识别的标记状态：$value")
+        }
     }
 
-    /**
-     * 统一燃油标号格式，缺省补 92，未带 # 的补上 #。
-     */
     private fun normalizeFuelGrade(raw: String): String {
-        val value = raw.trim().ifBlank { DEFAULT_FUEL_GRADE }
+        val value = raw.trim().ifBlank { DEFAULTFUELGRADE }
         return if (value.contains("#")) value else "$value#"
     }
 }

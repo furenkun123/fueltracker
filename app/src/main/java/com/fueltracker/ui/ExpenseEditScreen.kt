@@ -279,7 +279,7 @@ fun ExpenseEditScreen(
 
                     isSaving = true
 
-                    val newRecord = if (isEditMode && record != null) {
+                    val newRecord = if (isEditMode) {
                         record.copy(
                             timestamp = timestamp,
                             category = category,
@@ -381,12 +381,26 @@ fun ExpenseEditScreen(
             currentName = cat,
             existingNames = allCategories,
             onSave = { newName ->
-                ExpenseCategoryStore.update(cat, newName)
-                customCategories = ExpenseCategoryStore.getCustom()
-                if (category == cat) {
-                    category = newName.trim().ifEmpty { cat }
+                // 调用 ViewModel 执行数据库和内存的双重更新
+                viewModel.renameExpenseCategory(oldName = cat, newName = newName) { result ->
+                    result.onSuccess {
+                        val trimmed = newName.trim()
+                        // 刷新界面状态
+                        customCategories = ExpenseCategoryStore.getCustom()
+                        if (category == cat) {
+                            category = trimmed
+                        }
+                        editingCategory = null
+                    }
+
+                    result.onFailure { error ->
+                        Toast.makeText(
+                            context,
+                            error.message ?: "重命名失败",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
-                editingCategory = null
             },
             onDelete = {
                 ExpenseCategoryStore.remove(cat)

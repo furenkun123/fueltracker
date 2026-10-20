@@ -39,20 +39,39 @@ object ExpenseCategoryStore {
         prefs.edit { putStringSet(KEY_CUSTOM, set) }
     }
 
-    fun update(oldName: String, newName: String) {
+    @Suppress("UseKtx")
+    fun update(oldName: String, newName: String): Boolean {
         val trimmed = newName.trim()
-        if (trimmed.isEmpty()) return
-        if (trimmed == oldName) return
-        if (trimmed in DEFAULT_EXPENSE_CATEGORIES) return
 
-        val set = prefs.getStringSet(KEY_CUSTOM, emptySet()).orEmpty().toMutableSet()
+        if (trimmed.isEmpty()) return false
+        if (trimmed == oldName) return false
 
-        // 新名字已存在（且不是原名）→ 拒绝，避免两个分类合并
-        if (trimmed in set) return
+        if (DEFAULT_EXPENSE_CATEGORIES.any {
+                it.equals(trimmed, ignoreCase = true)
+            }
+        ) {
+            return false
+        }
+
+        val set = prefs.getStringSet(KEY_CUSTOM, emptySet())
+            .orEmpty()
+            .toMutableSet()
+
+        if (oldName !in set) return false
+
+        if (set.any {
+                it != oldName && it.equals(trimmed, ignoreCase = true)
+            }
+        ) {
+            return false
+        }
 
         set.remove(oldName)
         set.add(trimmed)
-        prefs.edit { putStringSet(KEY_CUSTOM, set) }
+
+        return prefs.edit()
+            .putStringSet(KEY_CUSTOM, set)
+            .commit()
     }
     /**
      * 用给定列表替换所有自定义分类（备份恢复用）。

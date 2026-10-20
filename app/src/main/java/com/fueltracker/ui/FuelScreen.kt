@@ -65,6 +65,7 @@ import com.fueltracker.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,105 +124,230 @@ fun FuelScreen(
     // 修复：保存按钮防抖状态
     var isSaving by remember { mutableStateOf(false) }
 
-    // 使用 derivedStateOf 避免每次界面小改动都反复 parse 文本
-    val volumeValue by remember(volume) { derivedStateOf { volume.toDoubleOrNull()?.takeIf { it > 0 } } }
-    val amountValue by remember(amount) { derivedStateOf { amount.toDoubleOrNull()?.takeIf { it >= 0 } } }
-    val unitPriceValue by remember(unitPrice) { derivedStateOf { unitPrice.toDoubleOrNull()?.takeIf { it > 0 } } }
-    val remainingFuelValue by remember(remainingFuel) { derivedStateOf { remainingFuel.toDoubleOrNull()?.takeIf { it >= 0 } } }
-
-    // 修复：漏记油量增加 > 0 校验
-    val missedOdometerValue by remember(missedOdometer) { derivedStateOf { missedOdometer.toDoubleOrNull()?.takeIf { it > 0 } } }
-    val missedVolumeValue by remember(missedVolume) { derivedStateOf { missedVolume.toDoubleOrNull()?.takeIf { it > 0 } } }
-
-    // 判断加油量是否超出油箱容量
-    val isVolumeExceedsCapacity by remember(volumeValue, tankCapacity) {
-        derivedStateOf { volumeValue != null && tankCapacity > 0.0 && volumeValue!! > tankCapacity }
-    }
-
-    val isMissedValid by remember(hasMissedRecord, missedOdometerValue, missedVolumeValue) {
-        derivedStateOf { !hasMissedRecord || (missedOdometerValue != null && missedVolumeValue != null) }
-    }
-
-    val isVolumeValid by remember(volumeValue, isVolumeExceedsCapacity) {
-        derivedStateOf { volumeValue != null && volumeValue!! > 0 && !isVolumeExceedsCapacity }
-    }
-
-    val isFormValid by remember(isVolumeValid, amountValue, unitPriceValue, fuelGrade, isMissedValid) {
+    // 数值解析统一检查有限值，避免 NaN / Infinity 进入数据库。
+    val volumeValue by remember(volume) {
         derivedStateOf {
-            isVolumeValid && amountValue != null &&
-                    unitPriceValue != null &&
-                    fuelGrade.isNotBlank() && isMissedValid
+            volume.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+        }
+    }
+    val amountValue by remember(amount) {
+        derivedStateOf {
+            amount.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+        }
+    }
+    val unitPriceValue by remember(unitPrice) {
+        derivedStateOf {
+            unitPrice.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+        }
+    }
+    val totalAmountValue by remember(totalAmount) {
+        derivedStateOf {
+            totalAmount.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+        }
+    }
+    val discountValue by remember(discount) {
+        derivedStateOf {
+            if (discount.isBlank()) {
+                0.0
+            } else {
+                discount.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+            }
+        }
+    }
+    val remainingFuelValue by remember(remainingFuel) {
+        derivedStateOf {
+            remainingFuel.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+        }
+    }
+    val odometerValue by remember(odometer) {
+        derivedStateOf {
+            odometer.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
         }
     }
 
-    // 联动计算逻辑
+    val missedOdometerValue by remember(missedOdometer) {
+        derivedStateOf {
+            missedOdometer.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+        }
+    }
+    val missedVolumeValue by remember(missedVolume) {
+        derivedStateOf {
+            missedVolume.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+        }
+    }
+
+    val isVolumeExceedsCapacity by remember(volumeValue, tankCapacity) {
+        derivedStateOf {
+            volumeValue != null && tankCapacity.isFinite() && tankCapacity > 0.0 &&
+                    volumeValue!! > tankCapacity
+        }
+    }
+
+    val isMissedValid by remember(hasMissedRecord, missedOdometerValue, missedVolumeValue) {
+        derivedStateOf {
+            !hasMissedRecord ||
+                    (missedOdometerValue != null && missedVolumeValue != null)
+        }
+    }
+
+    val isVolumeValid by remember(volumeValue, isVolumeExceedsCapacity) {
+        derivedStateOf {
+            volumeValue != null && !isVolumeExceedsCapacity
+        }
+    }
+
+    // 可选数字字段允许留空，但不允许输入了非法文本后被静默保存为 null。
+    val isOdometerInputValid by remember(odometer, odometerValue) {
+        derivedStateOf { odometer.isBlank() || odometerValue != null }
+    }
+    val isRemainingFuelInputValid by remember(remainingFuel, remainingFuelValue, tankCapacity) {
+        derivedStateOf {
+            remainingFuel.isBlank() || (
+                    remainingFuelValue != null &&
+                            (tankCapacity <= 0.0 || remainingFuelValue!! <= tankCapacity)
+                    )
+        }
+    }
+    val isTotalAmountValid by remember(totalAmountValue) {
+        derivedStateOf { totalAmountValue != null && totalAmountValue!! > 0.0 }
+    }
+    val isDiscountValid by remember(discount, discountValue, totalAmountValue) {
+        derivedStateOf {
+            discount.isBlank() || (
+                    discountValue != null && totalAmountValue != null &&
+                            discountValue!! <= totalAmountValue!!
+                    )
+        }
+    }
+    val isAmountConsistent by remember(amountValue, totalAmountValue, discountValue) {
+        derivedStateOf {
+            amountValue != null && totalAmountValue != null && discountValue != null &&
+                    abs((totalAmountValue!! - discountValue!!) - amountValue!!) <= 0.02
+        }
+    }
+
+    val isFormValid by remember(
+        isVolumeValid,
+        amountValue,
+        unitPriceValue,
+        totalAmountValue,
+        discountValue,
+        isTotalAmountValid,
+        isDiscountValid,
+        isAmountConsistent,
+        fuelGrade,
+        isMissedValid,
+        isOdometerInputValid,
+        isRemainingFuelInputValid,
+        timestamp
+    ) {
+        derivedStateOf {
+            isVolumeValid && amountValue != null && unitPriceValue != null &&
+                    isTotalAmountValid && isDiscountValid && isAmountConsistent &&
+                    fuelGrade.isNotBlank() && isMissedValid &&
+                    isOdometerInputValid && isRemainingFuelInputValid && timestamp > 0L
+        }
+    }
+
+    // 联动计算：基于“体积”和“单价”推导“原价”；基于“原价”和“单价”推导“体积”。
     fun onVolumeChange(newVol: String) {
         volume = newVol
-        val v = newVol.toDoubleOrNull()
+        val v = newVol.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 } ?: return
         val p = unitPriceValue
-        if (v != null && v > 0 && p != null) {
+        val disc = discountValue ?: 0.0
+
+        if (p != null) {
             val total = v * p
-            val disc = discount.toDoubleOrNull() ?: 0.0
-            totalAmount = formatNumber(total)
-            amount = formatNumber((total - disc).coerceAtLeast(0.0))
+            if (total.isFinite()) {
+                totalAmount = formatNumber(total)
+                amount = formatNumber(total - disc)
+            }
         }
     }
 
     fun onUnitPriceChange(newPrice: String) {
         unitPrice = newPrice
-        val p = newPrice.toDoubleOrNull()
+        val p = newPrice.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 } ?: return
         val vol = volumeValue
-        if (p != null && p > 0 && vol != null) {
-            val total = vol * p
-            val disc = discount.toDoubleOrNull() ?: 0.0
-            totalAmount = formatNumber(total)
-            amount = formatNumber((total - disc).coerceAtLeast(0.0))
-        }
-    }
+        val knownTotal = totalAmountValue
+        val disc = discountValue ?: 0.0
 
-    fun onAmountChange(newAmt: String) {
-        amount = newAmt
-        val amt = newAmt.toDoubleOrNull()
-        val p = unitPriceValue
-        val disc = discount.toDoubleOrNull() ?: 0.0
-        if (amt != null && amt >= 0) {
-            val total = amt + disc
-            totalAmount = formatNumber(total)
-            if (p != null && p > 0) {
-                volume = formatNumber(total / p)
+        if (vol != null) {
+            val total = vol * p
+            if (total.isFinite()) {
+                totalAmount = formatNumber(total)
+                amount = formatNumber(total - disc)
+            }
+        } else if (knownTotal != null) {
+            val calculatedVolume = knownTotal / p
+            if (calculatedVolume.isFinite() && calculatedVolume > 0.0) {
+                volume = formatNumber(calculatedVolume)
+                amount = formatNumber(knownTotal - disc)
             }
         }
     }
 
     fun onTotalAmountChange(newTotal: String) {
         totalAmount = newTotal
-        val total = newTotal.toDoubleOrNull()
+        val total = newTotal.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 } ?: return
+        val disc = discountValue ?: 0.0
+        amount = formatNumber(total - disc)
+
         val p = unitPriceValue
-        val disc = discount.toDoubleOrNull() ?: 0.0
-        if (total != null && total >= 0) {
-            amount = formatNumber((total - disc).coerceAtLeast(0.0))
-            if (p != null && p > 0) {
-                volume = formatNumber(total / p)
+        val vol = volumeValue
+
+        // 核心修复：优先保持单价不变，强制覆盖更新体积，解决输入中间态导致的值锁死。
+        if (p != null) {
+            val calculatedVolume = total / p
+            if (calculatedVolume.isFinite() && calculatedVolume > 0.0) {
+                volume = formatNumber(calculatedVolume)
+            }
+        } else if (vol != null) {
+            // 如果单价为空，但有体积，则用原价和体积反推单价
+            val calculatedPrice = total / vol
+            if (calculatedPrice.isFinite() && calculatedPrice > 0.0) {
+                unitPrice = formatNumber(calculatedPrice)
+            }
+        }
+    }
+
+    fun onAmountChange(newAmt: String) {
+        amount = newAmt
+        val amt = newAmt.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 } ?: return
+        val disc = discountValue ?: 0.0
+        val total = amt + disc
+        if (!total.isFinite()) return
+        totalAmount = formatNumber(total)
+
+        // 修改实付导致原价变化，如同上面的 onTotalAmountChange 一样重新计算体积或单价
+        val p = unitPriceValue
+        val vol = volumeValue
+        if (p != null) {
+            val calculatedVolume = total / p
+            if (calculatedVolume.isFinite() && calculatedVolume > 0.0) {
+                volume = formatNumber(calculatedVolume)
+            }
+        } else if (vol != null) {
+            val calculatedPrice = total / vol
+            if (calculatedPrice.isFinite() && calculatedPrice > 0.0) {
+                unitPrice = formatNumber(calculatedPrice)
             }
         }
     }
 
     fun onDiscountChange(newDisc: String) {
         discount = newDisc
-        val disc = newDisc.toDoubleOrNull() ?: 0.0
-        val total = totalAmount.toDoubleOrNull()
-        val amt = amount.toDoubleOrNull()
-        val p = unitPriceValue
+        val disc = if (newDisc.isBlank()) {
+            0.0
+        } else {
+            newDisc.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+        } ?: return
 
+        val total = totalAmountValue
         if (total != null) {
-            amount = formatNumber((total - disc).coerceAtLeast(0.0))
-        } else if (amt != null) {
-            val newTotal = amt + disc
-            totalAmount = formatNumber(newTotal)
-            if (p != null && p > 0) {
-                volume = formatNumber(newTotal / p)
-            }
+            amount = formatNumber(total - disc)
         }
+        // 优惠金额的变动只影响实付，不影响体积和单价
     }
 
     Scaffold(
@@ -474,15 +600,45 @@ fun FuelScreen(
             val vVal = volumeValue
             val pVal = unitPriceValue
             if (vVal != null && pVal != null) {
-                val total = vVal * pVal
-                val disc = discount.toDoubleOrNull() ?: 0.0
-                val paid = (total - disc).coerceAtLeast(0.0)
+                val calculatedTotal = vVal * pVal
+                val total = totalAmountValue ?: calculatedTotal
+                val disc = discountValue
+                if (calculatedTotal.isFinite() && disc != null) {
+                    val paid = total - disc
+                    Text(
+                        text = "计算结果：$fuelGrade · %.2f L × %.2f 元/L ≈ %.2f 元，实付 %.2f 元"
+                            .format(LocalLocale.current.platformLocale, vVal, pVal, total, paid),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                    )
+                }
+            }
+            if (discount.isNotBlank() && !isDiscountValid) {
                 Text(
-                    text = "计算结果：$fuelGrade · %.2f L × %.2f 元/L = %.2f 元，实付 %.2f 元"
-                        .format(LocalLocale.current.platformLocale, vVal, pVal, total, paid),
+                    text = "优惠金额必须是非负数，且不能超过原价",
+                    color = MaterialTheme.colorScheme.error,
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+            }
+            if (
+                amount.isNotBlank() && totalAmount.isNotBlank() && discountValue != null &&
+                amountValue != null && totalAmountValue != null && !isAmountConsistent
+            ) {
+                Text(
+                    text = "原价减去优惠金额应等于实际支付金额，请检查金额",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+            }
+            if (remainingFuel.isNotBlank() && !isRemainingFuelInputValid) {
+                Text(
+                    text = "加油后剩余油量无效或超出油箱容量",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 4.dp)
                 )
             }
 
@@ -559,46 +715,59 @@ fun FuelScreen(
                     val vol = volumeValue ?: return@Button
                     val amt = amountValue ?: return@Button
                     val price = unitPriceValue ?: return@Button
-                    val odo = odometer.toDoubleOrNull()?.takeIf { it > 0 }
+                    val total = totalAmountValue ?: return@Button
+                    val disc = if (discount.isBlank()) null else discountValue
+                    val odo = odometerValue
+                    val remaining = remainingFuelValue
+
+                    // 防止有限数值相乘溢出，或金额字段在 UI 外被改为不一致。
+                    if (!total.isFinite() || totalAmount.isBlank() || timestamp <= 0L) {
+                        Toast.makeText(context, "请检查原价和加油时间", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (disc != null && (!disc.isFinite() || disc < 0.0 || disc > total)) {
+                        Toast.makeText(context, "优惠金额无效", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (abs((total - (disc ?: 0.0)) - amt) > 0.02) {
+                        Toast.makeText(context, "原价减优惠金额应等于实际支付金额", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
 
                     isSaving = true
 
-                    val recordToSave = if (isEditMode) {
-                        record.copy(
-                            timestamp = timestamp,
-                            fuelGrade = fuelGrade,
-                            odometer = odo,
-                            volume = vol,
-                            totalAmount = totalAmount.toDoubleOrNull(),
-                            discount = discount.toDoubleOrNull(),
-                            actualPaidAmount = amt,
-                            unitPrice = price,
-                            remainingFuel = remainingFuelValue,
-                            isFull = isFull,
-                            hasMissedRecord = hasMissedRecord,
-                            missedOdometer = missedOdometerValue,
-                            missedVolume = missedVolumeValue,
-                            note = note.trim()
-                        )
-                    } else {
-                        FuelRecord(
-                            vehicleId = currentVehicle.id,
-                            timestamp = timestamp,
-                            fuelGrade = fuelGrade,
-                            odometer = odo,
-                            volume = vol,
-                            totalAmount = totalAmount.toDoubleOrNull(),
-                            discount = discount.toDoubleOrNull(),
-                            actualPaidAmount = amt,
-                            unitPrice = price,
-                            remainingFuel = remainingFuelValue,
-                            isFull = isFull,
-                            hasMissedRecord = hasMissedRecord,
-                            missedOdometer = missedOdometerValue,
-                            missedVolume = missedVolumeValue,
-                            note = note.trim()
-                        )
-                    }
+                    val recordToSave = record?.copy(
+                        timestamp = timestamp,
+                        fuelGrade = fuelGrade,
+                        odometer = odo,
+                        volume = vol,
+                        totalAmount = total,
+                        discount = disc,
+                        actualPaidAmount = amt,
+                        unitPrice = price,
+                        remainingFuel = remaining,
+                        isFull = isFull,
+                        hasMissedRecord = hasMissedRecord,
+                        missedOdometer = missedOdometerValue,
+                        missedVolume = missedVolumeValue,
+                        note = note.trim()
+                    ) ?: FuelRecord(
+                        vehicleId = currentVehicle.id,
+                        timestamp = timestamp,
+                        fuelGrade = fuelGrade,
+                        odometer = odo,
+                        volume = vol,
+                        totalAmount = total,
+                        discount = disc,
+                        actualPaidAmount = amt,
+                        unitPrice = price,
+                        remainingFuel = remaining,
+                        isFull = isFull,
+                        hasMissedRecord = hasMissedRecord,
+                        missedOdometer = missedOdometerValue,
+                        missedVolume = missedVolumeValue,
+                        note = note.trim()
+                    )
 
                     val onResult: (Result<Unit>) -> Unit = { result ->
                         isSaving = false
@@ -779,7 +948,8 @@ private fun MiuixCheckRow(checked: Boolean, text: String, onChecked: (Boolean) -
 // ============================================================
 
 private fun formatNumber(value: Double): String {
-    return if (value <= 0.0) "" else String.format(Locale.US, "%.2f", value)
+    if (!value.isFinite()) return ""
+    return String.format(Locale.US, "%.2f", value)
 }
 
 // ============================================================
