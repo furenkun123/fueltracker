@@ -1,20 +1,16 @@
 package com.fueltracker.ui
 
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -23,29 +19,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,7 +28,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +39,7 @@ import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
+import com.fueltracker.ui.components.scrollToHideBottomBar
 import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.flow.firstOrNull
@@ -72,34 +47,19 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import com.fueltracker.ui.components.scrollToHideBottomBar
+import androidx.compose.ui.platform.LocalContext
 
-private val expenseDateFormat by lazy {
-    SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
-}
 
+private val expenseDateFormat by lazy { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
 private const val CATEGORY_FUEL = "加油"
 
 private enum class ExpenseRange(val label: String) {
-    ALL("全部"),
-    MONTH("本月"),
-    YEAR("今年"),
-    CUSTOM_MONTH("")
+    ALL("全部"), MONTH("本月"), YEAR("今年"), CUSTOM_MONTH("")
 }
 
-/**
- * 明细列表的条目：加油记录 + 非加油费用。
- */
-private sealed class ExpenseListItem {
-    abstract val timestamp: Long
-
-    data class Fuel(val record: FuelRecord) : ExpenseListItem() {
-        override val timestamp: Long get() = record.timestamp
-    }
-
-    data class Expense(val record: ExpenseRecord) : ExpenseListItem() {
-        override val timestamp: Long get() = record.timestamp
-    }
+private sealed class ExpenseListItem(open val timestamp: Long) {
+    data class Fuel(val record: FuelRecord) : ExpenseListItem(record.timestamp)
+    data class Expense(val record: ExpenseRecord) : ExpenseListItem(record.timestamp)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -112,6 +72,7 @@ fun ExpenseScreen(
     onEditExpense: (ExpenseRecord) -> Unit,
     onEditFuel: (FuelRecord) -> Unit
 ) {
+    val context = LocalContext.current
     val expenses by viewModel.expenses.collectAsState()
     val fuelRecords by viewModel.records.collectAsState()
 
@@ -119,23 +80,15 @@ fun ExpenseScreen(
     var deletingFuel by remember { mutableStateOf<FuelRecord?>(null) }
 
     var selectedRange by remember { mutableStateOf(ExpenseRange.ALL) }
-    var customYear by remember {
-        mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR))
-    }
+    var customYear by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
     var customMonth by remember { mutableIntStateOf(0) }
     var showYearMonthPicker by remember { mutableStateOf(false) }
 
+    // 👇 修复 1：强制加入当前年份，防止在只有旧记录时无法查看今年空白月份
     val availableYears = remember(expenses, fuelRecords) {
-        val expenseYears = expenses.map {
-            Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.YEAR)
-        }
-        val fuelYears = fuelRecords.map {
-            Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.YEAR)
-        }
-        val all = (expenseYears + fuelYears).distinct().sortedDescending()
-        all.ifEmpty {
-            listOf(Calendar.getInstance().get(Calendar.YEAR))
-        }
+        val currentYear = getYear(System.currentTimeMillis())
+        (expenses.map { getYear(it.timestamp) } + fuelRecords.map { getYear(it.timestamp) } + currentYear)
+            .distinct().sortedDescending()
     }
 
     val rangeBounds = remember(selectedRange, customYear, customMonth) {
@@ -152,254 +105,154 @@ fun ExpenseScreen(
         computeSummary(expenses, fuelRecords, rangeBounds, rangeLabel)
     }
 
-    val monthTrend = remember(expenses, fuelRecords) {
-        buildMonthTrend(expenses, fuelRecords)
-            .filter { it.value > 0.0 }
+    // 趋势图独立的年份筛选状态，null 表示全部
+    var selectedTrendYear by remember { mutableStateOf<Int?>(null) }
+
+    val trendYears = remember(expenses, fuelRecords) {
+        (
+                expenses.map { getYear(it.timestamp) } +
+                        fuelRecords.filter { !it.isInitialRecord }.map { getYear(it.timestamp) }
+                ).distinct().sortedDescending()
+    }
+
+
+
+    // 年份被删空后自动回退到“全部”
+    LaunchedEffect(trendYears) {
+        if (selectedTrendYear != null && selectedTrendYear !in trendYears) {
+            selectedTrendYear = null
+        }
     }
 
     val structureItems = remember(expenses, fuelRecords, rangeBounds) {
         buildStructureData(expenses, fuelRecords, rangeBounds)
     }
 
-    // 明细列表：加油 + 费用，按时间倒序
-    val filteredItems: List<ExpenseListItem> = remember(
-        expenses,
-        fuelRecords,
-        rangeBounds,
-        selectedCategory
-    ) {
+    val filteredItems: List<ExpenseListItem> = remember(expenses, fuelRecords, rangeBounds, selectedCategory) {
         val (start, end) = rangeBounds
         val list = mutableListOf<ExpenseListItem>()
-
         val includeFuel = selectedCategory == null || selectedCategory == CATEGORY_FUEL
         val includeExpense = selectedCategory == null || selectedCategory != CATEGORY_FUEL
 
         if (includeFuel) {
-            fuelRecords
-                .filter { f ->
-                    !f.isInitialRecord &&
-                            (start == null || f.timestamp >= start) &&
-                            (end == null || f.timestamp <= end)
-                }
+            fuelRecords.filter { !it.isInitialRecord && inRange(it.timestamp, start, end) }
                 .forEach { list.add(ExpenseListItem.Fuel(it)) }
         }
-
         if (includeExpense) {
-            expenses
-                .filter { e ->
-                    val inRange = (start == null || e.timestamp >= start) &&
-                            (end == null || e.timestamp <= end)
-                    val matchCategory = selectedCategory == null || e.category == selectedCategory
-                    inRange && matchCategory
-                }
+            expenses.filter { inRange(it.timestamp, start, end) && (selectedCategory == null || it.category == selectedCategory) }
                 .forEach { list.add(ExpenseListItem.Expense(it)) }
         }
-
         list.sortedByDescending { it.timestamp }
     }
 
+
+
+    val monthTrend = remember(expenses, fuelRecords, selectedTrendYear) {
+        buildMonthTrend(expenses, fuelRecords, selectedTrendYear)
+    }
+
+
+
     val isEmpty = expenses.isEmpty() && fuelRecords.none { !it.isInitialRecord }
-
     val listState = rememberLazyListState()
-
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "费用",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                title = { Text("费用", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (isEmpty) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "还没有费用记录\n点右下角 ＋ 添加",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("还没有费用记录\n点右下角 ＋ 添加", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxSize()
-                        .scrollToHideBottomBar(listState, viewModel),                     // ★ 放到最后
+                    modifier = Modifier.fillMaxSize().scrollToHideBottomBar(listState, viewModel),
                     contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    item(key = "summary") {
-                        SummaryCard(
-                            summary = summary,
-                            selectedRange = selectedRange,
-                            rangeLabel = rangeLabel,
-                            onRangeSelected = { selectedRange = it },
-                            onCustomClick = { showYearMonthPicker = true }
-                        )
+                    item("summary") {
+                        SummaryCard(summary, selectedRange, rangeLabel, { selectedRange = it }, { showYearMonthPicker = true })
                     }
-
-                    if (monthTrend.isNotEmpty()) {
-                        item(key = "trend") {
-                            ExpenseTrendCard(points = monthTrend)
+                    // 即便全是 0 也保留，强制展示时间轴
+                    if (trendYears.isNotEmpty()) {
+                        item("trend") {
+                            ExpenseTrendCard(
+                                points = monthTrend,
+                                years = trendYears,
+                                selectedYear = selectedTrendYear,
+                                onYearSelected = { selectedTrendYear = it }
+                            )
                         }
                     }
-
                     if (structureItems.isNotEmpty()) {
-                        item(key = "structure") {
-                            ExpenseStructureCard(
-                                items = structureItems,
-                                selectedCategory = selectedCategory,
-                                onCategoryClick = { cat ->
-                                    val newCategory = if (selectedCategory == cat) null else cat
-                                    onSelectedCategoryChange(newCategory)
-                                }
-                            )
+                        item("structure") {
+                            ExpenseStructureCard(structureItems, selectedCategory) { cat ->
+                                onSelectedCategoryChange(if (selectedCategory == cat) null else cat)
+                            }
                         }
                     }
 
-                    // 明细标题
-                    item(key = "list_header") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (selectedCategory == null) {
-                                    "明细"
-                                } else {
-                                    "明细 · $selectedCategory"
-                                },
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    item("list_header") {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (selectedCategory == null) "明细" else "明细 · $selectedCategory", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (selectedCategory != null) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { onSelectedCategoryChange(null) }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = "清除",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                                Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable { onSelectedCategoryChange(null) }.padding(8.dp)) {
+                                    Text("清除", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
                     }
 
                     if (filteredItems.isEmpty()) {
-                        item(key = "list_empty") {
-                            MiuiCard(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp)
-                            ) {
-                                Text(
-                                    text = "该范围内没有记录",
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(20.dp)
-                                )
+                        item("list_empty") {
+                            MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                                Text("该范围内没有记录", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp))
                             }
                         }
                     } else {
-                        items(
-                            items = filteredItems,
-                            key = { item ->
-                                when (item) {
-                                    is ExpenseListItem.Fuel -> "fuel_${item.record.id}"
-                                    is ExpenseListItem.Expense -> "exp_${item.record.id}"
-                                }
-                            }
-                        ) { item ->
+                        items(filteredItems, key = { if (it is ExpenseListItem.Fuel) "fuel_${it.record.id}" else "exp_${(it as ExpenseListItem.Expense).record.id}" }) { item ->
                             when (item) {
-                                is ExpenseListItem.Fuel -> {
-                                    FuelItemCard(
-                                        record = item.record,
-                                        onEdit = { onEditFuel(item.record) },
-                                        onDelete = { deletingFuel = item.record }
-                                    )
-                                }
-
-                                is ExpenseListItem.Expense -> {
-                                    ExpenseItemCard(
-                                        record = item.record,
-                                        onEdit = { onEditExpense(item.record) },
-                                        onDelete = { deletingExpense = item.record }
-                                    )
-                                }
+                                is ExpenseListItem.Fuel -> ExpenseDetailItemCard(
+                                    title = "加油", time = expenseDateFormat.format(Date(item.record.timestamp)),
+                                    amount = item.record.actualPaidAmount,
+                                    onEdit = { onEditFuel(item.record) }, onDelete = { deletingFuel = item.record }
+                                )
+                                is ExpenseListItem.Expense -> ExpenseDetailItemCard(
+                                    title = item.record.category, time = expenseDateFormat.format(Date(item.record.timestamp)),
+                                    amount = item.record.amount,
+                                    onEdit = { onEditExpense(item.record) }, onDelete = { deletingExpense = item.record }
+                                )
                             }
                         }
                     }
                 }
             }
 
-            androidx.compose.animation.AnimatedVisibility(
+            AnimatedVisibility(
                 visible = viewModel.isBottomBarVisible,
-                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(
-                    initialScale = 0.8f
-                ),
-                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(
-                    targetScale = 0.8f
-                ),
+                enter = fadeIn() + scaleIn(initialScale = 0.8f),
+                exit = fadeOut() + scaleOut(targetScale = 0.8f),
                 modifier = Modifier.align(Alignment.BottomEnd)
             ) {
                 FloatingActionButton(
-                    onClick = onAddExpense,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 24.dp),
-                    containerColor = Color(0xFFFF9500),
-                    contentColor = Color.White,
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Receipt,
-                        contentDescription = "记费用"
-                    )
-                }
+                    onClick = onAddExpense, modifier = Modifier.padding(end = 16.dp, bottom = 24.dp),
+                    containerColor = Color(0xFFFF9500), contentColor = Color.White, shape = CircleShape
+                ) { Icon(Icons.Default.Receipt, "记费用") }
             }
         }
     }
 
     if (showYearMonthPicker) {
-        ExpenseYearMonthSheet(
-            initialYear = customYear,
-            initialMonth = customMonth,
-            availableYears = availableYears,
-            onDismiss = { showYearMonthPicker = false },
-            onConfirm = { y, m ->
-                customYear = y
-                customMonth = m
-                selectedRange = ExpenseRange.CUSTOM_MONTH
-                showYearMonthPicker = false
-            }
-        )
+        ExpenseYearMonthSheet(customYear, customMonth, availableYears, { showYearMonthPicker = false }) { y, m ->
+            customYear = y; customMonth = m; selectedRange = ExpenseRange.CUSTOM_MONTH; showYearMonthPicker = false
+        }
     }
 
     // 删除费用
@@ -408,8 +261,13 @@ fun ExpenseScreen(
             title = "删除费用记录",
             message = "确定删除这条 ${record.category} ¥%.2f 的记录吗？".format(record.amount),
             onConfirm = {
-                viewModel.deleteExpense(record)
-                deletingExpense = null
+                viewModel.deleteExpense(record) { result ->
+                    if (result.isSuccess) {
+                        deletingExpense = null
+                    } else {
+                        Toast.makeText(context, "删除失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
             },
             onDismiss = { deletingExpense = null }
         )
@@ -421,313 +279,133 @@ fun ExpenseScreen(
             title = "删除加油记录",
             message = "确定删除这条 ¥%.2f 的加油记录吗？\n\n删除后相关油耗计算会重新推导。".format(record.actualPaidAmount),
             onConfirm = {
-                viewModel.deleteRecord(record)
-                deletingFuel = null
+                // 👇 加上回调，等待真正删除成功后再关闭弹窗
+                viewModel.deleteRecord(record) { result ->
+                    if (result.isSuccess) {
+                        deletingFuel = null
+                    } else {
+                        Toast.makeText(context, "删除失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
             },
             onDismiss = { deletingFuel = null }
         )
     }
 }
 
-// ============================================================
-// 删除确认对话框
-// ============================================================
-
 @Composable
-private fun DeleteConfirmDialog(
-    title: String,
-    message: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                Text(
-                    text = message,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 20.sp
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(22.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Text(
-                            text = "取消",
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    TextButton(
-                        onClick = onConfirm,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(22.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text(
-                            text = "删除",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onError
-                        )
-                    }
+private fun ExpenseDetailItemCard(title: String, time: String, amount: Double, onEdit: () -> Unit, onDelete: () -> Unit) {
+    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(2.dp))
+                    Text(time, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    CompactExpenseTextButton("编辑", MaterialTheme.colorScheme.primary, onEdit)
+                    CompactExpenseTextButton("删除", Color(0xFFFF3B30).copy(alpha = 0.8f), onDelete)
                 }
             }
+            Text("¥%.2f".format(amount), fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
 
-// ============================================================
-// 范围计算
-// ============================================================
+private fun getYear(timestamp: Long): Int = Calendar.getInstance().apply { timeInMillis = timestamp }.get(Calendar.YEAR)
+private fun inRange(timestamp: Long, start: Long?, end: Long?) = (start == null || timestamp >= start) && (end == null || timestamp <= end)
 
-private fun computeExpenseRange(
-    range: ExpenseRange,
-    customYear: Int,
-    customMonth: Int
-): Pair<Long?, Long?> {
-    val now = System.currentTimeMillis()
-
+private fun computeExpenseRange(range: ExpenseRange, customYear: Int, customMonth: Int): Pair<Long?, Long?> {
+    if (range == ExpenseRange.ALL) return null to null
     val cal = Calendar.getInstance().apply {
-        timeInMillis = now
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
+        timeInMillis = System.currentTimeMillis()
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
     }
-
     when (range) {
-        ExpenseRange.ALL -> return null to null
         ExpenseRange.MONTH -> cal.set(Calendar.DAY_OF_MONTH, 1)
-        ExpenseRange.YEAR -> {
-            cal.set(Calendar.MONTH, Calendar.JANUARY)
-            cal.set(Calendar.DAY_OF_MONTH, 1)
-        }
+        ExpenseRange.YEAR -> { cal.set(Calendar.MONTH, Calendar.JANUARY); cal.set(Calendar.DAY_OF_MONTH, 1) }
         ExpenseRange.CUSTOM_MONTH -> {
             cal.set(Calendar.YEAR, customYear)
-            if (customMonth == 0) {
-                cal.set(Calendar.MONTH, Calendar.JANUARY)
-                cal.set(Calendar.DAY_OF_MONTH, 1)
-            } else {
-                cal.set(Calendar.MONTH, customMonth - 1)
-                cal.set(Calendar.DAY_OF_MONTH, 1)
-            }
+            if (customMonth == 0) { cal.set(Calendar.MONTH, Calendar.JANUARY); cal.set(Calendar.DAY_OF_MONTH, 1) }
+            else { cal.set(Calendar.MONTH, customMonth - 1); cal.set(Calendar.DAY_OF_MONTH, 1) }
         }
+        else -> {}
     }
-
     val start = cal.timeInMillis
     val endCal = cal.clone() as Calendar
-
     when (range) {
-        ExpenseRange.ALL -> return null to null
         ExpenseRange.MONTH -> endCal.add(Calendar.MONTH, 1)
         ExpenseRange.YEAR -> endCal.add(Calendar.YEAR, 1)
-        ExpenseRange.CUSTOM_MONTH -> {
-            if (customMonth == 0) endCal.add(Calendar.YEAR, 1)
-            else endCal.add(Calendar.MONTH, 1)
-        }
+        ExpenseRange.CUSTOM_MONTH -> if (customMonth == 0) endCal.add(Calendar.YEAR, 1) else endCal.add(Calendar.MONTH, 1)
+        else -> {}
     }
-
     return start to (endCal.timeInMillis - 1)
 }
 
-// ============================================================
-// 汇总
-// ============================================================
+private data class ExpenseSummary(val rangeLabel: String, val totalAmount: Double, val count: Int, val dailyAverage: Double, val showDaily: Boolean)
 
-private data class ExpenseSummary(
-    val rangeLabel: String,
-    val totalAmount: Double,
-    val count: Int,
-    val dailyAverage: Double,
-    val showDaily: Boolean
-)
-
-private fun computeSummary(
-    expenses: List<ExpenseRecord>,
-    fuelRecords: List<FuelRecord>,
-    rangeBounds: Pair<Long?, Long?>,
-    rangeLabel: String
-): ExpenseSummary {
+private fun computeSummary(expenses: List<ExpenseRecord>, fuelRecords: List<FuelRecord>, rangeBounds: Pair<Long?, Long?>, rangeLabel: String): ExpenseSummary {
     val (start, end) = rangeBounds
-
-    val filteredExpenses = expenses.filter { e ->
-        (start == null || e.timestamp >= start) &&
-                (end == null || e.timestamp <= end)
-    }
-    val filteredFuel = fuelRecords.filter { f ->
-        !f.isInitialRecord &&
-                (start == null || f.timestamp >= start) &&
-                (end == null || f.timestamp <= end)
-    }
-
-    val expenseTotal = filteredExpenses.sumOf { it.amount }
-    val fuelTotal = filteredFuel.sumOf { it.actualPaidAmount }
-    val total = expenseTotal + fuelTotal
-
+    val filteredExpenses = expenses.filter { inRange(it.timestamp, start, end) }
+    val filteredFuel = fuelRecords.filter { !it.isInitialRecord && inRange(it.timestamp, start, end) }
+    val total = filteredExpenses.sumOf { it.amount } + filteredFuel.sumOf { it.actualPaidAmount }
     val count = filteredExpenses.size + filteredFuel.size
 
-    val daysInRange: Long? = when {
-        start == null || end == null -> null
-        else -> {
-            val diffDays = ((end - start) / 86_400_000L) + 1
-            diffDays.coerceAtLeast(1)
-        }
+    // 👇 修复 3：使用 Calendar 逐日计算天数，彻底消除夏令时误差
+    val daysInRange = if (start == null || end == null) null else {
+        val s = Calendar.getInstance().apply { timeInMillis = start }
+        val e = Calendar.getInstance().apply { timeInMillis = end }
+        var days = 1
+        while (s.before(e)) { s.add(Calendar.DAY_OF_MONTH, 1); days++ }
+        days
     }
 
-    val daily = if (daysInRange != null && daysInRange > 0) total / daysInRange else 0.0
-
-    return ExpenseSummary(
-        rangeLabel = rangeLabel,
-        totalAmount = total,
-        count = count,
-        dailyAverage = daily,
-        showDaily = daysInRange != null
-    )
+    return ExpenseSummary(rangeLabel, total, count, if (daysInRange != null) total / daysInRange else 0.0, daysInRange != null)
 }
 
 @Composable
-private fun SummaryCard(
-    summary: ExpenseSummary,
-    selectedRange: ExpenseRange,
-    rangeLabel: String,
-    onRangeSelected: (ExpenseRange) -> Unit,
-    onCustomClick: () -> Unit
-) {
-    MiuiCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                ExpenseRangeChip(
-                    text = "全部",
-                    selected = selectedRange == ExpenseRange.ALL,
-                    onClick = { onRangeSelected(ExpenseRange.ALL) }
-                )
-                ExpenseRangeChip(
-                    text = "本月",
-                    selected = selectedRange == ExpenseRange.MONTH,
-                    onClick = { onRangeSelected(ExpenseRange.MONTH) }
-                )
-                ExpenseRangeChip(
-                    text = "今年",
-                    selected = selectedRange == ExpenseRange.YEAR,
-                    onClick = { onRangeSelected(ExpenseRange.YEAR) }
-                )
-                ExpenseRangeChip(
-                    text = if (selectedRange == ExpenseRange.CUSTOM_MONTH) rangeLabel else "选年月",
-                    selected = selectedRange == ExpenseRange.CUSTOM_MONTH,
-                    onClick = onCustomClick
-                )
+private fun SummaryCard(summary: ExpenseSummary, selectedRange: ExpenseRange, rangeLabel: String, onRangeSelected: (ExpenseRange) -> Unit, onCustomClick: () -> Unit) {
+    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ExpenseRangeChip("全部", selectedRange == ExpenseRange.ALL) { onRangeSelected(ExpenseRange.ALL) }
+                ExpenseRangeChip("本月", selectedRange == ExpenseRange.MONTH) { onRangeSelected(ExpenseRange.MONTH) }
+                ExpenseRangeChip("今年", selectedRange == ExpenseRange.YEAR) { onRangeSelected(ExpenseRange.YEAR) }
+                ExpenseRangeChip(if (selectedRange == ExpenseRange.CUSTOM_MONTH) rangeLabel else "选年月", selectedRange == ExpenseRange.CUSTOM_MONTH, onCustomClick)
             }
-
-            Text(
-                text = "${summary.rangeLabel}支出",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
+            Text("${summary.rangeLabel}支出", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = "¥",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                Text(
-                    text = "%.2f".format(summary.totalAmount),
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Text("¥", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
+                Text("%.2f".format(summary.totalAmount), fontSize = 32.sp, fontWeight = FontWeight.Bold)
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Column { Text("笔数", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${summary.count} 笔", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+                if (summary.showDaily) Column { Text("日均", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("¥%.2f".format(summary.dailyAverage), fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+            }
+        }
+    }
+}
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                Column {
-                    Text(
-                        text = "笔数",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "${summary.count} 笔",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                if (summary.showDaily) {
-                    Column {
-                        Text(
-                            text = "日均",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = "¥%.2f".format(summary.dailyAverage),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+@Composable
+private fun ExpenseRangeChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    Box(Modifier.clip(RoundedCornerShape(10.dp)).background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Text(text, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    }
+}
+
+@Composable
+private fun DeleteConfirmDialog(title: String, message: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(Modifier.fillMaxWidth().padding(horizontal = 24.dp), shape = RoundedCornerShape(20.dp)) {
+            Column(Modifier.padding(20.dp)) {
+                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Spacer(Modifier.height(12.dp))
+                Text(message, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 20.sp)
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(onDismiss, Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(22.dp), colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Text("取消", fontSize = 15.sp) }
+                    TextButton(onConfirm, Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(22.dp), colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("删除", fontSize = 15.sp, color = MaterialTheme.colorScheme.onError) }
                 }
             }
         }
@@ -735,246 +413,168 @@ private fun SummaryCard(
 }
 
 @Composable
-private fun ExpenseRangeChip(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (selected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.surfaceVariant
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        Text(
-            text = text,
-            fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected)
-                MaterialTheme.colorScheme.onPrimary
-            else
-                MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
+private fun CompactExpenseTextButton(text: String, color: Color, onClick: () -> Unit) {
+    Box(Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(8.dp), contentAlignment = Alignment.Center) {
+        Text(text, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = color)
     }
 }
 
-// ============================================================
-// 月度趋势
-// ============================================================
-
-private data class MonthTrendPoint(
-    val year: Int,
-    val month: Int,
-    val value: Double
-)
+private data class MonthTrendPoint(val year: Int, val month: Int, val value: Double)
 
 private fun buildMonthTrend(
     expenses: List<ExpenseRecord>,
     fuelRecords: List<FuelRecord>,
+    year: Int? // null = 全部
 ): List<MonthTrendPoint> {
-    val monthsBack = 12
-    val now = Calendar.getInstance()
-
-    val keys = (monthsBack - 1 downTo 0).map { offset ->
-        val c = Calendar.getInstance().apply {
-            timeInMillis = now.timeInMillis
-            add(Calendar.MONTH, -offset)
-        }
-        c.get(Calendar.YEAR) to (c.get(Calendar.MONTH) + 1)
-    }
-
     val grouped = mutableMapOf<Pair<Int, Int>, Double>()
 
-    fuelRecords
-        .filter { !it.isInitialRecord }
-        .forEach { r ->
-            val c = Calendar.getInstance().apply { timeInMillis = r.timestamp }
-            val key = c.get(Calendar.YEAR) to (c.get(Calendar.MONTH) + 1)
-            grouped[key] = (grouped[key] ?: 0.0) + r.actualPaidAmount
-        }
-
-    expenses.forEach { e ->
-        val c = Calendar.getInstance().apply { timeInMillis = e.timestamp }
-        val key = c.get(Calendar.YEAR) to (c.get(Calendar.MONTH) + 1)
-        grouped[key] = (grouped[key] ?: 0.0) + e.amount
+    fun accumulate(timestamp: Long, amount: Double) {
+        if (!amount.isFinite() || amount <= 0.0) return
+        val c = Calendar.getInstance().apply { timeInMillis = timestamp }
+        val y = c.get(Calendar.YEAR)
+        if (year != null && y != year) return
+        val key = y to (c.get(Calendar.MONTH) + 1)
+        grouped[key] = (grouped[key] ?: 0.0) + amount
     }
 
-    return keys.map { (y, m) ->
-        MonthTrendPoint(y, m, grouped[y to m] ?: 0.0)
-    }
+    fuelRecords.filter { !it.isInitialRecord }
+        .forEach { accumulate(it.timestamp, it.actualPaidAmount) }
+    expenses.forEach { accumulate(it.timestamp, it.amount) }
+
+    return grouped.entries
+        .filter { it.value > 0.0 }
+        .map { (key, value) -> MonthTrendPoint(key.first, key.second, value) }
+        .sortedWith(compareBy<MonthTrendPoint> { it.year }.thenBy { it.month })
 }
 
 @Composable
-private fun ExpenseTrendCard(points: List<MonthTrendPoint>) {
-    if (points.isEmpty()) return
-
-    val maxValue = points.maxOf { it.value }
-    val yMax = if (maxValue > 0) maxValue * 1.15 else 1.0
-
+private fun ExpenseTrendCard(
+    points: List<MonthTrendPoint>,
+    years: List<Int>,
+    selectedYear: Int?,
+    onYearSelected: (Int?) -> Unit
+) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
-
     val textMeasurer = rememberTextMeasurer()
-    val density = LocalDensity.current
 
-    val valueLabelStyle = remember {
-        TextStyle(
-            color = onSurfaceColor,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
-    val timeLabelStyle = remember {
-        TextStyle(
-            color = onSurfaceVariantColor,
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Normal
-        )
-    }
-
-    val isSameYear = remember(points) {
-        points.map { it.year }.distinct().size <= 1
-    }
-
-    val valueLayouts = remember(points, textMeasurer) {
-        points.map {
-            textMeasurer.measure(
-                text = "%.0f".format(it.value),
-                style = valueLabelStyle
+    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                if (selectedYear == null) "费用趋势 · 全部" else "费用趋势 · ${selectedYear}年",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
             )
-        }
-    }
-
-    val timeLayouts = remember(points, isSameYear, textMeasurer) {
-        points.map { p ->
-            val label = if (isSameYear) "${p.month}月"
-            else "%02d/%02d".format(p.year % 100, p.month)
-            textMeasurer.measure(text = label, style = timeLabelStyle)
-        }
-    }
-
-    val topPaddingDp = remember(valueLayouts, density) {
-        val maxH = valueLayouts.maxOfOrNull { it.size.height } ?: 0
-        with(density) {
-            (maxH.toDp() + 4.dp).coerceAtLeast(16.dp)
-        }
-    }
-
-    val chartAreaHeight = 94.dp
-    val timeAxisHeight = 18.dp
-    val canvasHeight = topPaddingDp + chartAreaHeight + timeAxisHeight
-
-    val scrollState = rememberScrollState()
-    val visibleCount = 10
-    val barCount = points.size
-
-    LaunchedEffect(barCount) {
-        if (barCount > visibleCount) {
-            val maxScroll = snapshotFlow { scrollState.maxValue }
-                .firstOrNull { it > 0 }
-                ?: return@LaunchedEffect
-            scrollState.scrollTo(maxScroll)
-        }
-    }
-
-    MiuiCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+            Spacer(Modifier.height(8.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = "费用趋势",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "(近 12 个月)",
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                ExpenseRangeChip("全部", selectedYear == null) { onYearSelected(null) }
+                years.forEach { y ->
+                    ExpenseRangeChip("${y}年", selectedYear == y) { onYearSelected(y) }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+
+            if (points.isEmpty()) {
+                Box(
+                    Modifier.fillMaxWidth().height(80.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "该范围暂无费用记录",
+                        fontSize = 12.sp,
+                        color = onSurfaceVariantColor
+                    )
+                }
+                return@Column
             }
 
-            androidx.compose.foundation.layout.BoxWithConstraints(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                val itemWidth = maxWidth / visibleCount
-                val chartWidth = if (barCount <= visibleCount) {
-                    maxWidth
-                } else {
-                    itemWidth * barCount
+            val maxValue = points.maxOf { it.value }
+            val yMax = if (maxValue > 0) maxValue * 1.15 else 1.0
+
+            val valueLayouts = remember(points, onSurfaceColor) {
+                points.map {
+                    textMeasurer.measure(
+                        "%.0f".format(it.value),
+                        TextStyle(color = onSurfaceColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    )
                 }
+            }
+            val timeLayouts = remember(points, onSurfaceVariantColor) {
+                points.mapIndexed { index, point ->
+                    val label = if (index == 0 || points[index - 1].year != point.year) {
+                        "${point.year % 100}年${point.month}月"
+                    } else {
+                        "${point.month}月"
+                    }
+                    textMeasurer.measure(
+                        label,
+                        TextStyle(color = onSurfaceVariantColor, fontSize = 8.sp)
+                    )
+                }
+            }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(scrollState)
-                ) {
+            val chartAreaHeight = 94.dp
+            val timeAxisHeight = 18.dp
+            val scrollState = rememberScrollState()
+            val visibleCount = 13
+            val barCount = points.size
+
+            LaunchedEffect(barCount, selectedYear) {
+                if (barCount > visibleCount) {
+                    snapshotFlow { scrollState.maxValue }
+                        .firstOrNull { it > 0 }
+                        ?.let { scrollState.scrollTo(it) }
+                } else {
+                    scrollState.scrollTo(0)
+                }
+            }
+
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val chartWidth =
+                    if (barCount <= visibleCount) maxWidth
+                    else (maxWidth / visibleCount) * barCount
+                Box(Modifier.fillMaxWidth().horizontalScroll(scrollState)) {
                     Canvas(
-                        modifier = Modifier
+                        Modifier
                             .width(chartWidth)
-                            .height(canvasHeight)
+                            .height(chartAreaHeight + timeAxisHeight + 16.dp)
                     ) {
-                        val width = size.width
-                        val topPadding = topPaddingDp.toPx()
-                        val timeAxis = timeAxisHeight.toPx()
-                        val chartHeight = size.height - topPadding - timeAxis
-                        val slotWidth = width / barCount
-
+                        val slotWidth = size.width / barCount
                         val barWidth = (slotWidth * 0.5f).coerceIn(4.dp.toPx(), 40.dp.toPx())
-                        val minBarHeight = 2.dp.toPx()
-                        val timeLabelY = topPadding + chartHeight + 4.dp.toPx()
+                        val chartHeight = size.height - timeAxisHeight.toPx() - 16.dp.toPx()
+                        val topPadding = 16.dp.toPx()
 
                         points.forEachIndexed { index, point ->
-                            val slotLeft = index * slotWidth
-                            val barCenterX = slotLeft + slotWidth / 2f
-                            val barLeft = barCenterX - barWidth / 2f
-
-                            val heightFactor = (point.value / yMax).toFloat().coerceIn(0f, 1f)
-                            val barHeight = (chartHeight * heightFactor).coerceAtLeast(minBarHeight)
-                            val barTop = topPadding + (chartHeight - barHeight)
-
-                            val isCurrentMonth = index == points.size - 1
-                            val barColor = if (isCurrentMonth)
-                                primaryColor
-                            else
-                                primaryColor.copy(alpha = 0.55f)
+                            val center = index * slotWidth + slotWidth / 2f
+                            val barHeight = (chartHeight * (point.value / yMax).toFloat().coerceIn(0f, 1f))
+                                .coerceAtLeast(2.dp.toPx())
+                            val barTop = topPadding + chartHeight - barHeight
 
                             drawRoundRect(
-                                color = barColor,
-                                topLeft = Offset(barLeft, barTop),
-                                size = Size(barWidth, barHeight),
-                                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                                if (index == barCount - 1) primaryColor
+                                else primaryColor.copy(alpha = 0.55f),
+                                Offset(center - barWidth / 2f, barTop),
+                                Size(barWidth, barHeight),
+                                CornerRadius(4.dp.toPx())
                             )
-
-                            val vLayout = valueLayouts[index]
-                            val vW = vLayout.size.width.toFloat()
-                            val vH = vLayout.size.height.toFloat()
-                            val maxX = (width - vW).coerceAtLeast(0f)
-                            val vX = (barCenterX - vW / 2f).coerceIn(0f, maxX)
-                            val vY = barTop - vH - 2.dp.toPx()
-                            drawText(vLayout, topLeft = Offset(vX, vY))
-
-                            val tLayout = timeLayouts[index]
-                            val tW = tLayout.size.width.toFloat()
-                            val maxTX = (width - tW).coerceAtLeast(0f)
-                            val tX = (barCenterX - tW / 2f).coerceIn(0f, maxTX)
-                            drawText(tLayout, topLeft = Offset(tX, timeLabelY))
+                            drawText(
+                                textLayoutResult = valueLayouts[index],
+                                topLeft = Offset(
+                                    x = center - valueLayouts[index].size.width / 2f,
+                                    y = barTop - valueLayouts[index].size.height - 2.dp.toPx()
+                                )
+                            )
+                            drawText(
+                                textLayoutResult = timeLayouts[index],
+                                topLeft = Offset(
+                                    x = center - timeLayouts[index].size.width / 2f,
+                                    y = topPadding + chartHeight + 4.dp.toPx()
+                                )
+                            )
                         }
                     }
                 }
@@ -983,433 +583,65 @@ private fun ExpenseTrendCard(points: List<MonthTrendPoint>) {
     }
 }
 
-// ============================================================
-// 费用结构
-// ============================================================
+private data class StructureItem(val name: String, val amount: Double, val ratio: Float)
 
-private data class StructureItem(
-    val name: String,
-    val amount: Double,
-    val ratio: Float
-)
-
-private fun buildStructureData(
-    expenses: List<ExpenseRecord>,
-    fuelRecords: List<FuelRecord>,
-    rangeBounds: Pair<Long?, Long?>
-): List<StructureItem> {
+private fun buildStructureData(expenses: List<ExpenseRecord>, fuelRecords: List<FuelRecord>, rangeBounds: Pair<Long?, Long?>): List<StructureItem> {
     val (start, end) = rangeBounds
-
     val map = mutableMapOf<String, Double>()
+    fuelRecords.filter { !it.isInitialRecord && inRange(it.timestamp, start, end) }.sumOf { it.actualPaidAmount }.takeIf { it > 0 }?.let { map[CATEGORY_FUEL] = it }
 
-    val fuelTotal = fuelRecords
-        .filter { f ->
-            !f.isInitialRecord &&
-                    (start == null || f.timestamp >= start) &&
-                    (end == null || f.timestamp <= end)
-        }
-        .sumOf { it.actualPaidAmount }
-
-    if (fuelTotal > 0) map[CATEGORY_FUEL] = fuelTotal
-
-    expenses
-        .filter { e ->
-            (start == null || e.timestamp >= start) &&
-                    (end == null || e.timestamp <= end)
-        }
-        .groupBy { it.category }
-        .forEach { (cat, list) ->
-            map[cat] = list.sumOf { it.amount }
-        }
+    // 👇 修复 4：累加而不是覆盖，防止用户自定义“加油”分类时数据被顶掉
+    expenses.filter { inRange(it.timestamp, start, end) }.groupBy { it.category }.forEach { (cat, list) ->
+        map[cat] = (map[cat] ?: 0.0) + list.sumOf { it.amount }
+    }
 
     val total = map.values.sum()
-
-    return map
-        .map { (name, amount) ->
-            StructureItem(
-                name = name,
-                amount = amount,
-                ratio = if (total > 0) (amount / total).toFloat() else 0f
-            )
-        }
-        .filter { it.amount > 0 }
-        .sortedByDescending { it.amount }
+    return map.map { (name, amount) -> StructureItem(name, amount, if (total > 0) (amount / total).toFloat() else 0f) }.filter { it.amount > 0 }.sortedByDescending { it.amount }
 }
 
 @Composable
-private fun ExpenseStructureCard(
-    items: List<StructureItem>,
-    selectedCategory: String?,
-    onCategoryClick: (String) -> Unit
-) {
-    if (items.isEmpty()) return
-
-    MiuiCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "费用结构",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (selectedCategory == null) "点击筛选" else "已筛选 $selectedCategory",
-                    fontSize = 11.sp,
-                    color = if (selectedCategory == null)
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    else
-                        MaterialTheme.colorScheme.primary
-                )
+private fun ExpenseStructureCard(items: List<StructureItem>, selectedCategory: String?, onCategoryClick: (String) -> Unit) {
+    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("费用结构", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (selectedCategory == null) "点击筛选" else "已筛选 $selectedCategory", fontSize = 11.sp, color = if (selectedCategory == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
             }
-
             items.forEach { item ->
-                StructureRow(
-                    item = item,
-                    selected = item.name == selectedCategory,
-                    onClick = { onCategoryClick(item.name) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StructureRow(
-    item: StructureItem,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp, horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = item.name,
-                fontSize = 14.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = if (selected)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.onSurface
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "¥%.2f".format(item.amount),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "%.0f%%".format(item.ratio * 100),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(36.dp)
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(item.ratio.coerceIn(0f, 1f))
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                    )
-            )
-        }
-    }
-}
-
-// ============================================================
-// 明细列表项：费用
-// ============================================================
-
-@Composable
-private fun ExpenseItemCard(
-    record: ExpenseRecord,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val timeText = remember(record.timestamp) {
-        expenseDateFormat.format(Date(record.timestamp))
-    }
-
-    MiuiCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = record.category,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = timeText,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    CompactExpenseTextButton(
-                        text = "编辑",
-                        color = MaterialTheme.colorScheme.primary,
-                        onClick = onEdit
-                    )
-                    CompactExpenseTextButton(
-                        text = "删除",
-                        color = Color(0xFFFF3B30).copy(alpha = 0.8f),
-                        onClick = onDelete
-                    )
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onCategoryClick(item.name) }.padding(vertical = 6.dp, horizontal = 4.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(item.name, fontSize = 14.sp, fontWeight = if (item.name == selectedCategory) FontWeight.Bold else FontWeight.Normal, color = if (item.name == selectedCategory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("¥%.2f".format(item.amount), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text("%.0f%%".format(item.ratio * 100), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(36.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                        Box(Modifier.fillMaxWidth(item.ratio.coerceIn(0f, 1f)).fillMaxHeight().background(if (item.name == selectedCategory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)))
+                    }
                 }
             }
-
-            Text(
-                text = "¥%.2f".format(record.amount),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
         }
     }
 }
-
-// ============================================================
-// 明细列表项：加油
-// ============================================================
-
-@Composable
-private fun FuelItemCard(
-    record: FuelRecord,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val timeText = remember(record.timestamp) {
-        expenseDateFormat.format(Date(record.timestamp))
-    }
-
-    MiuiCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "加油",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = timeText,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    CompactExpenseTextButton(
-                        text = "编辑",
-                        color = MaterialTheme.colorScheme.primary,
-                        onClick = onEdit
-                    )
-                    CompactExpenseTextButton(
-                        text = "删除",
-                        color = Color(0xFFFF3B30).copy(alpha = 0.8f),
-                        onClick = onDelete
-                    )
-                }
-            }
-
-            Text(
-                text = "¥%.2f".format(record.actualPaidAmount),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
-
-@Composable
-private fun CompactExpenseTextButton(
-    text: String,
-    color: Color,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = color,
-            maxLines = 1
-        )
-    }
-}
-
-// ============================================================
-// 年月选择
-// ============================================================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ExpenseYearMonthSheet(
-    initialYear: Int,
-    initialMonth: Int,
-    availableYears: List<Int>,
-    onDismiss: () -> Unit,
-    onConfirm: (Int, Int) -> Unit
-) {
+private fun ExpenseYearMonthSheet(initialYear: Int, initialMonth: Int, availableYears: List<Int>, onDismiss: () -> Unit, onConfirm: (Int, Int) -> Unit) {
     var year by remember { mutableIntStateOf(initialYear) }
     var month by remember { mutableIntStateOf(initialMonth) }
-
-    val monthValues = remember { listOf(0) + (1..12).toList() }
-
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable(onClick = onDismiss)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "取消",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Text(
-                    text = "选择年月",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { onConfirm(year, month) }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "确定",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("取消", Modifier.clickable(onClick = onDismiss).padding(8.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("选择年月", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("确定", Modifier.clickable { onConfirm(year, month) }.padding(8.dp), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
-
             Spacer(Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                WheelList(
-                    selectedValue = year,
-                    items = availableYears,
-                    visibleCount = 5,
-                    modifier = Modifier.weight(1.4f),
-                    style = WheelStyle.WithBackground,
-                    itemLabel = { "${it}年" },
-                    onChange = { year = it }
-                )
-                WheelList(
-                    selectedValue = month,
-                    items = monthValues,
-                    visibleCount = 5,
-                    modifier = Modifier.weight(1f),
-                    style = WheelStyle.WithBackground,
-                    itemLabel = { if (it == 0) "全年" else "%02d 月".format(it) },
-                    onChange = { month = it }
-                )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WheelList(selectedValue = year, items = availableYears, visibleCount = 3, modifier = Modifier.weight(1.4f), style = WheelStyle.WithBackground, itemLabel = { "${it}年" }, onChange = { year = it })
+                WheelList(selectedValue = month, items = (0..12).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.WithBackground, itemLabel = { if (it == 0) "全年" else "%02d 月".format(it) }, onChange = { month = it })
             }
         }
     }

@@ -10,7 +10,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 // ============================================================
-// 公共数据结构：保持与现有调用方兼容
+// 公共数据结构
 // ============================================================
 
 data class ConsumptionResult(
@@ -45,9 +45,9 @@ data class IntervalQuality(
     val inconsistentRemainingFuelCount: Int = 0,
     val oversizedSingleFuelCount: Int = 0,
     val oversizedMissedFuelCount: Int = 0,
+    val invalidMissedFuelCount: Int = 0,
     val suspiciousOdometerJumpCount: Int = 0,
     val hardBoundaryEventCount: Int = 0,
-    /** 存在无法可靠估算的燃油缺口或燃油累计溢出。 */
     val hasUnresolvedFuelGap: Boolean = false,
     val confidenceScore: Double = 1.0,
     val confidence: IntervalConfidence = IntervalConfidence.HIGH,
@@ -60,17 +60,13 @@ data class StatisticsSummary(
     val totalMissedVolume: Double,
     val totalCost: Double,
     val averagePrice: Double?,
-    /** 所有闭合区间总里程（含低可信度/离群）。 */
     val totalDistance: Double,
-    /** 所有闭合区间总燃油（含低可信度/离群）。 */
     val totalFuel: Double,
-    /** 仅使用物理可用区间计算的平均油耗。 */
     val averageConsumption: Double?,
     val odometerSpanText: String,
     val unclosedCount: Int,
     val rejectedCount: Int = 0,
     val rangeResults: List<ConsumptionResult>,
-    /** 未作为区间终点的记录，包括起点、半箱、未闭合及被拒绝记录。 */
     val pendingRecords: List<FuelRecord> = emptyList(),
     val missingOdometerCount: Int = 0,
     val robustAverageConsumption: Double? = null,
@@ -78,20 +74,12 @@ data class StatisticsSummary(
     val reliableResultCount: Int = 0,
     val outlierCount: Int = 0,
     val hasValidAnchor: Boolean = true,
-    /** 原始输入包含非法数值或统计发生数值异常时为 false。 */
-    val isCalculationValid: Boolean = true,  /** 统计运算是否发生数值异常，例如溢出或非有限结果。 */
-    val hasInvalidRecords: Boolean = false /** 统计范围内是否存在关键字段无效的记录。 */
+    val isCalculationValid: Boolean = true,
+    val hasInvalidRecords: Boolean = false
 )
 
 // ============================================================
-// FuelCalculator V4.9
-//
-// 设计原则：
-// 1. 仅由有效满箱记录闭合区间；不使用可撤销但未保存完整快照的暂存闭合。
-// 2. 每条记录的油量字段独立检查，严重异常油量不进入累计，并标记燃油缺口。
-// 3. 拒绝区间闭合时，不把该次满箱的油量继续混进下一个区间；有效满箱可作为新锚点。
-// 4. 里程基准只由被接受的里程更新；小幅回落不会降低普通区间中的可靠基准。
-// 5. 统计对非法输入和非有限运算显式失效，不把非法数值静默当作有效零值。
+// FuelCalculator V5.3
 // ============================================================
 
 object FuelCalculator {
@@ -114,6 +102,7 @@ object FuelCalculator {
     private const val RELATIVE_MAD_MIN_WIDTH = 0.35
     private const val PLUG_IN_MAD_MIN_WIDTH = 0.75
 
+    // 剩余油量相关阈值
     private const val REMAINING_FUEL_CONSISTENCY_LOW = 0.90
     private const val REMAINING_FUEL_CONSISTENCY_HIGH = 1.05
     private const val REMAINING_FUEL_SEVERE_LOW = 0.70
@@ -173,10 +162,11 @@ object FuelCalculator {
 
     private data class SoftRange(val min: Double, val max: Double)
 
-    private data class Analysis(
+    private class Analysis(
         val visible: List<FuelRecord>,
         val results: List<ConsumptionResult>,
         val rejected: Map<Int, String>,
+        val usedRecordIds: Set<Long>,
         val openAnchorIndex: Int?,
         val hasValidAnchor: Boolean
     )
@@ -218,33 +208,31 @@ object FuelCalculator {
         val tankCapacity = vehicle?.tankCapacity?.takeIf { it.isFinite() && it > 0.0 }
 
         fun inPeriod(timestamp: Long): Boolean =
-            (startTime == null || timestamp >= startTime) && (endTime == null || timestamp < endTime)
+            (startTime == null || timestamp >= startTime) && (endTime == null || timestamp <= endTime)
 
         val periodRecords = visible.filter { inPeriod(it.timestamp) }
-        val rangeResults = analysis.results.filter {
-            inPeriod(it.startTimestamp) && inPeriod(it.endTimestamp)
-        }
-        val resultRecordIds = analysis.results.map { it.recordId }.toSet()
+        val rangeResults = analysis.results.filter { inPeriod(it.endTimestamp) }
+
+        // 🚨 核心修复 1：移除 id == 0 的误判
         val pendingRecords = periodRecords
-            .filter { it.id !in resultRecordIds || it.id == 0L }
+            .filter { it.id !in analysis.usedRecordIds }
             .sortedByDescending { it.timestamp }
 
         val missingOdometerCount = periodRecords.count { validOdometer(it) == null }
-        val totalCount = periodRecords.size
+        val totalCount = periodRecords.count { isValidVolume(it.volume, tankCapacity) }
+
         var isCalculationValid = true
         var hasInvalidRecords = false
 
         fun safeAdd(a: Double, b: Double): Double {
-            if (!isCalculationValid) return 0.0
-
             if (!a.isFinite() || !b.isFinite()) {
                 isCalculationValid = false
-                return 0.0
+                return a
             }
             val sum = a + b
             if (!sum.isFinite()) {
                 isCalculationValid = false
-                return 0.0
+                return a
             }
             return sum
         }
@@ -260,17 +248,18 @@ object FuelCalculator {
             val volumeValid = isValidVolume(rawVolume, tankCapacity)
 
             val rawMissedVolume = safeMissedVolume(record)
-            val missedVolumeValid = !record.hasMissedRecord ||
-                    isValidVolume(rawMissedVolume, tankCapacity)
-
+            val missedVolumeValid = !record.hasMissedRecord || isValidVolume(rawMissedVolume, tankCapacity)
             val costValid = isValidMoney(record.actualPaidAmount)
+            val unitPriceValid = isValidMoney(record.unitPrice) && (record.isInitialRecord || record.unitPrice > 0)
+            val totalAmountValid = record.totalAmount == null || isValidMoney(record.totalAmount)
+            val discountValid = record.discount == null || isValidMoney(record.discount)
 
-            // 新增：检查其他关键字段
+            // 🚨 核心修复 2：完善所有关键字段的有效性检查
             val odometerValid = record.odometer == null || (record.odometer.isFinite() && record.odometer > 0.0)
             val remainingValid = record.remainingFuel == null || (record.remainingFuel.isFinite() && record.remainingFuel >= 0.0)
             val missedOdoValid = !record.hasMissedRecord || (record.missedOdometer != null && record.missedOdometer.isFinite() && record.missedOdometer > 0.0)
 
-            if (!volumeValid || !missedVolumeValid || !costValid || !odometerValid || !remainingValid || !missedOdoValid) {
+            if (!volumeValid || !missedVolumeValid || !costValid || !odometerValid || !remainingValid || !missedOdoValid || !unitPriceValid || !totalAmountValid || !discountValid) {
                 hasInvalidRecords = true
             }
 
@@ -282,7 +271,6 @@ object FuelCalculator {
             totalMissedVolume = safeAdd(totalMissedVolume, missedVolume)
             totalCost = safeAdd(totalCost, cost)
 
-            // 只有同时合法的金额和油量才能参与均价计算
             if (volumeValid && costValid) {
                 pricedVolume = safeAdd(pricedVolume, volume)
                 pricedCost = safeAdd(pricedCost, cost)
@@ -318,21 +306,12 @@ object FuelCalculator {
         val robust = robustWeightedConsumption(reliableResults) { isCalculationValid = false }
         val weightedMean = weightedArithmeticMean(reliableResults) { isCalculationValid = false }
         val odometerSpanText = if (rangeResults.isNotEmpty()) {
-            "%.0f - %.0f km".format(
-                Locale.US,
-                rangeResults.minOf { it.startOdometer },
-                rangeResults.maxOf { it.endOdometer }
-            )
+            "%.0f - %.0f km".format(Locale.US, rangeResults.minOf { it.startOdometer }, rangeResults.maxOf { it.endOdometer })
         } else "--"
 
-        val rejectedCount = analysis.rejected.keys.count { index ->
-            index in visible.indices && inPeriod(visible[index].timestamp)
-        }
+        val rejectedCount = analysis.rejected.keys.count { index -> index in visible.indices && inPeriod(visible[index].timestamp) }
         val anchorIndex = analysis.openAnchorIndex
-        val unclosedCount = if (
-            analysis.hasValidAnchor && anchorIndex != null &&
-            anchorIndex < visible.lastIndex && inPeriod(visible[anchorIndex].timestamp)
-        ) 1 else 0
+        val unclosedCount = if (analysis.hasValidAnchor && anchorIndex != null && anchorIndex < visible.lastIndex && inPeriod(visible[anchorIndex].timestamp)) 1 else 0
 
         return StatisticsSummary(
             totalCount = totalCount,
@@ -364,7 +343,7 @@ object FuelCalculator {
     // --------------------------------------------------------
 
     private fun analyze(records: List<FuelRecord>, vehicle: Vehicle?): Analysis {
-        if (records.isEmpty()) return Analysis(emptyList(), emptyList(), emptyMap(), null, false)
+        if (records.isEmpty()) return Analysis(emptyList(), emptyList(), emptyMap(), emptySet(), null, false)
 
         val deliveryDate = vehicle?.deliveryDate?.takeIf { it > 0L }
         val visibleRecords = records.asSequence()
@@ -372,7 +351,7 @@ object FuelCalculator {
             .sortedWith(RECORD_COMPARATOR)
             .toList()
         if (visibleRecords.isEmpty()) {
-            return Analysis(emptyList(), emptyList(), emptyMap(), null, false)
+            return Analysis(emptyList(), emptyList(), emptyMap(), emptySet(), null, false)
         }
 
         val nextValidIndex = IntArray(visibleRecords.size) { -1 }
@@ -390,20 +369,16 @@ object FuelCalculator {
 
         val tankCapacity = vehicle?.tankCapacity?.takeIf { it.isFinite() && it > 0.0 }
         val initialOdometer = vehicle?.initialOdometer?.takeIf { it.isFinite() && it > 0.0 }
-        val firstAnchor = findFirstAnchor(
-            visibleRecords, nextValidIndex, priorValidOdometer, tankCapacity, initialOdometer
-        )
-
-        if (firstAnchor == null) {
-            val rejected = HashMap<Int, String>()
-            visibleRecords.forEachIndexed { index, record ->
-                if (record.isFull) rejected[index] = REASON_NO_ANCHOR
+        val firstAnchor = findFirstAnchor(visibleRecords, nextValidIndex, priorValidOdometer, tankCapacity, initialOdometer)
+            ?: run {
+                val rejected = HashMap<Int, String>()
+                visibleRecords.forEachIndexed { index, record -> if (record.isFull) rejected[index] = REASON_NO_ANCHOR }
+                return Analysis(visibleRecords, emptyList(), rejected, emptySet(), null, false)
             }
-            return Analysis(visibleRecords, emptyList(), rejected, null, false)
-        }
 
         val results = ArrayList<ConsumptionResult>()
         val rejected = HashMap<Int, String>()
+        val usedRecordIds = mutableSetOf<Long>()
         val state = SegmentState()
 
         var segmentStartOdometer = firstAnchor.odometer
@@ -413,10 +388,10 @@ object FuelCalculator {
         var lastReliableOdometer = segmentStartOdometer
         var lastReliableTimestamp = segmentStartTimestamp
 
+        usedRecordIds.add(visibleRecords[firstAnchor.index].id)
         state.resetForStartRecord()
         state.recordAnchorBaselineFlags(visibleRecords[firstAnchor.index], tankCapacity)
 
-        // 统一的重锚操作：结束旧区间，把当前有效满箱作为新区间起点。
         fun reanchor(index: Int, record: FuelRecord, odometer: Double) {
             segmentStartOdometer = odometer
             segmentStartEstimated = false
@@ -424,6 +399,7 @@ object FuelCalculator {
             segmentStartIndex = index
             lastReliableOdometer = odometer
             lastReliableTimestamp = record.timestamp
+            usedRecordIds.add(record.id)
             state.resetForStartRecord()
             state.recordAnchorBaselineFlags(record, tankCapacity)
         }
@@ -431,115 +407,79 @@ object FuelCalculator {
         for (index in (firstAnchor.index + 1) until visibleRecords.size) {
             val record = visibleRecords[index]
             val currentOdometer = validOdometer(record)
-            val odoClass = classifyOdometer(
-                records = visibleRecords,
-                index = index,
-                nextValidIndexArray = nextValidIndex,
-                current = currentOdometer,
-                segmentStart = segmentStartOdometer,
-                lastReliable = lastReliableOdometer,
-                lastTimestamp = lastReliableTimestamp,
-                record = record,
-                tankCapacity = tankCapacity
-            )
+            val odoClass = classifyOdometer(visibleRecords, index, nextValidIndex, currentOdometer, segmentStartOdometer, lastReliableOdometer, lastReliableTimestamp, record, tankCapacity)
 
-            // 明确的里程表回退/换表：只允许合格满箱记录重建锚点。
-            if (odoClass == OdoClass.BELOW_START_REANCHOR && currentOdometer != null &&
-                isSuitableAsAnchor(record, tankCapacity)
-            ) {
+            if (odoClass == OdoClass.BELOW_START_REANCHOR && currentOdometer != null && isSuitableAsAnchor(record, tankCapacity)) {
                 reanchor(index, record, currentOdometer)
                 continue
             }
 
-            // 仅采纳正常单调前进的里程。小幅回落可以参与当前闭合判断，但不降低后续分类基准。
             if (currentOdometer != null && odoClass == OdoClass.ACCEPT) {
                 lastReliableOdometer = currentOdometer
                 lastReliableTimestamp = record.timestamp
             }
 
             val currentFuelSevere = isSeverelyOversizedVolume(record.volume, tankCapacity)
-            val missedFuelSevere = record.hasMissedRecord &&
-                    record.missedVolume?.let { isSeverelyOversizedVolume(it, tankCapacity) } == true
-
-            // 先登记质量信息，再按字段可采信性分别累计油量。
-            state.addRecordQualityFlags(record, tankCapacity)
-
-            when (odoClass) {
-                OdoClass.SUSPICIOUS_JUMP -> state.markSuspiciousOdometerJump()
-                OdoClass.HIGH_SPIKE, OdoClass.BELOW_START, OdoClass.LOW_CLUSTER,
-                OdoClass.LOW_SPIKE, OdoClass.UNCONFIRMED_DIP -> state.markOdometerAnomaly()
-                OdoClass.SMALL_DIP -> Unit
-                else -> Unit
-            }
-
             if (currentFuelSevere) {
-                // 严重超量的当前油量被排除，但未知的真实加油量构成缺口。
                 state.markUnresolvedFuelGap()
-            } else if (hasValidFuelVolume(record)) {
-                val currentVolume = safeFuelVolume(record)
-                state.addFuel(currentVolume)
-            } else {
-                // 记录存在但油量字段无效：不能把缺失油量当成 0 后继续给出高可信结果。
-                state.markUnresolvedFuelGap()
-            }
-
-            if (missedFuelSevere) {
-                state.markUnresolvedFuelGap()
-            } else {
-                val missedVolume = safeMissedVolume(record)
-                if (missedVolume > 0.0) {
-                    state.addFuel(missedVolume)
-                }
-            }
-
-            if (currentFuelSevere) {
                 rejected[index] = REASON_VOLUME_SEVERE
                 continue
             }
             if (isRemainingFuelSeverelyInconsistent(record, tankCapacity)) {
-                state.markAsMiddlePartialFueling()
+                state.markUnresolvedFuelGap()
                 rejected[index] = REASON_REMAINING_SEVERE
                 continue
             }
 
-            // 对任何满箱闭合尝试，先保证当前记录油量合法；不能让无效满箱静默进入闭合流程。
+            state.addRecordQualityFlags(record, tankCapacity)
+
+            when (odoClass) {
+                OdoClass.SUSPICIOUS_JUMP -> state.markSuspiciousOdometerJump()
+                OdoClass.HIGH_SPIKE, OdoClass.BELOW_START, OdoClass.LOW_CLUSTER, OdoClass.LOW_SPIKE, OdoClass.UNCONFIRMED_DIP -> state.markOdometerAnomaly()
+                else -> Unit
+            }
+
+            if (hasValidFuelVolume(record)) {
+                state.addFuel(safeFuelVolume(record))
+                usedRecordIds.add(record.id)
+            } else {
+                state.markUnresolvedFuelGap()
+            }
+
+            val missedVolumeInvalid = record.hasMissedRecord && (record.missedVolume == null || !record.missedVolume.isFinite() || record.missedVolume <= 0.0)
+            val missedFuelSevere = record.hasMissedRecord && record.missedVolume?.let { isSeverelyOversizedVolume(it, tankCapacity) } == true
+
+            if (missedVolumeInvalid || missedFuelSevere) {
+                state.markUnresolvedFuelGap()
+            } else {
+                val missedVolume = safeMissedVolume(record)
+                if (missedVolume > 0.0) state.addFuel(missedVolume)
+                usedRecordIds.add(record.id)
+            }
+
             if (!hasValidFuelVolume(record)) {
                 rejected[index] = REASON_VOLUME_INVALID
                 continue
             }
-
             if (!record.isFull) {
                 state.markAsMiddlePartialFueling()
                 continue
             }
 
+            // 满箱但没有里程：保留累计油量，等待后续有里程的满箱记录结算。
+// 缺少中间里程不等于缺少加油量，不能因此清空累计。
+            if (odoClass == OdoClass.MISSING) {
+                rejected[index] = REASON_NO_ODOMETER
+                continue
+            }
+
             when (odoClass) {
-                OdoClass.SUSPICIOUS_JUMP -> {
-                    rejected[index] = REASON_JUMP
-                    continue
-                }
-                OdoClass.HIGH_SPIKE -> {
-                    rejected[index] = REASON_SPIKE
-                    continue
-                }
-                OdoClass.BELOW_START -> {
-                    rejected[index] = REASON_ROLLBACK
-                    continue
-                }
-                OdoClass.LOW_CLUSTER, OdoClass.LOW_SPIKE, OdoClass.UNCONFIRMED_DIP -> {
-                    rejected[index] = REASON_BASELINE_DIP
-                    continue
-                }
-                OdoClass.MISSING -> {
-                    rejected[index] = REASON_NO_ODOMETER
-                    continue
-                }
+                OdoClass.SUSPICIOUS_JUMP -> { rejected[index] = REASON_JUMP; continue }
+                OdoClass.HIGH_SPIKE -> { rejected[index] = REASON_SPIKE; continue }
+                OdoClass.BELOW_START -> { rejected[index] = REASON_ROLLBACK; continue }
+                OdoClass.LOW_CLUSTER, OdoClass.LOW_SPIKE, OdoClass.UNCONFIRMED_DIP -> { rejected[index] = REASON_BASELINE_DIP; continue }
                 OdoClass.ACCEPT, OdoClass.SMALL_DIP -> Unit
-                OdoClass.BELOW_START_REANCHOR -> {
-                    // 该分支通常已在前面处理；不合格记录不能作为新锚点。
-                    rejected[index] = REASON_ROLLBACK
-                    continue
-                }
+                OdoClass.BELOW_START_REANCHOR -> { rejected[index] = REASON_ROLLBACK; continue }
             }
 
             if (currentOdometer == null) {
@@ -551,7 +491,6 @@ object FuelCalculator {
             if (!distance.isFinite() || distance <= 0.0) {
                 state.markOdometerAnomaly()
                 rejected[index] = REASON_ODOMETER_ANOMALY
-                // 已被里程分类接受的满箱可以作为新的起点，避免重复里程污染后续累计。
                 reanchor(index, record, currentOdometer)
                 continue
             }
@@ -565,54 +504,27 @@ object FuelCalculator {
 
             val fuelUsed = state.pendingFuel
             val consumption = calculateConsumption(fuelUsed, distance)
-            if (!consumption.isFinite() || consumption < MIN_HARD_CONSUMPTION ||
-                consumption > MAX_HARD_CONSUMPTION
-            ) {
+            if (!consumption.isFinite() || consumption < MIN_HARD_CONSUMPTION || consumption > MAX_HARD_CONSUMPTION) {
                 state.markHardBoundaryEvent()
                 state.markUnresolvedFuelGap()
-                rejected[index] = if (
-                    consumption.isFinite() && consumption > MAX_HARD_CONSUMPTION &&
-                    distance < SHORT_DISTANCE_MERGE_KM
-                ) REASON_SHORT_DISTANCE else REASON_HARD_BOUNDARY
-                // 关键修正：不把失败闭合的累计油量继续带进下一个区间。
+                rejected[index] = if (consumption.isFinite() && consumption > MAX_HARD_CONSUMPTION && distance < SHORT_DISTANCE_MERGE_KM) REASON_SHORT_DISTANCE else REASON_HARD_BOUNDARY
                 reanchor(index, record, currentOdometer)
                 continue
             }
 
-            val quality = buildQuality(
-                state = state,
-                startOdometerEstimated = segmentStartEstimated,
-                distance = distance,
-                tankCapacity = tankCapacity,
-                fuelType = vehicle?.fuelType,
-                consumption = consumption
-            )
+            val quality = buildQuality(state, segmentStartEstimated, distance, tankCapacity, vehicle?.fuelType, consumption)
             results.add(
                 ConsumptionResult(
-                    recordId = record.id,
-                    startOdometer = segmentStartOdometer,
-                    endOdometer = currentOdometer,
-                    distance = distance,
-                    fuelUsed = fuelUsed,
-                    consumption = consumption,
-                    isEstimated = quality.confidence != IntervalConfidence.HIGH,
-                    quality = quality,
-                    startTimestamp = segmentStartTimestamp,
-                    endTimestamp = record.timestamp
+                    recordId = record.id, startOdometer = segmentStartOdometer, endOdometer = currentOdometer,
+                    distance = distance, fuelUsed = fuelUsed, consumption = consumption,
+                    isEstimated = quality.confidence != IntervalConfidence.HIGH, quality = quality,
+                    startTimestamp = segmentStartTimestamp, endTimestamp = record.timestamp
                 )
             )
-
-            // 成功闭合：当前满箱是下一段起点，当前记录油量不可重复计入下一段。
             reanchor(index, record, currentOdometer)
         }
 
-        return Analysis(
-            visible = visibleRecords,
-            results = markOutliers(results, vehicle?.fuelType),
-            rejected = rejected,
-            openAnchorIndex = segmentStartIndex,
-            hasValidAnchor = true
-        )
+        return Analysis(visibleRecords, markOutliers(results, vehicle?.fuelType), rejected, usedRecordIds, segmentStartIndex, true)
     }
 
     // --------------------------------------------------------
@@ -620,40 +532,24 @@ object FuelCalculator {
     // --------------------------------------------------------
 
     private class SegmentState {
-        var pendingFuel: Double = 0.0
-            private set
-        var hasFuelOverflow: Boolean = false
-            private set
+        var pendingFuel: Double = 0.0; private set
+        var hasFuelOverflow: Boolean = false; private set
         private var fuelCompensation: Double = 0.0
-
-        var missingOdometerCount: Int = 0
-            private set
-        var missedFuelUnrecordedCount: Int = 0
-            private set
-        var missedFuelRecordedVolume: Double = 0.0
-            private set
-        var middlePartialFuelingCount: Int = 0
-            private set
-        var processedRecordCount: Int = 0
-            private set
-        var invalidFuelRecordCount: Int = 0
-            private set
-        var odometerAnomalyCount: Int = 0
-            private set
-        var inconsistentRemainingFuelCount: Int = 0
-            private set
-        var missedOdometerProvidedCount: Int = 0
-            private set
-        var oversizedSingleFuelCount: Int = 0
-            private set
-        var oversizedMissedFuelCount: Int = 0
-            private set
-        var suspiciousOdometerJumpCount: Int = 0
-            private set
-        var hardBoundaryEventCount: Int = 0
-            private set
-        var hasUnresolvedFuelGap: Boolean = false
-            private set
+        var missingOdometerCount: Int = 0; private set
+        var missedFuelUnrecordedCount: Int = 0; private set
+        var missedFuelRecordedVolume: Double = 0.0; private set
+        var middlePartialFuelingCount: Int = 0; private set
+        var processedRecordCount: Int = 0; private set
+        var invalidFuelRecordCount: Int = 0; private set
+        var odometerAnomalyCount: Int = 0; private set
+        var inconsistentRemainingFuelCount: Int = 0; private set
+        var missedOdometerProvidedCount: Int = 0; private set
+        var oversizedSingleFuelCount: Int = 0; private set
+        var oversizedMissedFuelCount: Int = 0; private set
+        var invalidMissedFuelCount: Int = 0; private set
+        var suspiciousOdometerJumpCount: Int = 0; private set
+        var hardBoundaryEventCount: Int = 0; private set
+        var hasUnresolvedFuelGap: Boolean = false; private set
 
         fun resetForStartRecord() {
             pendingFuel = 0.0
@@ -670,6 +566,7 @@ object FuelCalculator {
             missedOdometerProvidedCount = 0
             oversizedSingleFuelCount = 0
             oversizedMissedFuelCount = 0
+            invalidMissedFuelCount = 0
             suspiciousOdometerJumpCount = 0
             hardBoundaryEventCount = 0
             hasUnresolvedFuelGap = false
@@ -677,14 +574,21 @@ object FuelCalculator {
 
         fun recordAnchorBaselineFlags(record: FuelRecord, tankCapacity: Double?) {
             if (tankCapacity == null || tankCapacity <= 0.0) return
-            val remaining = record.remainingFuel ?: return
-            if (!record.isFull || !remaining.isFinite() || remaining <= 0.0) return
-            if (remaining < tankCapacity * REMAINING_FUEL_CONSISTENCY_LOW &&
-                remaining >= tankCapacity * REMAINING_FUEL_SEVERE_LOW
-            ) {
-                inconsistentRemainingFuelCount++
+            val remaining = record.remainingFuel
+            if (remaining != null) {
+                if (!remaining.isFinite() || remaining < 0.0 || remaining > tankCapacity * REMAINING_FUEL_CONSISTENCY_HIGH) {
+                    inconsistentRemainingFuelCount++
+                } else if (record.isFull && remaining > 0.0 && remaining < tankCapacity * REMAINING_FUEL_CONSISTENCY_LOW) {
+                    inconsistentRemainingFuelCount++
+                }
+            }
+
+            // 👇 新增：检查单次油量是否超出 1.15 倍油箱容量
+            if (record.volume.isFinite() && record.volume > tankCapacity * SINGLE_FUEL_OVER_TANK_RATIO) {
+                oversizedSingleFuelCount++
             }
         }
+
 
         fun addFuel(addition: Double) {
             if (!addition.isFinite() || addition <= 0.0) return
@@ -702,7 +606,15 @@ object FuelCalculator {
         fun addRecordQualityFlags(record: FuelRecord, tankCapacity: Double?) {
             processedRecordCount++
             if (validOdometer(record) == null) missingOdometerCount++
-            if (isMissedFuelUnrecorded(record)) missedFuelUnrecordedCount++
+
+            if (record.hasMissedRecord) {
+                val raw = record.missedVolume
+                if (raw == null || raw == 0.0) {
+                    missedFuelUnrecordedCount++
+                } else if (!raw.isFinite() || raw < 0.0) {
+                    invalidMissedFuelCount++
+                }
+            }
 
             val missedVolume = safeMissedVolume(record)
             if (missedVolume > 0.0) {
@@ -713,36 +625,26 @@ object FuelCalculator {
                 } else if (record.hasMissedRecord) {
                     oversizedMissedFuelCount++
                 }
-            } else if (record.hasMissedRecord && record.missedVolume != null &&
-                isSeverelyOversizedVolume(record.missedVolume, tankCapacity)
-            ) {
+            } else if (record.hasMissedRecord && record.missedVolume != null && isSeverelyOversizedVolume(record.missedVolume, tankCapacity)) {
                 oversizedMissedFuelCount++
             }
 
             if (!hasValidFuelVolume(record)) invalidFuelRecordCount++
 
             val missedOdometer = record.missedOdometer
-            if (isMissedFuelUnrecorded(record) && missedOdometer != null &&
-                missedOdometer.isFinite() && missedOdometer > 0.0
-            ) {
+            if (isMissedFuelUnrecorded(record) && missedOdometer != null && missedOdometer.isFinite() && missedOdometer > 0.0) {
                 missedOdometerProvidedCount++
             }
 
             if (tankCapacity == null || tankCapacity <= 0.0) return
             val remaining = record.remainingFuel
             if (remaining != null) {
-                if (!remaining.isFinite() || remaining < 0.0 ||
-                    remaining > tankCapacity * REMAINING_FUEL_CONSISTENCY_HIGH
-                ) {
+                if (!remaining.isFinite() || remaining < 0.0 || remaining > tankCapacity * REMAINING_FUEL_CONSISTENCY_HIGH) {
                     inconsistentRemainingFuelCount++
                 } else if (record.isFull && remaining > 0.0 &&
-                    remaining < tankCapacity * REMAINING_FUEL_CONSISTENCY_LOW
-                ) {
+                    remaining < tankCapacity * REMAINING_FUEL_CONSISTENCY_LOW) {
                     inconsistentRemainingFuelCount++
                 }
-            }
-            if (record.volume.isFinite() && record.volume > tankCapacity * SINGLE_FUEL_OVER_TANK_RATIO) {
-                oversizedSingleFuelCount++
             }
         }
 
@@ -754,12 +656,8 @@ object FuelCalculator {
     }
 
     private fun buildQuality(
-        state: SegmentState,
-        startOdometerEstimated: Boolean,
-        distance: Double,
-        tankCapacity: Double?,
-        fuelType: String?,
-        consumption: Double
+        state: SegmentState, startOdometerEstimated: Boolean, distance: Double,
+        tankCapacity: Double?, fuelType: String?, consumption: Double
     ): IntervalQuality {
         var penalty = 0.0
         if (startOdometerEstimated) penalty += PENALTY_ESTIMATED_START
@@ -767,17 +665,11 @@ object FuelCalculator {
 
         val missingFuelPenalty = PENALTY_MISSED_FUEL_UNRECORDED_PER * state.missedFuelUnrecordedCount
         val missingOdoRelief = RELIEF_MISSED_ODOMETER_PER * state.missedOdometerProvidedCount
-        penalty += min(
-            PENALTY_MISSED_FUEL_UNRECORDED_CAP,
-            (missingFuelPenalty - missingOdoRelief).coerceAtLeast(0.0)
-        )
+        penalty += min(PENALTY_MISSED_FUEL_UNRECORDED_CAP, (missingFuelPenalty - missingOdoRelief).coerceAtLeast(0.0))
 
         if (state.missedFuelRecordedVolume > 0.0) {
             val recordedPenalty = if (tankCapacity != null && tankCapacity > 0.0) {
-                min(
-                    PENALTY_MISSED_FUEL_RECORDED_CAP,
-                    state.missedFuelRecordedVolume / tankCapacity * PENALTY_MISSED_FUEL_RECORDED_CAP
-                )
+                min(PENALTY_MISSED_FUEL_RECORDED_CAP, state.missedFuelRecordedVolume / tankCapacity * PENALTY_MISSED_FUEL_RECORDED_CAP)
             } else {
                 min(0.10, state.missedFuelRecordedVolume * 0.01)
             }
@@ -788,22 +680,14 @@ object FuelCalculator {
         penalty += min(PENALTY_INVALID_FUEL_CAP, PENALTY_INVALID_FUEL_PER * state.invalidFuelRecordCount)
         penalty += min(PENALTY_ODOMETER_ANOMALY_CAP, PENALTY_ODOMETER_ANOMALY_PER * state.odometerAnomalyCount)
         penalty += min(PENALTY_SUSPICIOUS_JUMP_CAP, PENALTY_SUSPICIOUS_JUMP_PER * state.suspiciousOdometerJumpCount)
-        penalty += min(
-            PENALTY_INCONSISTENT_REMAINING_CAP,
-            PENALTY_INCONSISTENT_REMAINING_PER * state.inconsistentRemainingFuelCount
-        )
-        penalty += min(
-            PENALTY_OVERSIZED_CAP,
-            PENALTY_OVERSIZED_PER * (state.oversizedSingleFuelCount + state.oversizedMissedFuelCount)
-        )
+        penalty += min(PENALTY_INCONSISTENT_REMAINING_CAP, PENALTY_INCONSISTENT_REMAINING_PER * state.inconsistentRemainingFuelCount)
+        penalty += min(PENALTY_OVERSIZED_CAP, PENALTY_OVERSIZED_PER * (state.oversizedSingleFuelCount + state.oversizedMissedFuelCount))
+
         if (state.hasUnresolvedFuelGap) penalty += PENALTY_HARD_BOUNDARY
         penalty += calculateSoftRangePenalty(consumption, softRangeFor(fuelType))
-        if (distance < 100.0) {
-            penalty += PENALTY_SHORT_DISTANCE_BASE * ((100.0 - distance.coerceAtLeast(0.0)) / 100.0)
-        }
+        if (distance < 100.0) penalty += PENALTY_SHORT_DISTANCE_BASE * ((100.0 - distance.coerceAtLeast(0.0)) / 100.0)
 
-        val penaltyMillis = (penalty * 1000.0).roundToInt()
-            .coerceIn(0, (MAX_TOTAL_PENALTY * 1000.0).roundToInt())
+        val penaltyMillis = (penalty * 1000.0).roundToInt().coerceIn(0, (MAX_TOTAL_PENALTY * 1000.0).roundToInt())
         var score = 1.0 - penaltyMillis / 1000.0
         var confidence = when {
             score >= CONFIDENCE_HIGH_THRESHOLD -> IntervalConfidence.HIGH
@@ -836,6 +720,7 @@ object FuelCalculator {
             inconsistentRemainingFuelCount = state.inconsistentRemainingFuelCount,
             oversizedSingleFuelCount = state.oversizedSingleFuelCount,
             oversizedMissedFuelCount = state.oversizedMissedFuelCount,
+            invalidMissedFuelCount = state.invalidMissedFuelCount,
             suspiciousOdometerJumpCount = state.suspiciousOdometerJumpCount,
             hardBoundaryEventCount = state.hardBoundaryEventCount,
             hasUnresolvedFuelGap = state.hasUnresolvedFuelGap,
@@ -850,15 +735,9 @@ object FuelCalculator {
     // --------------------------------------------------------
 
     private fun classifyOdometer(
-        records: List<FuelRecord>,
-        index: Int,
-        nextValidIndexArray: IntArray,
-        current: Double?,
-        segmentStart: Double,
-        lastReliable: Double,
-        lastTimestamp: Long,
-        record: FuelRecord,
-        tankCapacity: Double?
+        records: List<FuelRecord>, index: Int, nextValidIndexArray: IntArray,
+        current: Double?, segmentStart: Double, lastReliable: Double, lastTimestamp: Long,
+        record: FuelRecord, tankCapacity: Double?
     ): OdoClass {
         if (current == null) return OdoClass.MISSING
 
@@ -868,10 +747,7 @@ object FuelCalculator {
         val next2 = if (next2Index >= 0) validOdometer(records[next2Index]) else null
 
         if (current < segmentStart) {
-            if (current < segmentStart - REANCHOR_MIN_DROP &&
-                next != null && next < segmentStart - REANCHOR_MIN_DROP &&
-                closer(next, current, segmentStart) && isSuitableAsAnchor(record, tankCapacity)
-            ) {
+            if (current < segmentStart - REANCHOR_MIN_DROP && next != null && next < segmentStart - REANCHOR_MIN_DROP && closer(next, current, segmentStart) && isSuitableAsAnchor(record, tankCapacity)) {
                 return OdoClass.BELOW_START_REANCHOR
             }
             return OdoClass.BELOW_START
@@ -889,29 +765,20 @@ object FuelCalculator {
 
         val jump = current - lastReliable
         val elapsedHours = (record.timestamp - lastTimestamp).toDouble() / 3_600_000.0
-        if (jump > 0.0 && isSuspiciousOdometerJump(jump, elapsedHours)) {
-            return OdoClass.SUSPICIOUS_JUMP
-        }
+        if (jump > 0.0 && isSuspiciousOdometerJump(jump, elapsedHours)) return OdoClass.SUSPICIOUS_JUMP
 
-        // 用后续两个有效里程辅助识别孤立高点，减少错误满箱闭合。
-        val nextConfirmsLower = next != null && next < current - ODOMETER_MATCH_TOLERANCE &&
-                closer(next, lastReliable, current)
-        val next2ConfirmsLower = next2 != null && next2 < current - ODOMETER_MATCH_TOLERANCE &&
-                closer(next2, lastReliable, current)
+        val nextConfirmsLower = next != null && next < current - ODOMETER_MATCH_TOLERANCE && closer(next, lastReliable, current)
+        val next2ConfirmsLower = next2 != null && next2 < current - ODOMETER_MATCH_TOLERANCE && closer(next2, lastReliable, current)
         if (nextConfirmsLower || next2ConfirmsLower) return OdoClass.HIGH_SPIKE
 
         return OdoClass.ACCEPT
     }
 
-    private fun closer(value: Double, a: Double, b: Double): Boolean =
-        abs(value - a) + ODOMETER_MATCH_TOLERANCE < abs(value - b)
+    private fun closer(value: Double, a: Double, b: Double): Boolean = abs(value - a) + ODOMETER_MATCH_TOLERANCE < abs(value - b)
 
     private fun findFirstAnchor(
-        records: List<FuelRecord>,
-        nextValidIndexArray: IntArray,
-        hasPriorValidOdometer: BooleanArray,
-        tankCapacity: Double?,
-        configuredInitialOdometer: Double?
+        records: List<FuelRecord>, nextValidIndexArray: IntArray, hasPriorValidOdometer: BooleanArray,
+        tankCapacity: Double?, configuredInitialOdometer: Double?
     ): AnchorInfo? {
         for (index in records.indices) {
             val record = records[index]
@@ -932,12 +799,7 @@ object FuelCalculator {
         return null
     }
 
-    private fun isIsolatedHighValue(
-        records: List<FuelRecord>,
-        nextValidIndexArray: IntArray,
-        index: Int,
-        candidate: Double
-    ): Boolean {
+    private fun isIsolatedHighValue(records: List<FuelRecord>, nextValidIndexArray: IntArray, index: Int, candidate: Double): Boolean {
         val nextIndex = nextValidIndexArray[index]
         if (nextIndex < 0) return false
         val next = validOdometer(records[nextIndex]) ?: return false
@@ -959,9 +821,7 @@ object FuelCalculator {
     // --------------------------------------------------------
 
     private fun markOutliers(results: List<ConsumptionResult>, fuelType: String?): List<ConsumptionResult> {
-        val reliableIndices = results.indices.filter {
-            isReliable(results[it]) && results[it].consumption.isFinite()
-        }
+        val reliableIndices = results.indices.filter { isReliable(results[it]) && results[it].consumption.isFinite() }
         if (reliableIndices.size <= MIN_MAD_SAMPLE_COUNT) return results
 
         val reliableSamples = reliableIndices.map { results[it] }
@@ -979,10 +839,7 @@ object FuelCalculator {
             for (cursor in start until end) {
                 if (cursor != sampleIndex) context.add(reliableSamples[cursor].consumption)
             }
-            val bounds = robustBounds(
-                context,
-                if (plugIn) PLUG_IN_MAD_MIN_WIDTH else RELATIVE_MAD_MIN_WIDTH
-            ) ?: continue
+            val bounds = robustBounds(context, if (plugIn) PLUG_IN_MAD_MIN_WIDTH else RELATIVE_MAD_MIN_WIDTH) ?: continue
             if (result.consumption < bounds.lower || result.consumption > bounds.upper) {
                 val oldQuality = result.quality ?: IntervalQuality()
                 updated[reliableIndices[sampleIndex]] = result.copy(
@@ -1004,17 +861,13 @@ object FuelCalculator {
         val minimumWidth = max(MAD_THRESHOLD_FLOOR, abs(medianValue) * relativeMinWidth)
         val threshold = max(madWidth, minimumWidth)
         return RobustBounds(
-            median = medianValue,
-            mad = madValue,
+            median = medianValue, mad = madValue,
             lower = (medianValue - threshold).coerceAtLeast(MIN_HARD_CONSUMPTION),
             upper = (medianValue + threshold).coerceAtMost(MAX_HARD_CONSUMPTION)
         )
     }
 
-    private fun robustWeightedConsumption(
-        results: List<ConsumptionResult>,
-        onOverflow: () -> Unit
-    ): Double? {
+    private fun robustWeightedConsumption(results: List<ConsumptionResult>, onOverflow: () -> Unit): Double? {
         val weighted = results.asSequence()
             .filter { isReliable(it) && it.distance > 0.0 && it.consumption.isFinite() }
             .map { result ->
@@ -1029,10 +882,7 @@ object FuelCalculator {
         var totalWeight = 0.0
         for ((_, weight) in weighted) {
             totalWeight += weight
-            if (!totalWeight.isFinite()) {
-                onOverflow()
-                return null
-            }
+            if (!totalWeight.isFinite()) { onOverflow(); return null }
         }
         if (totalWeight <= 0.0) return null
 
@@ -1040,19 +890,13 @@ object FuelCalculator {
         var accumulated = 0.0
         for ((value, weight) in weighted) {
             accumulated += weight
-            if (!accumulated.isFinite()) {
-                onOverflow()
-                return null
-            }
+            if (!accumulated.isFinite()) { onOverflow(); return null }
             if (accumulated >= halfWeight) return value
         }
         return weighted.last().value
     }
 
-    private fun weightedArithmeticMean(
-        results: List<ConsumptionResult>,
-        onOverflow: () -> Unit
-    ): Double? {
+    private fun weightedArithmeticMean(results: List<ConsumptionResult>, onOverflow: () -> Unit): Double? {
         var totalWeight = 0.0
         var weightedSum = 0.0
         for (result in results) {
@@ -1061,23 +905,14 @@ object FuelCalculator {
             val weight = confidence * result.distance.coerceAtLeast(1.0)
             if (!weight.isFinite() || weight <= 0.0) continue
             val product = result.consumption * weight
-            if (!product.isFinite()) {
-                onOverflow()
-                return null
-            }
+            if (!product.isFinite()) { onOverflow(); return null }
             totalWeight += weight
             weightedSum += product
-            if (!totalWeight.isFinite() || !weightedSum.isFinite()) {
-                onOverflow()
-                return null
-            }
+            if (!totalWeight.isFinite() || !weightedSum.isFinite()) { onOverflow(); return null }
         }
         if (totalWeight <= 0.0) return null
         val mean = weightedSum / totalWeight
-        if (!mean.isFinite()) {
-            onOverflow()
-            return null
-        }
+        if (!mean.isFinite()) { onOverflow(); return null }
         return mean
     }
 
@@ -1099,8 +934,7 @@ object FuelCalculator {
 
     private fun isPlugIn(fuelType: String?): Boolean {
         val type = normalizedFuelType(fuelType)
-        return type.contains("插电") || type.contains("插混") || type.contains("PHEV") ||
-                type.contains("增程") || type.contains("EREV")
+        return type.contains("插电") || type.contains("插混") || type.contains("PHEV") || type.contains("增程") || type.contains("EREV")
     }
 
     private fun softRangeFor(fuelType: String?): SoftRange {
@@ -1108,8 +942,7 @@ object FuelCalculator {
         return when {
             type.contains("柴油") || type.contains("DIESEL") -> SoftRange(3.0, 15.0)
             isPlugIn(fuelType) -> SoftRange(1.0, 12.0)
-            type.contains("混动") || type.contains("油电") || type.contains("HEV") ||
-                    type.contains("HYBRID") -> SoftRange(2.0, 10.0)
+            type.contains("混动") || type.contains("油电") || type.contains("HEV") || type.contains("HYBRID") -> SoftRange(2.0, 10.0)
             else -> SoftRange(3.0, 30.0)
         }
     }
@@ -1117,14 +950,8 @@ object FuelCalculator {
     private fun calculateSoftRangePenalty(consumption: Double, soft: SoftRange): Double {
         if (!consumption.isFinite()) return SOFT_RANGE_PENALTY_CAP
         return when {
-            consumption > soft.max -> min(
-                SOFT_RANGE_PENALTY_CAP,
-                (consumption - soft.max) / soft.max.coerceAtLeast(0.1) * SOFT_RANGE_PENALTY_CAP
-            )
-            consumption < soft.min -> min(
-                SOFT_RANGE_PENALTY_CAP,
-                (soft.min - consumption) / soft.min.coerceAtLeast(0.1) * SOFT_RANGE_PENALTY_CAP
-            )
+            consumption > soft.max -> min(SOFT_RANGE_PENALTY_CAP, (consumption - soft.max) / soft.max.coerceAtLeast(0.1) * SOFT_RANGE_PENALTY_CAP)
+            consumption < soft.min -> min(SOFT_RANGE_PENALTY_CAP, (soft.min - consumption) / soft.min.coerceAtLeast(0.1) * SOFT_RANGE_PENALTY_CAP)
             else -> 0.0
         }
     }
@@ -1135,11 +962,13 @@ object FuelCalculator {
         return volume > tankCapacity * SINGLE_FUEL_SEVERE_RATIO
     }
 
+    // 🚨 核心修复 5：修正剩余油量（加油前剩余）严重不一致的逻辑
     private fun isRemainingFuelSeverelyInconsistent(record: FuelRecord, tankCapacity: Double?): Boolean {
         if (tankCapacity == null || !tankCapacity.isFinite() || tankCapacity <= 0.0 || !record.isFull) return false
         val remaining = record.remainingFuel ?: return false
         if (!remaining.isFinite() || remaining == 0.0) return false
         if (remaining < 0.0 || remaining > tankCapacity * REMAINING_FUEL_CONSISTENCY_HIGH) return true
+        // 👇 满箱状态下，剩余油量如果低于油箱的 70%，判定为严重异常
         return remaining < tankCapacity * REMAINING_FUEL_SEVERE_LOW
     }
 
@@ -1161,8 +990,7 @@ object FuelCalculator {
     }
 
     private fun hasValidFuelVolume(record: FuelRecord): Boolean = record.volume.isFinite() && record.volume > 0.0
-    private fun safeFuelVolume(record: FuelRecord): Double =
-        if (record.volume.isFinite() && record.volume > 0.0) record.volume else 0.0
+    private fun safeFuelVolume(record: FuelRecord): Double = if (record.volume.isFinite() && record.volume > 0.0) record.volume else 0.0
 
     private fun safeMissedVolume(record: FuelRecord): Double {
         if (!record.hasMissedRecord) return 0.0
@@ -1170,8 +998,7 @@ object FuelCalculator {
         return if (volume.isFinite() && volume > 0.0) volume else 0.0
     }
 
-    private fun isMissedFuelUnrecorded(record: FuelRecord): Boolean =
-        record.hasMissedRecord && safeMissedVolume(record) <= 0.0
+    private fun isMissedFuelUnrecorded(record: FuelRecord): Boolean = record.hasMissedRecord && safeMissedVolume(record) <= 0.0
 
     private fun calculateConsumption(fuel: Double, distance: Double): Double {
         if (!fuel.isFinite() || !distance.isFinite() || fuel <= 0.0 || distance <= 0.0) return Double.NaN
@@ -1183,6 +1010,7 @@ object FuelCalculator {
         if (!result.distance.isFinite() || result.distance <= 0.0) return false
         if (!result.fuelUsed.isFinite() || result.fuelUsed <= 0.0) return false
         if (!result.consumption.isFinite()) return false
+        if (result.isOutlier) return false
         val quality = result.quality ?: return true
         if (quality.hasUnresolvedFuelGap) return false
         if (quality.exclusionReason == REASON_HARD_BOUNDARY) return false
@@ -1190,16 +1018,11 @@ object FuelCalculator {
         return quality.confidence.atLeast(IntervalConfidence.LOW)
     }
 
-    private fun isReliable(result: ConsumptionResult): Boolean =
-        !result.isOutlier && isPhysicallyUsable(result)
+    private fun isReliable(result: ConsumptionResult): Boolean = isPhysicallyUsable(result)
 
-    private val RECORD_COMPARATOR = compareBy<FuelRecord> { it.timestamp }
-        .thenBy { it.odometer ?: 0.0 }
-        .thenBy { it.id }
+    private val RECORD_COMPARATOR = compareBy<FuelRecord> { it.timestamp }.thenBy { it.odometer ?: 0.0 }.thenBy { it.id }
 
-    private fun isValidMoney(value: Double): Boolean {
-        return value.isFinite() && value >= 0.0
-    }
+    private fun isValidMoney(value: Double): Boolean = value.isFinite() && value >= 0.0
 
     private fun isValidVolume(volume: Double, tankCapacity: Double?): Boolean {
         if (!volume.isFinite() || volume <= 0.0) return false
@@ -1209,4 +1032,3 @@ object FuelCalculator {
         return true
     }
 }
-

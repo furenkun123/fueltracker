@@ -30,11 +30,13 @@ interface VehicleDao {
     @Query("SELECT * FROM vehicles ORDER BY id DESC")
     fun observeAllVehicles(): Flow<List<Vehicle>>
 
-    @Query("SELECT * FROM vehicles")
+    @Query("SELECT * FROM vehicles ORDER BY id DESC")
     suspend fun getAllVehicles(): List<Vehicle>
 
     @Query("SELECT * FROM vehicles WHERE id = :vehicleId LIMIT 1")
     suspend fun getVehicleById(vehicleId: Long): Vehicle?
+
+
 
     @Query(
         """
@@ -58,10 +60,10 @@ interface VehicleDao {
     suspend fun insert(vehicle: Vehicle): Long
 
     @Update
-    suspend fun update(vehicle: Vehicle)
+    suspend fun update(vehicle: Vehicle): Int
 
     @Delete
-    suspend fun delete(vehicle: Vehicle)
+    suspend fun delete(vehicle: Vehicle): Int
 
     @Query("DELETE FROM vehicles")
     suspend fun deleteAll()

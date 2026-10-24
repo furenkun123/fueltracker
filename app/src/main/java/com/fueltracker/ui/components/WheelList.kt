@@ -33,7 +33,8 @@ enum class WheelStyle {
     Plain,
 
     /** 灰色高亮条（HomeScreen / ExpenseScreen 风格） */
-    WithBackground
+    WithBackground,
+    DatePicker
 }
 
 /**
@@ -104,13 +105,15 @@ fun <T> WheelList(
         contentAlignment = Alignment.Center
     ) {
         // 高亮条（可选）
-        if (style == WheelStyle.WithBackground) {
+        if (style != WheelStyle.Plain) {
             Box(
-                modifier = Modifier
+                Modifier
                     .fillMaxWidth()
                     .height(itemHeight)
                     .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        color = if (style == WheelStyle.DatePicker)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+                        else MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(10.dp)
                     )
             )
@@ -142,12 +145,10 @@ fun <T> WheelList(
                         fontSize = if (isSelected) 15.sp else 13.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         color = when {
-                            isSelected && style == WheelStyle.WithBackground ->
+                            isSelected && style != WheelStyle.Plain ->
                                 MaterialTheme.colorScheme.onSurface
-                            isSelected ->
-                                MaterialTheme.colorScheme.primary
-                            else ->
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            isSelected -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         }
                     )
                 }

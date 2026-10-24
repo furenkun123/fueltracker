@@ -25,6 +25,7 @@ interface ExpenseDao {
     )
     fun observeByVehicle(vehicleId: Long): Flow<List<ExpenseRecord>>
 
+    // 👇 修复：删除了重复的 getActiveParking，只保留这一个
     @Query(
         """
         SELECT * FROM expenses
@@ -59,21 +60,15 @@ interface ExpenseDao {
     // 插入与更新
     // =========================
 
-    /**
-     * 普通新增遇到主键冲突时失败，不覆盖已有费用。
-     */
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(record: ExpenseRecord): Long
 
-    /**
-     * 返回实际更新行数。
-     * 调用方可以据此判断记录是否存在。
-     */
     @Update
     suspend fun update(record: ExpenseRecord): Int
 
+    // 👇 修复：加上 : Int 返回受影响行数
     @Delete
-    suspend fun delete(record: ExpenseRecord)
+    suspend fun delete(record: ExpenseRecord): Int
 
     // =========================
     // 停车状态
@@ -105,35 +100,21 @@ interface ExpenseDao {
         exceptId: Long
     )
 
-    /**
-     * 新增一条有效停车记录时，先停用旧记录，再插入新记录。
-     * 两步处于同一个事务中；插入失败会回滚旧记录的停用操作。
-     */
     @Transaction
     suspend fun insertParkingAsActive(record: ExpenseRecord): Long {
-        require(record.category == "停车") {
-            "insertParkingAsActive 只能用于停车记录"
-        }
-        require(record.isActive) {
-            "新停车记录必须为激活状态"
-        }
-
+        require(record.category == "停车") { "insertParkingAsActive 只能用于停车记录" }
+        require(record.isActive) { "新停车记录必须为激活状态" }
         deactivateAllParking(record.vehicleId)
         return insert(record)
     }
 
-    /**
-     * 编辑停车记录并将其设为有效时，先停用其他有效停车记录。
-     * 如果目标记录不存在，抛出异常并回滚本次事务。
-     */
     @Transaction
     suspend fun updateParkingAsActive(record: ExpenseRecord) {
-        require(record.category == "停车") {
-            "updateParkingAsActive 只能用于停车记录"
-        }
-        require(record.isActive) {
-            "目标停车记录必须为激活状态"
-        }
+        require(record.category == "停车")
+        require(record.isActive)
+
+        val existing = getById(record.id) ?: throw IllegalArgumentException("记录不存在")
+        require(existing.vehicleId == record.vehicleId) { "不能通过编辑更改所属车辆" }
 
         deactivateOtherActiveParking(
             vehicleId = record.vehicleId,
@@ -167,10 +148,10 @@ interface ExpenseDao {
 
     @Query(
         """
-    UPDATE expenses
-    SET category = :newName
-    WHERE category = :oldName
-    """
+        UPDATE expenses
+        SET category = :newName
+        WHERE category = :oldName
+        """
     )
     suspend fun renameCategory(
         oldName: String,

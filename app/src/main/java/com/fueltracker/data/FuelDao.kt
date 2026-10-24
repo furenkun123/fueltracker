@@ -52,10 +52,10 @@ interface FuelDao {
     suspend fun insert(record: FuelRecord): Long
 
     @Update
-    suspend fun update(record: FuelRecord)
+    suspend fun update(record: FuelRecord): Int
 
     @Delete
-    suspend fun delete(record: FuelRecord)
+    suspend fun delete(record: FuelRecord): Int
 
     // =========================
     // 删除

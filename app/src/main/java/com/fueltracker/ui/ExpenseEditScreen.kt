@@ -1,52 +1,24 @@
 package com.fueltracker.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -63,8 +35,6 @@ import com.fueltracker.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,36 +44,17 @@ fun ExpenseEditScreen(
     onBack: () -> Unit,
     onSaved: () -> Unit
 ) {
-    val isEditMode = record != null
     val context = LocalContext.current
+    val isEditMode = record != null
+    val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
-    val dateFormatter = remember {
-        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-    }
+    var customCategories by remember { mutableStateOf(ExpenseCategoryStore.getCustom()) }
+    val allCategories = remember(customCategories) { DEFAULT_EXPENSE_CATEGORIES + customCategories }
 
-    var customCategories by remember {
-        mutableStateOf(ExpenseCategoryStore.getCustom())
-    }
-    val allCategories = remember(customCategories) {
-        DEFAULT_EXPENSE_CATEGORIES + customCategories
-    }
-
-    var category by remember(record) {
-        mutableStateOf(record?.category ?: DEFAULT_EXPENSE_CATEGORIES.first())
-    }
-    var amountText by remember(record) {
-        mutableStateOf(
-            record?.amount?.takeIf { it > 0 }?.let { "%.2f".format(it) } ?: ""
-        )
-    }
-    var note by remember(record) {
-        mutableStateOf(record?.note ?: "")
-    }
-    var timestamp by remember(record) {
-        mutableLongStateOf(
-            record?.timestamp?.takeIf { it > 0 } ?: System.currentTimeMillis()
-        )
-    }
+    var category by remember(record) { mutableStateOf(record?.category ?: DEFAULT_EXPENSE_CATEGORIES.first()) }
+    var amountText by remember(record) { mutableStateOf(record?.amount?.takeIf { it > 0 }?.let { "%.2f".format(it) } ?: "") }
+    var note by remember(record) { mutableStateOf(record?.note ?: "") }
+    var timestamp by remember(record) { mutableLongStateOf(record?.timestamp?.takeIf { it > 0 } ?: System.currentTimeMillis()) }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
@@ -112,9 +63,7 @@ fun ExpenseEditScreen(
     var isSaving by remember { mutableStateOf(false) }
 
     val trimmedNewName = newCategoryName.trim()
-    val isDuplicate = trimmedNewName.isNotEmpty() &&
-            (trimmedNewName in allCategories)
-
+    val isDuplicate = trimmedNewName.isNotEmpty() && trimmedNewName in allCategories
     val amount = amountText.toDoubleOrNull()
     val canSave = amount != null && amount > 0 && !isSaving
 
@@ -122,252 +71,118 @@ fun ExpenseEditScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = if (isEditMode) "编辑费用" else "记费用",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                title = { Text(if (isEditMode) "编辑费用" else "记费用", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .imePadding()
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).imePadding().navigationBarsPadding()
+                .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // 分类
             ExpenseFormCard {
-                Text(
-                    text = "分类",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Text("分类", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
-
                 FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     allCategories.forEach { cat ->
-                        val isCustom = cat in customCategories
                         CategoryChip(
-                            text = cat,
-                            selected = category == cat,
-                            isCustom = isCustom,
+                            text = cat, selected = category == cat, isCustom = cat in customCategories,
                             onClick = { category = cat },
-                            onLongClick = if (isCustom) {
-                                { editingCategory = cat }
-                            } else null
+                            onLongClick = if (cat in customCategories) { { editingCategory = cat } } else null
                         )
                     }
-
-                    CategoryChip(
-                        text = "＋ 新建分类",
-                        selected = false,
-                        isAction = true,
-                        onClick = {
-                            newCategoryName = ""
-                            showAddCategoryDialog = true
-                        }
-                    )
+                    CategoryChip("＋ 新建分类", selected = false, isAction = true, onClick = {
+                        newCategoryName = ""; showAddCategoryDialog = true
+                    })
                 }
-
                 if (customCategories.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "提示：长按自定义分类可编辑或删除",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("提示：长按自定义分类可编辑或删除", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
             // 金额
             ExpenseFormCard {
                 ExpenseInputField(
-                    value = amountText,
-                    onValueChange = { amountText = it },
-                    label = "金额",
-                    isRequired = true,
-                    suffix = "元",
-                    keyboardType = KeyboardType.Decimal
+                    value = amountText, onValueChange = { amountText = it },
+                    label = "金额", isRequired = true, suffix = "元", keyboardType = KeyboardType.Decimal
                 )
             }
 
             // 时间
             ExpenseFormCard {
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "时间",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = " *",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
+                    ExpenseFieldLabel("时间", isRequired = true)
                     Spacer(Modifier.height(6.dp))
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(14.dp)
-                            )
-                            .clickable { showDatePicker = true }
-                            .padding(horizontal = 14.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
+                            .clickable { showDatePicker = true }.padding(horizontal = 14.dp),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        Text(
-                            text = remember(timestamp) {
-                                dateFormatter.format(Date(timestamp))
-                            },
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1
-                        )
+                        Text(dateFormatter.format(Date(timestamp)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
             // 备注
             ExpenseFormCard {
-                ExpenseInputField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = "备注（可选）",
-                    keyboardType = KeyboardType.Text
-                )
+                ExpenseInputField(value = note, onValueChange = { note = it }, label = "备注（可选）")
             }
 
-
             Spacer(Modifier.height(8.dp))
-
             Button(
                 onClick = {
-                    if (isSaving) return@Button
-                    val amt = amount ?: return@Button
-
+                    if (!canSave) return@Button
                     isSaving = true
-
-                    val newRecord = if (isEditMode) {
-                        record.copy(
-                            timestamp = timestamp,
-                            category = category,
-                            amount = amt,
-                            note = note.trim()
-                        )
-                    } else {
-                        ExpenseRecord(
-                            vehicleId = 0,
-                            timestamp = timestamp,
-                            category = category,
-                            amount = amt,
-                            note = note.trim()
-                        )
-                    }
+                    val newRecord = record?.copy(timestamp = timestamp, category = category, amount = amount, note = note.trim())
+                        ?: ExpenseRecord(vehicleId = 0, timestamp = timestamp, category = category, amount = amount, note = note.trim())
 
                     val onResult: (Result<Unit>) -> Unit = { result ->
                         isSaving = false
-                        if (result.isSuccess) {
-                            onSaved()
-                        } else {
-                            Toast.makeText(
-                                context,
-                                "保存失败：${result.exceptionOrNull()?.message ?: "未知错误"}",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
+                        if (result.isSuccess) onSaved() else Toast.makeText(context, "保存失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                     }
-
-                    if (isEditMode) {
-                        viewModel.updateExpense(newRecord, onResult)
-                    } else {
-                        viewModel.addExpense(newRecord, onResult)
-                    }
+                    if (isEditMode) viewModel.updateExpense(newRecord, onResult) else viewModel.addExpense(newRecord, onResult)
                 },
-                enabled = canSave && !isSaving,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
+                enabled = canSave,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
             ) {
-                Text(
-                    text = if (isEditMode) "保存修改" else "保存",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text(if (isEditMode) "保存修改" else "保存", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
-
             Spacer(Modifier.height(24.dp))
         }
     }
 
-    // 月历 + 滚轮时间选择
     if (showDatePicker) {
+        // 👇 修复：使用具名参数，防止参数错位报错
         MiuiDatePickerDialog(
             initialTimestamp = timestamp,
             title = "选择时间",
-            onSelected = { selected ->
-                timestamp = selected
-                showDatePicker = false
-            },
+            onSelected = { timestamp = it; showDatePicker = false },
             onDismiss = { showDatePicker = false }
         )
     }
 
-    // 新建分类
+    // 新建分类弹窗
     if (showAddCategoryDialog) {
         MiuixInputDialog(
-            title = "新建分类",
-            value = newCategoryName,
-            onValueChange = { newCategoryName = it },
-            placeholder = if (isDuplicate) {
-                "该分类已存在"
-            } else {
-                "如：过路费、洗车、装饰"
-            },
-            confirmText = "创建",
-            confirmEnabled = trimmedNewName.isNotEmpty() && !isDuplicate,
+            title = "新建分类", value = newCategoryName, onValueChange = { newCategoryName = it },
+            placeholder = if (isDuplicate) "该分类已存在" else "如：过路费、洗车、装饰",
+            confirmText = "创建", confirmEnabled = trimmedNewName.isNotEmpty() && !isDuplicate,
             onConfirm = {
-                val trimmed = newCategoryName.trim()
-                if (trimmed.isNotEmpty()) {
-                    ExpenseCategoryStore.add(trimmed)
+                if (trimmedNewName.isNotEmpty()) {
+                    ExpenseCategoryStore.add(trimmedNewName)
                     customCategories = ExpenseCategoryStore.getCustom()
-                    category = trimmed
+                    category = trimmedNewName
                 }
                 showAddCategoryDialog = false
             },
@@ -375,39 +190,25 @@ fun ExpenseEditScreen(
         )
     }
 
-    // 编辑/删除自定义分类
+    // 编辑分类弹窗
     editingCategory?.let { cat ->
         EditCategoryDialog(
-            currentName = cat,
-            existingNames = allCategories,
+            currentName = cat, existingNames = allCategories,
             onSave = { newName ->
-                // 调用 ViewModel 执行数据库和内存的双重更新
-                viewModel.renameExpenseCategory(oldName = cat, newName = newName) { result ->
+                viewModel.renameExpenseCategory(cat, newName) { result ->
                     result.onSuccess {
-                        val trimmed = newName.trim()
-                        // 刷新界面状态
                         customCategories = ExpenseCategoryStore.getCustom()
-                        if (category == cat) {
-                            category = trimmed
-                        }
+                        if (category == cat) category = newName.trim()
                         editingCategory = null
-                    }
-
-                    result.onFailure { error ->
-                        Toast.makeText(
-                            context,
-                            error.message ?: "重命名失败",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    }.onFailure { error ->
+                        Toast.makeText(context, error.message ?: "重命名失败", Toast.LENGTH_SHORT).show()
                     }
                 }
             },
             onDelete = {
                 ExpenseCategoryStore.remove(cat)
                 customCategories = ExpenseCategoryStore.getCustom()
-                if (category == cat) {
-                    category = DEFAULT_EXPENSE_CATEGORIES.first()
-                }
+                if (category == cat) category = DEFAULT_EXPENSE_CATEGORIES.first()
                 editingCategory = null
             },
             onDismiss = { editingCategory = null }
@@ -415,50 +216,76 @@ fun ExpenseEditScreen(
     }
 }
 
-/**
- * MIUI 风格分类 chip。
- * 自定义分类长按可编辑 / 删除。
- * 提示：进入页面时，如果存在自定义分类，会在下方显示一行灰色小字说明。
- */
+// ============================================================
+// 复用组件区
+// ============================================================
+
+@Composable
+private fun ExpenseFieldLabel(text: String, isRequired: Boolean = false) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        if (isRequired) Text(" *", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+    }
+}
+
+@Composable
+private fun ExpenseFormCard(content: @Composable ColumnScope.() -> Unit) {
+    MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), content = content)
+    }
+}
+
+@Composable
+private fun CommonTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    placeholder: String? = null,
+    isRequired: Boolean = false,
+    suffix: String? = null,
+    keyboardType: KeyboardType = KeyboardType.Text
+) {
+    Column(modifier = modifier) {
+        label?.let { ExpenseFieldLabel(it, isRequired) }
+        if (label != null) Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = value, onValueChange = onValueChange, modifier = Modifier.fillMaxWidth(), singleLine = true,
+            shape = RoundedCornerShape(14.dp),
+            textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
+            placeholder = placeholder?.let { { Text(it, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+            suffix = suffix?.let { { Text(it, fontSize = 14.sp) } },
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Transparent, cursorColor = MaterialTheme.colorScheme.primary
+            )
+        )
+    }
+}
+
+@Composable
+private fun ExpenseInputField(
+    value: String, onValueChange: (String) -> Unit, label: String,
+    isRequired: Boolean = false, suffix: String? = null, keyboardType: KeyboardType = KeyboardType.Text
+) {
+    CommonTextField(value, onValueChange, label = label, isRequired = isRequired, suffix = suffix, keyboardType = keyboardType)
+}
+
 @Composable
 private fun CategoryChip(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    isCustom: Boolean = false,
-    isAction: Boolean = false,
-    onLongClick: (() -> Unit)? = null
+    text: String, selected: Boolean, onClick: () -> Unit,
+    isCustom: Boolean = false, isAction: Boolean = false, onLongClick: (() -> Unit)? = null
 ) {
-    val bgColor = when {
-        selected -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
-    val textColor = when {
-        selected -> MaterialTheme.colorScheme.onPrimary
-        isAction -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-
+    val bgColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val textColor = when { selected -> MaterialTheme.colorScheme.onPrimary; isAction -> MaterialTheme.colorScheme.primary; else -> MaterialTheme.colorScheme.onSurface }
     Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(bgColor)
-            .combinedClickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-                onLongClick = if (isCustom) onLongClick else null
-            )
+        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(bgColor)
+            .combinedClickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = if (isCustom) onLongClick else null)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            fontSize = 15.sp,
-            fontWeight = if (selected || isAction) FontWeight.SemiBold else FontWeight.Normal,
-            color = textColor,
-            maxLines = 1
-        )
+        Text(text, fontSize = 15.sp, fontWeight = if (selected || isAction) FontWeight.SemiBold else FontWeight.Normal, color = textColor, maxLines = 1)
     }
 }
 
@@ -472,198 +299,96 @@ private fun EditCategoryDialog(
 ) {
     var name by remember { mutableStateOf(currentName) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    val trimmed = name.trim()
+    val isDuplicate = trimmed.isNotEmpty() && trimmed != currentName && trimmed in existingNames
 
-    // 主编辑对话框
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 29.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
+    if (showDeleteConfirm) {
+        // ======== 删除确认弹窗 ========
+        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                Text(
-                    text = "编辑分类",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("分类名") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        cursorColor = MaterialTheme.colorScheme.primary
+                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                    Text(
+                        "删除分类",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
-                )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "确定删除分类「$currentName」吗？\n\n已有记录不会丢失，仍保留原分类标签。",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 20.sp
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        // 使用 TextButton 减少宽度占用
+                        TextButton(
+                            onClick = { showDeleteConfirm = false },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(22.dp),
+                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface) }
 
-                Spacer(Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TextButton(
-                        onClick = { showDeleteConfirm = true },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(22.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        )
-                    ) {
-                        Text(
-                            text = "删除",
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(22.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Text(
-                            text = "取消",
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    val trimmedName = name.trim()
-                    val isDuplicate = trimmedName.isNotEmpty() &&
-                            trimmedName != currentName &&
-                            trimmedName in existingNames
-
-                    TextButton(
-                        onClick = { onSave(name) },
-                        enabled = trimmedName.isNotEmpty() &&
-                                trimmedName != currentName &&
-                                !isDuplicate,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(22.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                        )
-                    ) {
-                        Text(
-                            text = "保存",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
+                        TextButton(
+                            onClick = { onDelete() }, // 外部处理完逻辑会关闭弹窗
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(22.dp),
+                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.error)
+                        ) { Text("删除", fontSize = 15.sp, color = MaterialTheme.colorScheme.onError) }
                     }
                 }
             }
         }
-    }
-
-    // 删除确认
-    if (showDeleteConfirm) {
-        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
+    } else {
+        // ======== 编辑分类弹窗 ========
+        Dialog(onDismissRequest = onDismiss) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), // 将 29.dp 改小一点，给内容留更多空间
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                     Text(
-                        text = "删除分类",
+                        "编辑分类",
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
+                    Spacer(Modifier.height(16.dp))
 
-                    Spacer(Modifier.height(12.dp))
-
-                    Text(
-                        text = "确定删除分类「$currentName」吗？\n\n已有记录不会丢失，仍保留原分类标签。",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    CommonTextField(value = name, onValueChange = { name = it }, label = "分类名")
 
                     Spacer(Modifier.height(16.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(
-                            onClick = { showDeleteConfirm = false },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp),
+                            onClick = { showDeleteConfirm = true },
+                            modifier = Modifier.weight(1f).height(44.dp),
                             shape = RoundedCornerShape(22.dp),
-                            colors = ButtonDefaults.textButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Text(
-                                text = "取消",
-                                fontSize = 15.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                            contentPadding = PaddingValues(0.dp) // 去掉默认内边距
+                        ) { Text("删除", fontSize = 14.sp, color = MaterialTheme.colorScheme.onErrorContainer) }
 
                         TextButton(
-                            onClick = {
-                                showDeleteConfirm = false
-                                onDelete()
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp),
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f).height(44.dp),
                             shape = RoundedCornerShape(22.dp),
-                            colors = ButtonDefaults.textButtonColors(
-                                containerColor = MaterialTheme.colorScheme.error
-                            )
-                        ) {
-                            Text(
-                                text = "删除",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onError
-                            )
-                        }
+                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            contentPadding = PaddingValues(0.dp)
+                        ) { Text("取消", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface) }
+
+                        Button(
+                            onClick = { onSave(name) },
+                            enabled = trimmed.isNotEmpty() && trimmed != currentName && !isDuplicate,
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(22.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) { Text("保存", fontSize = 14.sp) }
                     }
                 }
             }
@@ -671,196 +396,21 @@ private fun EditCategoryDialog(
     }
 }
 
-@Composable
-private fun ExpenseFormCard(
-    content: @Composable () -> Unit
-) {
-    MiuiCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun ExpenseInputField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    isRequired: Boolean = false,
-    suffix: String? = null,
-    keyboardType: KeyboardType = KeyboardType.Text
-) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = label,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            if (isRequired) {
-                Text(
-                    text = " *",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = RoundedCornerShape(14.dp),
-            textStyle = TextStyle(
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            ),
-            suffix = {
-                suffix?.let {
-                    Text(
-                        text = it,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = Color.Transparent,
-                cursorColor = MaterialTheme.colorScheme.primary
-            )
-        )
-    }
-}
-
-/**
- * MIUI 风格的输入对话框：单输入框 + 取消/确认。
- */
 @Composable
 private fun MiuixInputDialog(
-    title: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    confirmText: String,
-    confirmEnabled: Boolean,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    title: String, value: String, onValueChange: (String) -> Unit, placeholder: String,
+    confirmText: String, confirmEnabled: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(24.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
                 Spacer(Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    placeholder = {
-                        Text(
-                            text = placeholder,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    textStyle = TextStyle(
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        cursorColor = MaterialTheme.colorScheme.primary
-                    )
-                )
-
+                CommonTextField(value = value, onValueChange = onValueChange, placeholder = placeholder)
                 Spacer(Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Text(
-                            text = "取消",
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    TextButton(
-                        onClick = onConfirm,
-                        enabled = confirmEnabled,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                        )
-                    ) {
-                        Text(
-                            text = confirmText,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(24.dp)) { Text("取消", color = MaterialTheme.colorScheme.onSurface) }
+                    Button(onClick = onConfirm, enabled = confirmEnabled, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(24.dp)) { Text(confirmText) }
                 }
             }
         }

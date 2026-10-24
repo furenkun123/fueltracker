@@ -1,5 +1,6 @@
 package com.fueltracker.ui
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -20,6 +21,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,10 +36,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Check
@@ -100,45 +105,32 @@ import com.fueltracker.ui.theme.ThemeMode
 import com.fueltracker.ui.theme.ThemePreferences
 import com.fueltracker.util.BackupManager
 import com.fueltracker.util.UpdateLogManager
-import com.fueltracker.viewmodel.MainViewModel
-import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.coroutines.launch
 import com.fueltracker.util.XiaoxiongCsvImporter
+import com.fueltracker.viewmodel.MainViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 // ============================================================
-// 动画规格
+// 动画规格 & 常量
 // ============================================================
 
 private const val ExpandDurationMs = 380
-private const val ScrollDelayMs: Long = ExpandDurationMs.toLong() + 40L
+private val ScrollDelay: Duration = (ExpandDurationMs + 40).milliseconds
 
-private val ExpandSpec = expandVertically(
-    animationSpec = tween(durationMillis = ExpandDurationMs, easing = FastOutSlowInEasing)
-)
-
-private val ShrinkSpec = shrinkVertically(
-    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-)
-
-private val FadeInSpec = fadeIn(
-    animationSpec = tween(durationMillis = 260, delayMillis = 80)
-)
-
-private val FadeOutSpec = fadeOut(
-    animationSpec = tween(durationMillis = 180)
-)
-
-// ============================================================
-// LazyColumn 稳定 Key
-// ============================================================
+private val ExpandSpec = expandVertically(tween(durationMillis = ExpandDurationMs, easing = FastOutSlowInEasing))
+private val ShrinkSpec = shrinkVertically(tween(durationMillis = 300, easing = FastOutSlowInEasing))
+private val FadeInSpec = fadeIn(tween(durationMillis = 260, delayMillis = 80))
+private val FadeOutSpec = fadeOut(tween(durationMillis = 180))
 
 private const val KeyDataSection = "section_data"
 private const val KeyThemeSection = "section_theme"
 private const val KeyAboutSection = "section_about"
 
 // ============================================================
-// SettingsScreen
+// 主页面
 // ============================================================
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -163,16 +155,14 @@ fun SettingsScreen(
     var isXiaoxiongExpanded by rememberSaveable { mutableStateOf(false) }
 
     var currentThemeMode by remember { mutableStateOf(ThemePreferences.mode) }
-
-
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showUpdateHistory by remember { mutableStateOf(false) }
     var showInstructions by remember { mutableStateOf(false) }
+
     var notificationsEnabled by remember {
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
     }
 
-    // 从系统设置返回时刷新通知状态
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -189,228 +179,92 @@ fun SettingsScreen(
         if (!isDataExpanded) isXiaoxiongExpanded = false
     }
 
-    // 导出备份
-    val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
+    // --- 各种 Launcher 定义 ---
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-
         viewModel.createBackup(uri) { result ->
-            if (result.isSuccess) {
-                Toast.makeText(context, "备份导出成功", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(
-                    context,
-                    "导出失败: ${result.exceptionOrNull()?.localizedMessage}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+            result.fold(
+                onSuccess = { Toast.makeText(context, "备份导出成功", Toast.LENGTH_SHORT).show() },
+                onFailure = { Toast.makeText(context, "导出失败: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
+            )
         }
     }
 
-    // 导入备份
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-
         viewModel.checkIsJsonFile(uri) { isJson ->
-            if (isJson) {
-                selectedRestoreUri = uri
-            } else {
-                Toast.makeText(
-                    context,
-                    "请选择 JSON 格式的备份文件",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+            if (isJson) selectedRestoreUri = uri
+            else Toast.makeText(context, "请选择 JSON 格式的备份文件", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // 加油记录导入
-    val fuelImporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        val vehicle = viewModel.currentVehicle.value ?: return@rememberLauncherForActivityResult
-
-        viewModel.viewModelScope.launch {
-            val result = XiaoxiongCsvImporter.parseFuelCsv(context, uri, vehicle.id)
-            val records = result.getOrNull()
-            if (records != null) {
-                viewModel.importFuelRecords(records) { importResult ->
-                    importResult.getOrNull()?.let { count ->
-                        if (count > 0) {
-                            Toast.makeText(context, "成功导入 $count 条加油记录", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "没有新记录，数据已存在", Toast.LENGTH_SHORT).show()
-                        }
-                    } ?: Toast.makeText(
-                        context,
-                        "导入失败：${importResult.exceptionOrNull()?.localizedMessage}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            } else {
-                Toast.makeText(
-                    context,
-                    "CSV 解析失败：${result.exceptionOrNull()?.localizedMessage ?: "请确认是小熊导出的加油 CSV"}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
+    val fuelImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        launchCsvImport(context, viewModel, uri, "加油",
+            parser = { ctx, fileUri, id -> XiaoxiongCsvImporter.parseFuelCsv(ctx, fileUri, id) },
+            saveRecords = { records, cb -> viewModel.importFuelRecords(records, cb) }
+        )
     }
 
-    // 费用记录导入
-    val expenseImporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        val vehicle = viewModel.currentVehicle.value ?: return@rememberLauncherForActivityResult
-
-        viewModel.viewModelScope.launch {
-            val result = XiaoxiongCsvImporter.parseExpenseCsv(context, uri, vehicle.id)
-            val records = result.getOrNull()
-            if (records != null) {
-                viewModel.importExpenseRecords(records) { importResult ->
-                    importResult.getOrNull()?.let { count ->
-                        if (count > 0) {
-                            Toast.makeText(context, "成功导入 $count 条费用记录", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "没有新记录，数据已存在", Toast.LENGTH_SHORT).show()
-                        }
-                    } ?: Toast.makeText(
-                        context,
-                        "导入失败：${importResult.exceptionOrNull()?.localizedMessage}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            } else {
-                Toast.makeText(
-                    context,
-                    "CSV 解析失败：${result.exceptionOrNull()?.localizedMessage ?: "请确认是小熊导出的费用 CSV"}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
+    val expenseImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        launchCsvImport(context, viewModel, uri, "费用",
+            parser = { ctx, fileUri, id -> XiaoxiongCsvImporter.parseExpenseCsv(ctx, fileUri, id) },
+            saveRecords = { records, cb -> viewModel.importExpenseRecords(records, cb) }
+        )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        // 顶栏
+    // --- 界面结构 ---
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TopAppBar(
-            title = {
-                Text(
-                    text = "设置与数据",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
+            title = { Text("设置与数据", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "返回",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.background
-            )
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
         )
 
-        // 内容区
         LazyColumn(
             state = listState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // 车辆管理标题栏
+            // 1. 车辆管理
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "车辆管理",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-
-                        TextButton(
-                            onClick = onAddVehicle,
-                            enabled = !viewModel.isBackupOperationRunning
-                        ) {
-                            Text(
-                                text = "＋ 添加车辆",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 14.sp
-                            )
+                        Text("车辆管理", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        TextButton(onClick = onAddVehicle, enabled = !viewModel.isBackupOperationRunning) {
+                            Text("＋ 添加车辆", fontSize = 14.sp)
                         }
                     }
-
                     if (vehicles.isEmpty()) {
                         MiuiCardLocal {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(24.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "暂无车辆信息，请添加车辆",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 14.sp
-                                )
+                            Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                Text("暂无车辆信息，请添加车辆", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
                 }
             }
 
-            // 车辆列表
-            items(
-                items = vehicles,
-                key = { it.id },
-                contentType = { "vehicle" }
-            ) { vehicle ->
+            items(vehicles, key = { it.id }) { vehicle ->
                 VehicleItemCard(
                     vehicle = vehicle,
-                    onSelect = {
-                        if (!viewModel.isBackupOperationRunning) {
-                            onSetCurrentVehicle(vehicle)
-                        }
-                    },
-                    onEdit = {
-                        if (!viewModel.isBackupOperationRunning) {
-                            onEditVehicle(vehicle)
-                        }
-                    },
-                    onDelete = {
-                        if (!viewModel.isBackupOperationRunning) {
-                            vehicleToDeleteId = vehicle.id
-                        }
-                    }
+                    onSelect = { if (!viewModel.isBackupOperationRunning) onSetCurrentVehicle(vehicle) },
+                    onEdit = { if (!viewModel.isBackupOperationRunning) onEditVehicle(vehicle) },
+                    onDelete = { if (!viewModel.isBackupOperationRunning) vehicleToDeleteId = vehicle.id }
                 )
             }
 
-            // 数据管理
+            // 2. 备份与恢复
             item(key = KeyDataSection) {
-                ExpandableSettingCard(
+                ExpandableSettingsGroup(
                     icon = Icons.Default.Folder,
                     title = "备份与恢复",
                     subtitle = "导出或导入本地 JSON 数据备份文件",
@@ -418,117 +272,80 @@ fun SettingsScreen(
                     enabled = !viewModel.isBackupOperationRunning,
                     onExpandedChange = { isDataExpanded = !isDataExpanded }
                 ) {
-                    SettingActionRow(
-                        icon = Icons.Default.FileUpload,
-                        title = "导出本地备份",
-                        subtitle = "将车辆及所有加油记录导出为 JSON 文件",
-                        enabled = !viewModel.isBackupOperationRunning,
-                        onClick = {
-                            exportLauncher.launch(BackupManager.generateFileName())
-                        }
+                    SettingsRow(
+                        icon = Icons.Default.FileUpload, title = "导出本地备份", subtitle = "导出为 JSON 文件",
+                        useCircleBackground = true,
+                        enabled = !viewModel.isBackupOperationRunning, onClick = { exportLauncher.launch(BackupManager.generateFileName()) }
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+
+                    SettingsRow(
+                        icon = Icons.Default.FileDownload, title = "恢复本地备份", subtitle = "覆盖当前记录",
+                        useCircleBackground = true,
+                        enabled = !viewModel.isBackupOperationRunning, onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }
                     )
 
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        thickness = 0.6.dp
-                    )
-
-                    SettingActionRow(
-                        icon = Icons.Default.FileDownload,
-                        title = "恢复本地备份",
-                        subtitle = "从本地备份文件中恢复数据并覆盖当前记录",
-                        enabled = !viewModel.isBackupOperationRunning,
-                        onClick = {
-                            importLauncher.launch(arrayOf("application/json", "*/*"))
-                        }
-                    )
-
-                    // ===== 小熊油耗数据（子菜单） =====
-                    NestedExpandableGroup(
+                    ExpandableSettingsGroup(
                         icon = Icons.Default.CloudDownload,
+                        title = "小熊油耗数据",
+                        subtitle = "导入小熊导出的加油 / 费用 CSV",
                         expanded = isXiaoxiongExpanded,
                         enabled = !viewModel.isBackupOperationRunning,
+                        isNested = true,
                         onExpandedChange = { isXiaoxiongExpanded = !isXiaoxiongExpanded }
                     ) {
-                        NestedActionRow(
-                            icon = Icons.Default.FileDownload,
-                            title = "导入加油 CSV",
-                            subtitle = "从小熊油耗导出的 fuel-eco-*.csv 导入",
-                            enabled = !viewModel.isBackupOperationRunning,
+                        // 导入加油 CSV
+                        SettingsRow(
+                            icon = Icons.Default.FileDownload, title = "导入加油 CSV", subtitle = "导入 fuel-eco-*.csv",
+                            indent = true, enabled = !viewModel.isBackupOperationRunning,
                             onClick = {
-                                fuelImporter.launch(
-                                    arrayOf("text/csv", "text/comma-separated-values", "*/*")
-                                )
+                                fuelImporter.launch(arrayOf(
+                                    "text/csv",
+                                    "text/comma-separated-values",
+                                    "text/plain",
+                                    "application/vnd.ms-excel"
+                                ))
                             }
                         )
 
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            thickness = 0.6.dp,
-                            modifier = Modifier.padding(start = 48.dp)
-                        )
-
-                        NestedActionRow(
-                            icon = Icons.Default.FileDownload,
-                            title = "导入费用 CSV",
-                            subtitle = "从小熊油耗导出的 expense-*.csv 导入",
-                            enabled = !viewModel.isBackupOperationRunning,
+// 导入费用 CSV
+                        SettingsRow(
+                            icon = Icons.Default.FileDownload, title = "导入费用 CSV", subtitle = "导入 expense-*.csv",
+                            indent = true, enabled = !viewModel.isBackupOperationRunning,
                             onClick = {
-                                expenseImporter.launch(
-                                    arrayOf("text/csv", "text/comma-separated-values", "*/*")
-                                )
+                                expenseImporter.launch(arrayOf(
+                                    "text/csv",
+                                    "text/comma-separated-values",
+                                    "text/plain",
+                                    "application/vnd.ms-excel"
+                                ))
                             }
                         )
-
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            thickness = 0.6.dp,
-                            modifier = Modifier.padding(start = 48.dp)
-                        )
-
-                        NestedActionRow(
-                            icon = Icons.Default.CloudDownload,
-                            title = "前往小熊网页导出",
-                            subtitle = "登录小熊油耗网页版导出 CSV，再回到本应用导入",
-                            enabled = !viewModel.isBackupOperationRunning,
-                            onClick = {
-                                val url = "https://www.xiaoxiongyouhao.com/carowner/page_data_mgr.php"
-                                try {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-                                } catch (_: Exception) {
-                                    Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show()
-                                }
-                            }
+                        SettingsRow(
+                            icon = Icons.Default.CloudDownload, title = "前往小熊网页导出", subtitle = "登录网页版导出 CSV",
+                            indent = true, enabled = !viewModel.isBackupOperationRunning,
+                            onClick = { openExternalPage(context, "https://www.xiaoxiongyouhao.com/carowner/page_data_mgr.php", "无法打开浏览器") }
                         )
                     }
 
                     if (viewModel.isBackupOperationRunning) {
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            thickness = 0.6.dp
-                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
                         ProcessingRow()
                     }
                 }
             }
 
-
-            // 主题设置
+            // 3. 主题设置
             item(key = KeyThemeSection) {
-                ExpandableSettingCard(
-                    icon = Icons.Default.Brightness6,
-                    title = "主题",
-                    subtitle = currentThemeMode.displayName,
-                    expanded = isThemeExpanded,
-                    enabled = !viewModel.isBackupOperationRunning,
+                ExpandableSettingsGroup(
+                    icon = Icons.Default.Brightness6, title = "主题", subtitle = currentThemeMode.displayName,
+                    expanded = isThemeExpanded, enabled = !viewModel.isBackupOperationRunning,
                     onExpandedChange = { isThemeExpanded = !isThemeExpanded }
                 ) {
                     ThemeMode.entries.forEach { mode ->
                         val selected = currentThemeMode == mode
-
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth()
                                 .clickable(enabled = !viewModel.isBackupOperationRunning) {
                                     ThemePreferences.setMode(context, mode)
                                     currentThemeMode = mode
@@ -537,274 +354,117 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = mode.displayName,
-                                fontSize = 14.sp,
-                                color = if (selected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal
-                            )
-
-                            if (selected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "已选中",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            } else {
-                                Spacer(modifier = Modifier.size(18.dp))
-                            }
+                            Text(mode.displayName, fontSize = 14.sp, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            if (selected) Icon(Icons.Default.Check, "已选中", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            else Spacer(Modifier.size(18.dp))
                         }
-
                         if (mode != ThemeMode.entries.last()) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                thickness = 0.6.dp,
-                                modifier = Modifier.padding(start = 16.dp)
-                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp, modifier = Modifier.padding(start = 16.dp))
                         }
                     }
                 }
             }
 
-            // 关于应用
+            // 4. 关于应用
             item(key = KeyAboutSection) {
-                ExpandableSettingCard(
-                    icon = Icons.Default.Info,
-                    title = "关于应用",
-                    subtitle = "版本信息、使用说明、更新",
-                    expanded = isAboutExpanded,
-                    enabled = !viewModel.isBackupOperationRunning,
-                    onExpandedChange = {
-                        isAboutExpanded = !isAboutExpanded
-                    }
+                ExpandableSettingsGroup(
+                    icon = Icons.Default.Info, title = "关于应用", subtitle = "版本信息、使用说明、更新",
+                    expanded = isAboutExpanded, enabled = !viewModel.isBackupOperationRunning,
+                    onExpandedChange = { isAboutExpanded = !isAboutExpanded }
                 ) {
-
-                    // 关键：恢复原来的左右内边距
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                horizontal = 16.dp,
-                                vertical = 12.dp
-                            ),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-
-                        AboutRow(
-                            title = "应用说明",
-                            subtitle = "使用指南与常见问题",
-                            icon = Icons.AutoMirrored.Filled.MenuBook,
-                            enabled = !viewModel.isBackupOperationRunning,
-                            onClick = { showInstructions = true }
+                        SettingsRow(
+                            title = "应用说明", subtitle = "使用指南与常见问题",
+                            icon = Icons.AutoMirrored.Filled.MenuBook, trailingIcon = null,
+                            enabled = !viewModel.isBackupOperationRunning, onClick = { showInstructions = true }
                         )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
 
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            thickness = 0.6.dp
-                        )
-
-
-                        // ==============================
-                        // 查看更新
-                        // ==============================
-
-                        AboutRow(
-                            title = "查看更新",
-                            subtitle = "跳转网盘查看与下载最新安装包",
-                            icon = Icons.Default.CloudDownload,
+                        SettingsRow(
+                            title = "查看更新", subtitle = "跳转网盘查看下载",
+                            icon = Icons.Default.CloudDownload, trailingIcon = null,
                             enabled = !viewModel.isBackupOperationRunning,
-                            onClick = {
-                                val url =
-                                    "https://yun.139.com/shareweb/#/w/i/2xTrJEeQhKJ01"
+                            onClick = { openExternalPage(context, "https://yun.139.com/shareweb/#/w/i/2xTrJEeQhKJ01", "无法打开网盘链接") }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
 
+                        SettingsRow(
+                            title = "更新历史", subtitle = "查看历次版本更新内容",
+                            icon = Icons.Default.History, trailingIcon = null,
+                            enabled = !viewModel.isBackupOperationRunning, onClick = { showUpdateHistory = true }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+
+                        // 通知权限（特殊排版，保留原生 Row）
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable(enabled = !viewModel.isBackupOperationRunning) {
                                 try {
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            url.toUri()
-                                        )
-                                    )
+                                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                    }
+                                    context.startActivity(intent)
                                 } catch (_: Exception) {
-                                    Toast.makeText(
-                                        context,
-                                        "无法打开网盘链接",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    Toast.makeText(context, "无法打开系统设置", Toast.LENGTH_SHORT).show()
                                 }
-                            }
-                        )
-
-                        HorizontalDivider(
-                            color =
-                                MaterialTheme.colorScheme.surfaceVariant,
-                            thickness = 0.6.dp
-                        )
-
-                        AboutRow(
-                            title = "更新历史",
-                            subtitle = "查看历次版本更新内容",
-                            icon = Icons.Default.History,
-                            enabled = !viewModel.isBackupOperationRunning,
-                            onClick = { showUpdateHistory = true }
-                        )
-
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            thickness = 0.6.dp
-                        )
-
-                        // ==============================
-                        // 通知权限
-                        // ==============================
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = !viewModel.isBackupOperationRunning) {
-                                    val intent = Intent(
-                                        Settings.ACTION_APP_NOTIFICATION_SETTINGS
-                                    ).apply {
-                                        putExtra(
-                                            Settings.EXTRA_APP_PACKAGE,
-                                            context.packageName
-                                        )
-                                    }
-                                    try {
-                                        context.startActivity(intent)
-                                    } catch (_: Exception) {
-                                        Toast.makeText(
-                                            context,
-                                            "无法打开系统设置",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }
-                                .padding(vertical = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            }.padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Notifications,
-                                    contentDescription = null,
-                                    tint = if (notificationsEnabled)
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "通知权限",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = if (notificationsEnabled) {
-                                            "已开启，记停车时会显示位置提醒"
-                                        } else {
-                                            "已关闭，点击前往系统设置开启"
-                                        },
-                                        fontSize = 12.sp,
-                                        color = if (notificationsEnabled)
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        else
-                                            MaterialTheme.colorScheme.error
-                                    )
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Default.Notifications, null, tint = if (notificationsEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text("通知权限", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text(if (notificationsEnabled) "已开启，记停车时会显示位置提醒" else "已关闭，点击前往系统设置开启", fontSize = 12.sp, color = if (notificationsEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
                                 }
                             }
-                            Text(
-                                text = if (notificationsEnabled) "已开启" else "去开启",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (notificationsEnabled)
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                else
-                                    MaterialTheme.colorScheme.primary
-                            )
                         }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
 
-                        HorizontalDivider(
-                            color =
-                                MaterialTheme.colorScheme.surfaceVariant,
-                            thickness = 0.6.dp
-                        )
-
-                        // ==============================
                         // 版本号
-                        // ==============================
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "版本号",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("版本号", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text("v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
             }
-            // 隐私声明
+
+            // 5. 隐私声明入口
             item(key = "section_privacy") {
                 MiuiCardLocal {
-                    SettingActionRow(
-                        icon = Icons.Default.Security,
-                        title = "隐私声明",
-                        subtitle = "了解应用信息收集情况",
-                        enabled = !viewModel.isBackupOperationRunning,
-                        onClick = { showPrivacyDialog = true }
+                    SettingsRow(
+                        icon = Icons.Default.Security, title = "隐私声明", subtitle = "了解应用信息收集情况",
+                        useCircleBackground = true,
+                        enabled = !viewModel.isBackupOperationRunning, onClick = { showPrivacyDialog = true }
                     )
                 }
             }
         }
     }
 
-    // 自动滚动处理
+    // --- 自动滚动 ---
     AutoScrollOnExpand(isDataExpanded, KeyDataSection, listState)
     AutoScrollOnExpand(isThemeExpanded, KeyThemeSection, listState)
     AutoScrollOnExpand(isAboutExpanded, KeyAboutSection, listState)
     AutoScrollOnExpand(isXiaoxiongExpanded, KeyDataSection, listState)
-    // 删除车辆确认弹窗
+
+    // --- 各种确认与弹窗 ---
     vehicles.firstOrNull { it.id == vehicleToDeleteId }?.let { vehicle ->
         MiuiConfirmDialog(
             title = "确认删除车辆？",
             message = buildString {
                 append("删除“${vehicle.brand} ${vehicle.model}”将同步删除该车辆下的所有加油记录，且不可恢复。")
-                if (vehicle.isCurrent) {
-                    append("\n注意：这是当前正在使用的车辆。")
-                }
+                if (vehicle.isCurrent) append("\n注意：这是当前正在使用的车辆。")
             },
             confirmText = "删除",
-            onConfirm = {
-                vehicleToDeleteId = null
-                onDeleteVehicle(vehicle)
-            },
+            onConfirm = { vehicleToDeleteId = null; onDeleteVehicle(vehicle) },
             onDismiss = { vehicleToDeleteId = null }
         )
     }
 
-    // 恢复备份确认弹窗
     selectedRestoreUri?.let { uri ->
         MiuiConfirmDialog(
             title = "确认恢复备份？",
@@ -813,280 +473,210 @@ fun SettingsScreen(
             onConfirm = {
                 selectedRestoreUri = null
                 viewModel.restoreBackup(uri) { result ->
-                    if (result.isSuccess) {
-                        Toast.makeText(context, "数据恢复成功！", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(
-                            context,
-                            "数据恢复失败: ${result.exceptionOrNull()?.localizedMessage}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+                    result.fold(
+                        onSuccess = { Toast.makeText(context, "数据恢复成功！", Toast.LENGTH_SHORT).show() },
+                        onFailure = { Toast.makeText(context, "数据恢复失败: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
+                    )
                 }
             },
             onDismiss = { selectedRestoreUri = null }
         )
     }
-    // 隐私声明弹窗
-    if (showPrivacyDialog) {
-        PrivacyDialog(onDismiss = { showPrivacyDialog = false })
-    }
-    //更新历史弹窗
-    if (showUpdateHistory) {
-        UpdateHistoryDialog(onDismiss = { showUpdateHistory = false })
-    }
-    //关于应用弹窗
-    if (showInstructions) {
-        InstructionsDialog(onDismiss = { showInstructions = false })
-    }
+
+    if (showPrivacyDialog) PrivacyDialog { showPrivacyDialog = false }
+    if (showUpdateHistory) UpdateHistoryDialog { showUpdateHistory = false }
+    if (showInstructions) InstructionsDialog { showInstructions = false }
 }
 
 // ============================================================
-// 可展开设置卡片
+// 核心抽象组件区
 // ============================================================
 
 @Composable
-private fun ExpandableSettingCard(
+private fun ExpandableSettingsGroup(
     icon: ImageVector,
     title: String,
     subtitle: String,
     expanded: Boolean,
     enabled: Boolean = true,
+    isNested: Boolean = false, // 是否作为内部子菜单
     onExpandedChange: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    MiuiCardLocal {
-        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+    val innerContent = @Composable {
+        Column(modifier = if (isNested) Modifier else Modifier.padding(vertical = 4.dp)) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = enabled, onClick = onExpandedChange)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onExpandedChange).padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    if (!isNested) {
+                        Box(Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                    } else {
+                        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
                     }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
                     Column {
-                        Text(
-                            text = title,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = subtitle,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text(title, fontSize = if (isNested) 14.sp else 15.sp, fontWeight = if (isNested) FontWeight.Medium else FontWeight.SemiBold)
+                        Spacer(Modifier.height(2.dp))
+                        Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-
-                Icon(
-                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (expanded) "收起" else "展开",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, "展开", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = ExpandSpec + FadeInSpec,
-                exit = ShrinkSpec + FadeOutSpec
-            ) {
+            AnimatedVisibility(expanded, enter = ExpandSpec + FadeInSpec, exit = ShrinkSpec + FadeOutSpec) {
                 Column {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        thickness = 0.6.dp
-                    )
+                    if (!isNested) HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
                     content()
                 }
             }
         }
     }
+
+    if (isNested) innerContent()
+    else MiuiCardLocal { innerContent() }
 }
 
-// ============================================================
-// 自动滚动
-// ============================================================
-
 @Composable
-private fun AutoScrollOnExpand(
-    expanded: Boolean,
-    sectionKey: String,
-    listState: LazyListState
+private fun SettingsRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector? = null,
+    indent: Boolean = false,
+    useCircleBackground: Boolean = false,
+    trailingIcon: ImageVector? = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+    enabled: Boolean = true,
+    onClick: () -> Unit
 ) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-
-    LaunchedEffect(expanded, sectionKey) {
-        if (!expanded) return@LaunchedEffect
-
-        delay(ScrollDelayMs.milliseconds)
-
-        val layoutInfo = listState.layoutInfo
-        val item = layoutInfo.visibleItemsInfo.firstOrNull { it.key == sectionKey } ?: return@LaunchedEffect
-
-        val overshoot = item.offset + item.size - layoutInfo.viewportEndOffset
-        if (overshoot <= 0) return@LaunchedEffect
-
-        val keepHeaderPx = with(density) { 48.dp.toPx() }
-        val maxScroll = (item.offset - layoutInfo.viewportStartOffset + keepHeaderPx).coerceAtLeast(0f)
-        val scrollBy = overshoot.toFloat().coerceIn(0f, maxScroll)
-
-        if (scrollBy > 0f) {
-            listState.animateScrollBy(
-                value = scrollBy,
-                animationSpec = tween(
-                    durationMillis = 350,
-                    easing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
-                )
-            )
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick)
+            .padding(start = if (indent) 48.dp else 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            if (icon != null) {
+                if (useCircleBackground) {
+                    Box(Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    }
+                } else {
+                    Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(if (indent) 18.dp else 20.dp))
+                }
+                Spacer(Modifier.width(if (indent) 10.dp else 12.dp))
+            }
+            Column {
+                Text(title, fontSize = if (indent) 14.sp else 15.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(2.dp))
+                Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (trailingIcon != null) {
+            Icon(trailingIcon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         }
     }
 }
 
-
 // ============================================================
-// MIUI 卡片
-// ============================================================
-
-@Composable
-private fun MiuiCardLocal(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    MiuiCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        content()
-    }
-}
-// ============================================================
-// 车辆卡片
+// 弹窗区（统一使用 ScrollableSettingsDialog）
 // ============================================================
 
 @Composable
-private fun VehicleItemCard(
-    vehicle: Vehicle,
-    onSelect: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+private fun ScrollableSettingsDialog(
+    title: String,
+    buttonText: String,
+    onDismiss: () -> Unit,
+    centeredTitle: Boolean = false,
+    spacedContent: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit
 ) {
-    MiuiCardLocal(modifier = Modifier.clickable(onClick = onSelect)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (vehicle.isCurrent) {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        }
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DirectionsCar,
-                    contentDescription = null,
-                    tint = if (vehicle.isCurrent) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp).padding(horizontal = 16.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
                 Text(
-                    text = listOf(vehicle.brand, vehicle.series, vehicle.model)
-                        .filter { it.isNotBlank() }
-                        .joinToString(" "),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = title, fontSize = if (centeredTitle) 18.sp else 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start, modifier = Modifier.fillMaxWidth()
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "${vehicle.year}款 | ${vehicle.fuelType} (${vehicle.fuelGrade}) | 油箱 ${vehicle.tankCapacity}L",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                Spacer(Modifier.height(16.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    verticalArrangement = if (spacedContent) Arrangement.spacedBy(10.dp) else Arrangement.Top,
+                    content = content
                 )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                if (vehicle.isCurrent) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Text(
-                            text = "当前使用",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                Spacer(Modifier.height(20.dp))
+                TextButton(
+                    onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "编辑车辆",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
+                    Text(buttonText, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onPrimary)
+                }
+            }
+        }
+    }
+}
 
-                    IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = "删除车辆",
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.9f),
-                            modifier = Modifier.size(16.dp)
-                        )
+@Composable
+private fun PrivacyDialog(onDismiss: () -> Unit) {
+    ScrollableSettingsDialog(title = "隐私声明", buttonText = "我已了解", onDismiss = onDismiss, centeredTitle = true) {
+        PrivacySection(
+            title = "数据本地化存储",
+            body = "本应用为纯本地工具。您的车辆信息、加油记录、费用记录以及停车位置，均仅保存在您手机的本地 SQLite 数据库中。我们不运营任何服务器，不会主动将您的任何记账数据上传至云端。")
+        PrivacySection(
+            title = "信息收集与使用",
+            body = "本应用不收集您的通讯录、短信、通话记录、相册等个人敏感身份信息。应用仅会在您主动记录时，获取您填写的车辆配置、金额、里程等必要记账数据。")
+        PrivacySection(
+            title = "位置权限说明",
+            body = "当您使用“记停车”功能并点击“获取当前位置”时，应用会向系统请求定位权限。获取的经纬度和地址文本，仅用于自动填写停车位置输入框。当您保存该条停车记录后，位置文本将保存在本地数据库中，绝不会上传。")
+        PrivacySection(
+            title = "网络访问与第三方",
+            body = "本应用主体不包含联网上报代码。仅在您主动点击“查看更新”或“前往小熊网页导出”时，应用会调用您手机自带的系统浏览器打开对应的外部网页。该过程不涉及本应用向外部回传任何本地数据。")
+        PrivacySection(
+            title = "数据备份与安全",
+            body = "备份文件由您主动导出并保存在手机本地。请妥善保管您的备份文件。卸载本应用会直接清除应用内的所有本地数据（含未导出的历史记录），建议您定期导出备份。同时，本应用已关闭 Android 系统的云自动备份功能，防止您的敏感数据被自动同步至云端。")
+    }
+}
+
+@Composable
+private fun PrivacySection(title: String, body: String) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(body, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 20.sp)
+    }
+}
+
+@Composable
+private fun InstructionsDialog(onDismiss: () -> Unit) {
+    val instructions = remember {
+        listOf(
+            "【基础记账】添加车辆后，每次加油记一笔。填写当前里程、加油量和金额，系统会自动生成记录",
+            "【精准油耗】连续两次勾选“已加满”，即可计算出准确的百公里油耗。若期间有未加满，系统会智能折算，并在列表中标注“预估”",
+            "【漏记补录】忘记记某次加油？下次记录时勾选“上次漏记”，填入大概里程和油量，系统会自动还原真实油耗",
+            "【智慧停车】记停车可自动获取当前位置并保存车位号。首页会常驻提醒，取车后点击“已取车”即可结束",
+            "【费用管理】费用页可记录高速、保养、洗车等支出，支持自定义分类。点击费用结构图表，可快速按分类筛选明细",
+            "【数据迁移】如需从小熊油耗迁移数据：请先在小熊网页版导出 CSV 文件，然后在“设置 -> 备份与恢复 -> 小熊油耗数据”中导入（系统会自动去重）",
+            "【记录管理】在“全部记录”或“费用明细”页，点击任意记录右侧的“编辑/删除”即可修改或移除数据",
+            "【数据安全】所有数据100%保存在手机本地。强烈建议定期在“设置”中导出 JSON 备份，以免换机或卸载时丢失数据"
+        )
+    }
+    ScrollableSettingsDialog(title = "应用说明", buttonText = "关闭", onDismiss = onDismiss, spacedContent = true) {
+        instructions.forEachIndexed { index, text -> MiuiInstructionItem(index + 1, text) }
+    }
+}
+
+@Composable
+private fun UpdateHistoryDialog(onDismiss: () -> Unit) {
+    val allLogs = remember { UpdateLogManager.getAllUpdateLogs() }
+    ScrollableSettingsDialog(title = "更新历史", buttonText = "关闭", onDismiss = onDismiss, spacedContent = true) {
+        allLogs.forEach { entry ->
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("v${entry.versionName}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                entry.items.forEach { lineText ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Top) {
+                        Box(modifier = Modifier.padding(top = 8.dp).size(4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant))
+                        Text(lineText, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, lineHeight = 20.sp, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -1094,484 +684,91 @@ private fun VehicleItemCard(
     }
 }
 
+@Composable
+private fun MiuiInstructionItem(index: Int, text: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+        Box(modifier = Modifier.size(22.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+            Text("$index", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+        Text(text, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface, lineHeight = 21.sp, modifier = Modifier.weight(1f))
+    }
+}
+
 // ============================================================
-// 设置操作行
+// 其他基础组件 & 工具
 // ============================================================
 
 @Composable
-private fun SettingActionRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
-        ) {
+private fun MiuiCardLocal(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    MiuiCard(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) { content() }
+}
+
+@Composable
+private fun VehicleItemCard(vehicle: Vehicle, onSelect: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+    MiuiCardLocal(modifier = Modifier.clickable(onClick = onSelect)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                modifier = Modifier.size(38.dp).clip(CircleShape).background(if (vehicle.isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
+                Icon(Icons.Default.DirectionsCar, null, tint = if (vehicle.isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             }
-
             Spacer(modifier = Modifier.width(12.dp))
-
-            Column {
-                Text(
-                    text = title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(listOf(vehicle.brand, vehicle.series, vehicle.model).filter { it.isNotBlank() }.joinToString(" "), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("${vehicle.year}款 | ${vehicle.fuelType} (${vehicle.fuelGrade}) | 油箱 ${vehicle.tankCapacity}L", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        }
-
-        Text(
-            text = "›",
-            fontSize = 22.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 8.dp)
-        )
-    }
-}
-
-@Composable
-private fun NestedExpandableGroup(
-    icon: ImageVector,
-    expanded: Boolean,
-    enabled: Boolean = true,
-    onExpandedChange: () -> Unit,
-    content: @Composable () -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = enabled, onClick = onExpandedChange)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    // 👇 这里直接写死
-                    Text(
-                        text = "小熊油耗数据",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    // 👇 这里直接写死
-                    Text(
-                        text = "导入小熊导出的加油 / 费用 CSV，或前往网页导出",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (vehicle.isCurrent) {
+                    Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                        Text("当前使用", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "编辑", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp)) }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.DeleteOutline, "删除", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.9f), modifier = Modifier.size(16.dp)) }
                 }
             }
-
-            Icon(
-                imageVector = if (expanded) Icons.Default.KeyboardArrowUp
-                else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (expanded) "收起" else "展开",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        AnimatedVisibility(
-            visible = expanded,
-            enter = ExpandSpec + FadeInSpec,
-            exit = ShrinkSpec + FadeOutSpec
-        ) {
-            Column { content() }
         }
     }
 }
-
-@Composable
-private fun NestedActionRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(start = 48.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column {
-                Text(
-                    text = title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Text(
-            text = "›",
-            fontSize = 20.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 8.dp)
-        )
-    }
-}
-
-// ============================================================
-// 处理中的提示
-// ============================================================
 
 @Composable
 private fun ProcessingRow() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "正在处理数据，请稍候…",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        Text("正在处理数据，请稍候…", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
-
-// ============================================================
-// About 行
-// ============================================================
-
-@Composable
-private fun AboutRow(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-}
-
-// ============================================================
-// 使用说明
-// ============================================================
-
-@Composable
-private fun MiuiInstructionItem(
-    index: Int,
-    text: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        Box(
-            modifier = Modifier
-                .size(22.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "$index",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        }
-
-        Text(
-            text = text,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface,
-            lineHeight = 21.sp,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-// ============================================================
-// MIUI 确认弹窗
-// ============================================================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MiuiConfirmDialog(
-    title: String,
-    message: String,
-    confirmText: String = "确定",
-    dismissText: String = "取消",
-    confirmColor: Color? = null,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
+private fun MiuiConfirmDialog(title: String, message: String, confirmText: String = "确定", dismissText: String = "取消", confirmColor: Color? = null, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val effectiveConfirmColor = confirmColor ?: MaterialTheme.colorScheme.error
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var actionTriggered by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(40.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                )
-            }
-        }
+        dragHandle = { Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), contentAlignment = Alignment.Center) { Box(modifier = Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))) } }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 28.dp)
-        ) {
-            Text(
-                text = title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp)) {
+            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = message,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 22.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-
+            Text(message, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 22.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(28.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Text(
-                        text = dismissText,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(24.dp), colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Text(dismissText, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                 }
-
                 TextButton(
-                    onClick = {
-                        if (actionTriggered) return@TextButton
-                        actionTriggered = true
-                        onConfirm()
-                    },
-                    enabled = !actionTriggered,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = effectiveConfirmColor.copy(alpha = 0.12f)
-                    )
+                    onClick = { if (actionTriggered) return@TextButton; actionTriggered = true; onConfirm() },
+                    enabled = !actionTriggered, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.textButtonColors(containerColor = effectiveConfirmColor.copy(alpha = 0.12f))
                 ) {
-                    Text(
-                        text = confirmText,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = effectiveConfirmColor
-                    )
-                }
-            }
-        }
-    }
-}
-@Composable
-private fun PrivacyDialog(
-    onDismiss: () -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                Text(
-                    text = "隐私声明",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                PrivacySection(
-                    title = "数据本地化存储",
-                    body = "本应用为纯本地工具。您的车辆信息、加油记录、费用记录以及停车位置，均仅保存在您手机的本地 SQLite 数据库中。我们不运营任何服务器，不会主动将您的任何记账数据上传至云端。"
-                )
-
-                PrivacySection(
-                    title = "信息收集与使用",
-                    body = "本应用不收集您的通讯录、短信、通话记录、相册等个人敏感身份信息。应用仅会在您主动记录时，获取您填写的车辆配置、金额、里程等必要记账数据。"
-                )
-
-                PrivacySection(
-                    title = "位置权限说明",
-                    body = "当您使用“记停车”功能并点击“获取当前位置”时，应用会向系统请求定位权限。获取的经纬度和地址文本，仅用于自动填写停车位置输入框。当您保存该条停车记录后，位置文本将保存在本地数据库中，绝不会上传。"
-                )
-
-                PrivacySection(
-                    title = "网络访问与第三方",
-                    body = "本应用主体不包含联网上报代码。仅在您主动点击“查看更新”或“前往小熊网页导出”时，应用会调用您手机自带的系统浏览器打开对应的外部网页。该过程不涉及本应用向外部回传任何本地数据。"
-                )
-
-                PrivacySection(
-                    title = "数据备份与安全",
-                    body = "备份文件由您主动导出并保存在手机本地。请妥善保管您的备份文件。卸载本应用会直接清除应用内的所有本地数据（含未导出的历史记录），建议您定期导出备份。同时，本应用已关闭 Android 系统的云自动备份功能，防止您的敏感数据被自动同步至云端。"
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text(
-                        text = "我已了解",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
+                    Text(confirmText, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = effectiveConfirmColor)
                 }
             }
         }
@@ -1579,201 +776,121 @@ private fun PrivacyDialog(
 }
 
 @Composable
-private fun PrivacySection(
-    title: String,
-    body: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-    ) {
-        Text(
-            text = title,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = body,
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            lineHeight = 20.sp
-        )
+private fun AutoScrollOnExpand(expanded: Boolean, sectionKey: String, listState: LazyListState) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    LaunchedEffect(expanded, sectionKey) {
+        if (!expanded) return@LaunchedEffect
+        delay(ScrollDelay)
+        val layoutInfo = listState.layoutInfo
+        val item = layoutInfo.visibleItemsInfo.firstOrNull { it.key == sectionKey } ?: return@LaunchedEffect
+        val overshoot = item.offset + item.size - layoutInfo.viewportEndOffset
+        if (overshoot <= 0) return@LaunchedEffect
+        val keepHeaderPx = with(density) { 48.dp.toPx() }
+        val maxScroll = (item.offset - layoutInfo.viewportStartOffset + keepHeaderPx).coerceAtLeast(0f)
+        val scrollBy = overshoot.toFloat().coerceIn(0f, maxScroll)
+        if (scrollBy > 0f) {
+            listState.animateScrollBy(value = scrollBy, animationSpec = tween(durationMillis = 350, easing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)))
+        }
     }
 }
 
-
-@Composable
-private fun UpdateHistoryDialog(
-    onDismiss: () -> Unit
+private fun openExternalPage(
+    context: Context,
+    url: String,
+    errorMessage: String
 ) {
-    val allLogs = remember { UpdateLogManager.getAllUpdateLogs() }
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
+            // 👇 加上这个 Flag，防止在非 Activity 上下文中调用时崩溃
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+    }
+}
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 600.dp)
-                .padding(horizontal = 16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                Text(
-                    text = "更新历史",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+private fun isCsvFileUri(context: Context, uri: Uri): Boolean {
+    val displayName = try {
+        context.contentResolver.query(
+            uri,
+            arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+            null, null, null
+        )?.use { cursor ->
+            val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
+        }
+    } catch (_: Exception) {
+        null
+    }
+    return displayName?.endsWith(".csv", ignoreCase = true) == true
+}
 
-                Spacer(Modifier.height(16.dp))
+private fun <T> launchCsvImport(
+    context: Context,
+    viewModel: MainViewModel,
+    uri: Uri?, // 传入的参数叫 uri
+    typeName: String,
+    parser: suspend (Context, Uri, Long) -> Result<List<T>>,
+    saveRecords: (List<T>, (Result<Int>) -> Unit) -> Unit
+) {
+    // 1. 声明并赋值 fileUri，如果是 null 直接返回
+    val fileUri = uri ?: return
 
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    allLogs.forEach { entry ->
-                        item(key = entry.versionCode) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = "v${entry.versionName}",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+    // 2. 校验文件后缀（注意这里用的是 fileUri）
+    if (!isCsvFileUri(context, fileUri)) {
+        Toast.makeText(context, "请选择 .csv 格式的文件", Toast.LENGTH_SHORT).show()
+        return
+    }
 
-                                entry.items.forEach { lineText ->
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalAlignment = Alignment.Top
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .padding(top = 8.dp)
-                                                .size(4.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.onSurfaceVariant)
-                                        )
-                                        Text(
-                                            text = lineText,
-                                            fontSize = 13.sp,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            lineHeight = 20.sp,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
+    // 3. 获取当前车辆
+    val vehicleId = viewModel.currentVehicle.value?.id
+    if (vehicleId == null) {
+        Toast.makeText(context, "请先添加并选择车辆，再导入 CSV", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    // 4. 开始解析和导入
+    viewModel.viewModelScope.launch {
+        val parseResult = try {
+            parser(context, fileUri, vehicleId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+
+        parseResult.fold(
+            onSuccess = { records ->
+                saveRecords(records) { result ->
+                    viewModel.viewModelScope.launch {
+                        val message = result.fold(
+                            onSuccess = { count ->
+                                if (count > 0) {
+                                    "成功导入 $count 条${typeName}记录"
+                                } else {
+                                    "没有新记录，数据已存在"
                                 }
+                            },
+                            onFailure = { error ->
+                                "导入失败：${error.localizedMessage ?: "未知错误"}"
                             }
-                        }
+                        )
+                        Toast.makeText(
+                            context,
+                            message,
+                            if (result.isSuccess) Toast.LENGTH_SHORT else Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
-
-                Spacer(Modifier.height(16.dp))
-
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text(
-                        text = "关闭",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
+            },
+            onFailure = { error ->
+                Toast.makeText(
+                    context,
+                    "CSV 解析失败：${error.localizedMessage ?: "请确认文件是小熊油耗导出的${typeName} CSV"}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
-        }
-    }
-}
-@Composable
-private fun InstructionsDialog(
-    onDismiss: () -> Unit
-) {
-    val instructions = listOf(
-        "【基础记账】添加车辆后，每次加油记一笔。填写当前里程、加油量和金额，系统会自动生成记录",
-        "【精准油耗】连续两次勾选“已加满”，即可计算出准确的百公里油耗。若期间有未加满，系统会智能折算，并在列表中标注“预估”",
-        "【漏记补录】忘记记某次加油？下次记录时勾选“上次漏记”，填入大概里程和油量，系统会自动还原真实油耗",
-        "【智慧停车】记停车可自动获取当前位置并保存车位号。首页会常驻提醒，取车后点击“已取车”即可结束",
-        "【费用管理】费用页可记录高速、保养、洗车等支出，支持自定义分类。点击费用结构图表，可快速按分类筛选明细",
-        "【数据迁移】如需从小熊油耗迁移数据：请先在小熊网页版导出 CSV 文件，然后在“设置 -> 备份与恢复 -> 小熊油耗数据”中导入（系统会自动去重）",
-        "【记录管理】在“全部记录”或“费用明细”页，点击任意记录右侧的“编辑/删除”即可修改或移除数据",
-        "【数据安全】所有数据100%保存在手机本地。强烈建议定期在“设置”中导出 JSON 备份，以免换机或卸载时丢失数据"
-    )
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                Text(
-                    text = "应用说明",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    instructions.forEachIndexed { index, text ->
-                        MiuiInstructionItem(index + 1, text)
-                    }
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text(
-                        text = "关闭",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-        }
+        )
     }
 }
