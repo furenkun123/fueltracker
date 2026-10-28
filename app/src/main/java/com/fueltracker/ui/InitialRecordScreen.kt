@@ -1,11 +1,9 @@
 package com.fueltracker.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,12 +12,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fueltracker.ui.miui.MuiXGroupCard
-import com.fueltracker.ui.miui.MuiXInputItem
-import com.fueltracker.ui.miui.MuiXSectionHeader
+import com.fueltracker.ui.components.MiuiConfirmDialog // 👈 引入确认弹窗
+import com.fueltracker.ui.miui.*
 import com.fueltracker.viewmodel.MainViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InitialRecordScreen(
     viewModel: MainViewModel,
@@ -29,6 +25,9 @@ fun InitialRecordScreen(
     val vehicle by viewModel.currentVehicle.collectAsState()
     var odometer by remember { mutableStateOf("") }
     var currentFuel by remember { mutableStateOf("") }
+
+    // 👇 控制“跳过”确认弹窗的显示
+    var showSkipConfirm by remember { mutableStateOf(false) }
 
     val currentVehicle = vehicle
 
@@ -44,13 +43,24 @@ fun InitialRecordScreen(
     val isFuelValid = fuelValue == null || (fuelValue >= 0 && fuelValue <= currentVehicle.tankCapacity)
     val canSave = odometerValue != null && odometerValue >= 0 && isFuelValid
 
+    // 👇 拦截系统返回键，不直接退出，而是弹窗确认
+    BackHandler(enabled = true) {
+        showSkipConfirm = true
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("首次记录", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            MiuiTopBar(
+                title = "首次记录",
+                // 取消左上角的返回按钮
+                navigationIcon = null,
+                // 👇 右上角提供显式的“跳过”按钮
+                action = {
+                    TextButton(onClick = { showSkipConfirm = true }) {
+                        Text("跳过", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    }
+                }
             )
         }
     ) { paddingValues ->
@@ -63,8 +73,8 @@ fun InitialRecordScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            MuiXSectionHeader(title = "当前车辆信息")
-            MuiXGroupCard {
+            MiuiSectionHeader(title = "当前车辆信息")
+            MiuiGroupCard {
                 Column(modifier = Modifier.padding(vertical = 14.dp)) {
                     Text(
                         text = "${currentVehicle.brand} ${currentVehicle.series} ${currentVehicle.model}".trim(),
@@ -81,9 +91,9 @@ fun InitialRecordScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            MuiXSectionHeader(title = "录入初始状态")
-            MuiXGroupCard {
-                MuiXInputItem(
+            MiuiSectionHeader(title = "录入初始状态")
+            MiuiGroupCard {
+                MiuiInputItem(
                     label = "当前公里数 (km)",
                     value = odometer,
                     onValueChange = { odometer = it },
@@ -91,7 +101,7 @@ fun InitialRecordScreen(
                     keyboardType = KeyboardType.Decimal
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.8.dp)
-                MuiXInputItem(
+                MiuiInputItem(
                     label = "当前剩余油量 (L)",
                     value = currentFuel,
                     onValueChange = { currentFuel = it },
@@ -111,19 +121,34 @@ fun InitialRecordScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            Button(
+            MiuiButton(
+                text = "开始记录",
+                enabled = canSave,
                 onClick = {
                     viewModel.addInitialRecord(odometerValue, fuelValue)
                     onCompleted()
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                enabled = canSave // Material3 默认的 disabled 状态已经足够好看，去掉了多余的颜色覆盖
-            ) {
-                Text("开始记录", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            }
+                }
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    // 👇 跳过时的确认弹窗
+    if (showSkipConfirm) {
+        MiuiConfirmDialog(
+            title = "确定要跳过吗？",
+            message = "没有初始里程，系统将无法计算这辆车前几次的油耗。您可以在后续添加加油记录时补充里程信息。",
+            confirmText = "仍要跳过",
+            dismissText = "去填写",
+            confirmColor = MaterialTheme.colorScheme.error,
+            onConfirm = {
+                showSkipConfirm = false
+                onBack() // 执行原本的返回逻辑
+            },
+            onDismiss = {
+                showSkipConfirm = false
+            }
+        )
     }
 }

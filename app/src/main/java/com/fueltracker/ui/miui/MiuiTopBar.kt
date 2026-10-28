@@ -1,17 +1,15 @@
+
 package com.fueltracker.ui.miui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -20,34 +18,51 @@ import androidx.compose.ui.unit.sp
 fun MiuiTopBar(
     modifier: Modifier = Modifier,
     title: String = "随记油耗",
-    navigationIcon: (@Composable () -> Unit)? = null, // 注意这里的 @Composable 声明
+    isGlassEnabled: Boolean = false,
+    navigationIcon: (@Composable () -> Unit)? = null,
     action: (@Composable () -> Unit)? = null
 ) {
-    Row(
+    val statusBarHeight = WindowInsets.statusBars
+        .asPaddingValues()
+        .calculateTopPadding()
+
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+
+    val topBarBackground = when {
+        !isGlassEnabled -> MaterialTheme.colorScheme.background
+        isLight -> Color.White.copy(alpha = 0.88f)
+        else -> Color(0xFF18181A).copy(alpha = 0.88f)
+    }
+
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(MiuiColors.Background) // 背景防穿透
-            .statusBarsPadding()               // 撑开状态栏高度
-            .height(48.dp)                     // 紧凑高度
-            .padding(horizontal = 12.dp),      // 左右边距
-        verticalAlignment = Alignment.CenterVertically
+            .background(topBarBackground)
     ) {
-        // 左侧返回/导航图标
-        if (navigationIcon != null) {
-            navigationIcon()
-            Spacer(modifier = Modifier.width(4.dp))
+        // 背景覆盖状态栏区域，标题不与系统图标重叠
+        Spacer(modifier = Modifier.height(statusBarHeight))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (navigationIcon != null) {
+                navigationIcon()
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+
+            Text(
+                text = title,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+
+            action?.invoke()
         }
-
-        // 标题
-        Text(
-            text = title,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold,
-            color = MiuiColors.Text,
-            modifier = Modifier.weight(1f)
-        )
-
-        // 右侧操作按钮
-        action?.invoke()
     }
-}
+    }

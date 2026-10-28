@@ -5,15 +5,44 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,14 +58,14 @@ import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.data.DEFAULT_EXPENSE_CATEGORIES
 import com.fueltracker.data.ExpenseCategoryStore
 import com.fueltracker.data.ExpenseRecord
+import com.fueltracker.ui.components.MiuiConfirmDialog
 import com.fueltracker.ui.components.MiuiDatePickerDialog
+import com.fueltracker.ui.miui.MiuiButton
 import com.fueltracker.ui.miui.MiuiCard
+import com.fueltracker.ui.miui.MiuiTopBar
+import com.fueltracker.util.toDateTimeText
 import com.fueltracker.viewmodel.MainViewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseEditScreen(
     viewModel: MainViewModel,
@@ -46,7 +75,6 @@ fun ExpenseEditScreen(
 ) {
     val context = LocalContext.current
     val isEditMode = record != null
-    val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
     var customCategories by remember { mutableStateOf(ExpenseCategoryStore.getCustom()) }
     val allCategories = remember(customCategories) { DEFAULT_EXPENSE_CATEGORIES + customCategories }
@@ -70,10 +98,12 @@ fun ExpenseEditScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(if (isEditMode) "编辑费用" else "记费用", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            // 👈 替换为统一的 MiuiTopBar
+            MiuiTopBar(
+                title = if (isEditMode) "编辑费用" else "记费用",
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
+                }
             )
         }
     ) { padding ->
@@ -127,7 +157,8 @@ fun ExpenseEditScreen(
                             .clickable { showDatePicker = true }.padding(horizontal = 14.dp),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        Text(dateFormatter.format(Date(timestamp)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        // 👈 使用公共扩展函数替代了 dateFormatter
+                        Text(timestamp.toDateTimeText(), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -138,32 +169,27 @@ fun ExpenseEditScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            Button(
+            // 👈 替换为 MiuiButton
+            MiuiButton(
+                text = if (isEditMode) "保存修改" else "保存",
+                enabled = canSave,
                 onClick = {
-                    if (!canSave) return@Button
                     isSaving = true
-                    val newRecord = record?.copy(timestamp = timestamp, category = category, amount = amount, note = note.trim())
-                        ?: ExpenseRecord(vehicleId = 0, timestamp = timestamp, category = category, amount = amount, note = note.trim())
+                    val newRecord = amount?.let { record?.copy(timestamp = timestamp, category = category, amount = it, note = note.trim()) }
+                        ?: amount?.let { ExpenseRecord(vehicleId = 0, timestamp = timestamp, category = category, amount = it, note = note.trim()) }
 
                     val onResult: (Result<Unit>) -> Unit = { result ->
                         isSaving = false
                         if (result.isSuccess) onSaved() else Toast.makeText(context, "保存失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                     }
-                    if (isEditMode) viewModel.updateExpense(newRecord, onResult) else viewModel.addExpense(newRecord, onResult)
-                },
-                enabled = canSave,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-            ) {
-                Text(if (isEditMode) "保存修改" else "保存", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
+                    if (isEditMode) newRecord?.let { viewModel.updateExpense(it, onResult) } else newRecord?.let { viewModel.addExpense(it, onResult) }
+                }
+            )
             Spacer(Modifier.height(24.dp))
         }
     }
 
     if (showDatePicker) {
-        // 👇 修复：使用具名参数，防止参数错位报错
         MiuiDatePickerDialog(
             initialTimestamp = timestamp,
             title = "选择时间",
@@ -303,52 +329,18 @@ private fun EditCategoryDialog(
     val isDuplicate = trimmed.isNotEmpty() && trimmed != currentName && trimmed in existingNames
 
     if (showDeleteConfirm) {
-        // ======== 删除确认弹窗 ========
-        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                    Text(
-                        "删除分类",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "确定删除分类「$currentName」吗？\n\n已有记录不会丢失，仍保留原分类标签。",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 20.sp
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        // 使用 TextButton 减少宽度占用
-                        TextButton(
-                            onClick = { showDeleteConfirm = false },
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(22.dp),
-                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface) }
-
-                        TextButton(
-                            onClick = { onDelete() }, // 外部处理完逻辑会关闭弹窗
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(22.dp),
-                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.error)
-                        ) { Text("删除", fontSize = 15.sp, color = MaterialTheme.colorScheme.onError) }
-                    }
-                }
-            }
-        }
+        // 👈 核心优化：直接复用公共的 MiuiConfirmDialog
+        MiuiConfirmDialog(
+            title = "删除分类",
+            message = "确定删除分类「$currentName」吗？\n\n已有记录不会丢失，仍保留原分类标签。",
+            confirmText = "删除",
+            onConfirm = { onDelete() },
+            onDismiss = { showDeleteConfirm = false }
+        )
     } else {
-        // ======== 编辑分类弹窗 ========
         Dialog(onDismissRequest = onDismiss) {
             Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), // 将 29.dp 改小一点，给内容留更多空间
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
@@ -371,7 +363,7 @@ private fun EditCategoryDialog(
                             modifier = Modifier.weight(1f).height(44.dp),
                             shape = RoundedCornerShape(22.dp),
                             colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                            contentPadding = PaddingValues(0.dp) // 去掉默认内边距
+                            contentPadding = PaddingValues(0.dp)
                         ) { Text("删除", fontSize = 14.sp, color = MaterialTheme.colorScheme.onErrorContainer) }
 
                         TextButton(

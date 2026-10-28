@@ -1,8 +1,19 @@
 package com.fueltracker.ui
 
+// 👇 引入公共组件
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -10,41 +21,60 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LocalGasStation
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
+import com.fueltracker.ui.components.MiuiBottomSheetWrapper
+import com.fueltracker.ui.components.MiuiConfirmDialog
+import com.fueltracker.ui.components.MiuiFilterChip
+import com.fueltracker.ui.components.MiuiTextButton
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
-import com.fueltracker.ui.components.scrollToHideBottomBar
+import com.fueltracker.ui.components.scrollToHideFab
+import com.fueltracker.ui.miui.MiuiCard
+import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.IntervalConfidence
 import com.fueltracker.viewmodel.MainViewModel
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
 
 private val RECORD_DATE_FORMAT by lazy { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
 @Composable
 fun RecordsScreen(
     viewModel: MainViewModel,
+    isGlassEnabled: Boolean = false,
+    hazeState: HazeState? = null,
     onEdit: (FuelRecord) -> Unit
 ) {
     val records by viewModel.records.collectAsState()
     val vehicle by viewModel.currentVehicle.collectAsState()
     val listState = rememberLazyListState()
+    val isFloating = viewModel.isFloatingBottomBar
 
     val consumptionMap = remember(records, vehicle) { FuelCalculator.calculateMap(records, vehicle) }
 
@@ -84,17 +114,17 @@ fun RecordsScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = "全部加油记录", fontWeight = FontWeight.Bold, fontSize = 20.sp,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp)
-        )
+    Box(modifier = Modifier.fillMaxSize()) {
 
+        // 👇 1. 底层滚动列表（挂载 hazeSource）
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxWidth().weight(1f).scrollToHideBottomBar(listState, viewModel),
-            contentPadding = PaddingValues(bottom = 100.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                // 👈 优化：只有在开启了效果且 hazeState 不为空时才挂载，防止崩溃
+                .then(if (hazeState != null) Modifier.hazeSource(state = hazeState) else Modifier)
+                .scrollToHideFab(listState, viewModel),
+            contentPadding = PaddingValues(top = 96.dp, bottom = if (isFloating) 120.dp else 80.dp) // 👈 顶部留白给悬浮顶栏
         ) {
             item(key = "filter_bar") {
                 RecordFilterBar(filterType, selectedYear, selectedMonth, selectedDay, { filterType = it }, { showDatePicker = true })
@@ -110,6 +140,13 @@ fun RecordsScreen(
                 }
             }
         }
+
+        // 👇 2. 悬浮顶栏（放在 Box 内部，用 align 悬浮）
+        MiuiTopBar(
+            modifier = Modifier.align(Alignment.TopCenter),
+            title = "全部加油记录",
+            isGlassEnabled = isGlassEnabled
+        )
     }
 
     if (showDatePicker) {
@@ -125,17 +162,6 @@ fun RecordsScreen(
 // 基础卡片 & 统计区域
 // =================================================
 
-@Composable
-private fun MiuixCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).then(modifier),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) { content() }
-}
-
-/** 👇 核心优化 1：抽离统一的统计格子 */
 @Composable
 private fun StatCell(title: String, value: String, isHighlight: Boolean = false) {
     Column {
@@ -153,7 +179,8 @@ private fun RecordStatistics(displayRecords: List<FuelRecord>, vehicle: Vehicle?
         if (displayRecords.isEmpty()) null else FuelCalculator.calculateSummary(allRecords = displayRecords, vehicle = vehicle).averageConsumption
     }
 
-    MiuixCard {
+    // 👈 直接复用公共 MiuiCard
+    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
@@ -175,31 +202,10 @@ private fun RecordFilterBar(filterType: String, year: Int, month: Int, day: Int,
     val customText = remember(year, month, day) { if (day == 0) "${year}.${month}月 ▼" else "${year}.${month}.${day} ▼" }
 
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterCapsule("全部", filterType == "全部") { onFilterChange("全部") }
-        FilterCapsule("本月", filterType == "本月") { onFilterChange("本月") }
-        FilterCapsule(customText, filterType == "按时间", onMonthClick)
-    }
-}
-
-@Composable
-private fun FilterCapsule(text: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick, shape = RoundedCornerShape(50.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-        shadowElevation = if (selected) 1.dp else 0.dp
-    ) {
-        Text(
-            text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp), fontSize = 13.sp,
-            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
-private fun CompactTextButton(text: String, color: Color, onClick: () -> Unit) {
-    Box(Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
-        Text(text, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = color, maxLines = 1)
+        // 👈 复用 MiuiFilterChip（原本是胶囊形 FilterCapsule，为了全局统一，这里使用标准 Chip）
+        MiuiFilterChip("全部", filterType == "全部") { onFilterChange("全部") }
+        MiuiFilterChip("本月", filterType == "本月") { onFilterChange("本月") }
+        MiuiFilterChip(customText, filterType == "按时间", onMonthClick)
     }
 }
 
@@ -214,7 +220,7 @@ private fun FuelRecordCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     val timeText = remember(record.timestamp) { RECORD_DATE_FORMAT.format(Date(record.timestamp)) }
 
-    MiuixCard {
+    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // 顶栏：时间 + 标签 + 操作
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -231,8 +237,9 @@ private fun FuelRecordCard(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    CompactTextButton("编辑", MaterialTheme.colorScheme.primary, onEdit)
-                    CompactTextButton("删除", Color(0xFFFF3B30).copy(alpha = 0.8f)) { showDeleteDialog = true }
+                    // 👈 替换为公共 MiuiTextButton
+                    MiuiTextButton("编辑", MaterialTheme.colorScheme.primary, onEdit)
+                    MiuiTextButton("删除", Color(0xFFFF3B30).copy(alpha = 0.8f)) { showDeleteDialog = true }
                 }
             }
 
@@ -256,7 +263,7 @@ private fun FuelRecordCard(
                 }
             }
 
-            // 补充细节 (有才显示)
+            // 补充细节
             val hasExtraInfo = (record.odometer ?: 0.0) > 0 || record.remainingFuel != null || record.hasMissedRecord || record.note.isNotBlank()
             if (hasExtraInfo) {
                 Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -270,6 +277,7 @@ private fun FuelRecordCard(
     }
 
     if (showDeleteDialog) {
+        // 👈 直接使用公共的底部弹窗版确认框
         MiuiConfirmDialog(
             title = "删除记录",
             message = "确定删除该条加油记录吗？删除后相关油耗计算将重新推导。",
@@ -296,7 +304,6 @@ private fun TagChip(text: String, color: Color, bgColor: Color) {
 // 三滚轮日期选择弹窗
 // =================================================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DatePicker3WheelSheet(initialYear: Int, initialMonth: Int, initialDay: Int, availableYears: List<Int>, onSelect: (Int, Int, Int) -> Unit, onDismiss: () -> Unit) {
     var tempYear by remember { mutableIntStateOf(initialYear) }
@@ -307,31 +314,27 @@ private fun DatePicker3WheelSheet(initialYear: Int, initialMonth: Int, initialDa
         Calendar.getInstance().apply { set(Calendar.YEAR, tempYear); set(Calendar.MONTH, tempMonth - 1); set(Calendar.DAY_OF_MONTH, 1) }.getActualMaximum(Calendar.DAY_OF_MONTH)
     }
 
-    // 👇 核心优化 2：自动纠偏，省去手动计算天数的冗余逻辑
     LaunchedEffect(maxDays) {
         if (tempDay > maxDays) tempDay = maxDays
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(), containerColor = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onDismiss) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Text("选择日期", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                TextButton(onClick = { onSelect(tempYear, tempMonth, tempDay) }) { Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                WheelList(selectedValue = tempYear, items = availableYears, modifier = Modifier.weight(1f), style = WheelStyle.DatePicker, itemLabel = { "$it 年" }, onChange = { tempYear = it })
-                WheelList(selectedValue = tempMonth, items = (1..12).toList(), modifier = Modifier.weight(1f), style = WheelStyle.DatePicker, itemLabel = { "%02d 月".format(it) }, onChange = { tempMonth = it })
-                WheelList(selectedValue = tempDay, items = (0..maxDays).toList(), modifier = Modifier.weight(1f), style = WheelStyle.DatePicker, itemLabel = { if (it == 0) "全月" else "%02d 日".format(it) }, onChange = { tempDay = it })
-            }
-            Spacer(Modifier.height(20.dp))
+    // 👈 直接使用公共的底部弹窗外壳
+    MiuiBottomSheetWrapper(
+        title = "选择日期",
+        onDismiss = onDismiss,
+        onConfirm = { onSelect(tempYear, tempMonth, tempDay) }
+    ) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            WheelList(selectedValue = tempYear, items = availableYears, modifier = Modifier.weight(1f), style = WheelStyle.DatePicker, itemLabel = { "$it 年" }, onChange = { tempYear = it })
+            WheelList(selectedValue = tempMonth, items = (1..12).toList(), modifier = Modifier.weight(1f), style = WheelStyle.DatePicker, itemLabel = { "%02d 月".format(it) }, onChange = { tempMonth = it })
+            WheelList(selectedValue = tempDay, items = (0..maxDays).toList(), modifier = Modifier.weight(1f), style = WheelStyle.DatePicker, itemLabel = { if (it == 0) "全月" else "%02d 日".format(it) }, onChange = { tempDay = it })
         }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
 // =================================================
-// 空状态与确认弹窗
+// 空状态
 // =================================================
 
 @Composable
@@ -340,30 +343,9 @@ private fun EmptyRecordsState(modifier: Modifier = Modifier) {
         Box(Modifier.height(64.dp).width(64.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape), contentAlignment = Alignment.Center) {
             Icon(Icons.Outlined.LocalGasStation, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.height(32.dp).width(32.dp))
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         Text("暂无加油记录", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-        Spacer(Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text("点击首页“记加油”添加新记录", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun MiuiConfirmDialog(title: String, message: String, confirmText: String = "确定", dismissText: String = "取消", confirmColor: Color = Color(0xFFFF3B30), onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)) {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(Modifier.height(24.dp))
-                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
-                Text(message, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 20.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
-                Spacer(Modifier.height(24.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(0.dp)) { Text(dismissText, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface) }
-                    Box(Modifier.width(0.6.dp).height(30.dp).background(MaterialTheme.colorScheme.surfaceVariant))
-                    TextButton(onClick = onConfirm, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(0.dp)) { Text(confirmText, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = confirmColor) }
-                }
-            }
-        }
     }
 }

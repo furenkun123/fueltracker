@@ -53,6 +53,22 @@ class MainViewModel(
         if (isBottomBarVisible != visible) isBottomBarVisible = visible
     }
 
+    // 控制是否使用悬浮底栏（默认 true）
+    var isFloatingBottomBar by mutableStateOf(true)
+        private set
+
+    fun toggleFloatingBottomBar() {
+        isFloatingBottomBar = !isFloatingBottomBar
+    }
+
+    //液态玻璃效果
+    var isGlassEffectEnabled by mutableStateOf(true) // 默认开启
+        private set
+
+    fun toggleGlassEffect() {
+        isGlassEffectEnabled = !isGlassEffectEnabled
+    }
+
     fun navigateTo(screen: AppScreen) {
         currentScreen = screen
         isBottomBarVisible = true
@@ -82,6 +98,14 @@ class MainViewModel(
     fun navigateToAddVehicle(origin: AppScreen) {
         addVehicleOrigin = origin
         currentScreen = AppScreen.ADD_VEHICLE
+    }
+
+    // 👇 控制右下角悬浮加号（FAB）的显隐
+    var isFabVisible by mutableStateOf(true)
+        private set
+
+    fun updateFabVisibility(visible: Boolean) {
+        if (isFabVisible != visible) isFabVisible = visible
     }
 
     fun clearEditingStates() {

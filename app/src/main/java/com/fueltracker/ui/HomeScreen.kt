@@ -6,10 +6,20 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -20,48 +30,61 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
-import com.fueltracker.ui.components.WheelList
-import com.fueltracker.ui.components.WheelStyle
-import com.fueltracker.ui.components.scrollToHideBottomBar
+import com.fueltracker.ui.components.MiuiConfirmDialog
+import com.fueltracker.ui.components.MiuiFilterChip
+import com.fueltracker.ui.components.MiuiTextButton
+import com.fueltracker.ui.components.MiuiYearMonthSheet
+import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miui.MiuiButton
 import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.ui.miui.MiuiTextIconButton
 import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.ui.miui.VehicleCard
+import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.StatisticsSummary
+import com.fueltracker.util.computeExpenseRange
+import com.fueltracker.util.toDateTimeText
+import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
 
 private data class CostPoint(val timestamp: Long, val value: Double)
-private val homeRecordDateFormat by lazy { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
 
 @Composable
 fun HomeScreen(
@@ -77,12 +100,13 @@ fun HomeScreen(
     onEditParking: (ExpenseRecord) -> Unit,
     onClearParking: () -> Unit,
     onIgnoreParking: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    hazeState: HazeState? = null,
+    isGlassEnabled: Boolean = false
 ) {
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
 
-    // 首页展示用的列表（排除初始记录和交付前记录）
     val (displayRecords, recentRecords) = remember(records, deliveryDate) {
         val list = records
             .filter { (deliveryDate == null || it.timestamp >= deliveryDate) && !it.isInitialRecord }
@@ -100,22 +124,22 @@ fun HomeScreen(
         latestConsumption ?: displayRecords.firstOrNull { it.consumption != null }?.consumption
     }
 
-    var selectedRange by remember { mutableStateOf(StatsRange.ALL) }
+    // 👈 统一使用 ExpenseRange
+    var selectedRange by remember { mutableStateOf(ExpenseRange.ALL) }
     var customYear by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
     var customMonth by remember { mutableIntStateOf(0) }
     var showYearMonthPicker by remember { mutableStateOf(false) }
 
-    // 🚨 核心修复 1：年份列表基于全量 records 构建，防止历史年份丢失
     val availableYears = remember(records, customYear) {
         (records.map { Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.YEAR) } + customYear)
             .distinct().sortedDescending()
     }
 
+    // 👈 统一使用 computeExpenseRange
     val statsRange = remember(selectedRange, customYear, customMonth) {
-        computeStatsRange(selectedRange, customYear, customMonth)
+        computeExpenseRange(selectedRange, customYear, customMonth)
     }
 
-    // 🚨 核心修复 2：保留初始记录传给计算引擎，因为初始记录是算首段油耗的基准
     val statsSummary = remember(vehicle, records, statsRange) {
         FuelCalculator.calculateSummary(
             allRecords = records,
@@ -126,66 +150,77 @@ fun HomeScreen(
     }
 
     val listState = rememberLazyListState()
+    val isFloating = viewModel.isFloatingBottomBar
 
+    // 👈 外层只保留一个 Box
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            MiuiTopBar {
-                MiuiTextIconButton(text = "", icon = Icons.Default.Settings, onClick = onOpenSettings)
-            }
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxWidth().weight(1f).scrollToHideBottomBar(listState, viewModel),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 100.dp)
-            ) {
-                if (vehicle == null) {
-                    item { EmptyVehicleCard(onAddVehicle) }
-                } else {
-                    item { VehicleCard(vehicle) }
-                    if (activeParking != null) {
-                        item(key = "active_parking_${activeParking.id}") {
-                            ActiveParkingCard(
-                                parking = activeParking,
-                                onClick = { onEditParking(activeParking) },
-                                onClear = onClearParking,
-                                onIgnore = onIgnoreParking
-                            )
-                        }
-                    }
-                    // 🚨 核心修复 3：统一口径，使用 statsSummary.totalCount 作为加油次数
-                    item { ConsumptionCard(statsSummary.totalCount, resolvedLatestConsumption, averageConsumption) }
-
-                    item {
-                        ConsumptionStatsCard(
-                            summary = statsSummary, selectedRange = selectedRange,
-                            customYear = customYear, customMonth = customMonth,
-                            onRangeSelected = { selectedRange = it },
-                            onCustomMonthClick = { showYearMonthPicker = true }
+        // 👈 1. 底层：LazyColumn（挂载 hazeSource，顶部留白 96dp）
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (hazeState != null) Modifier.hazeSource(state = hazeState) else Modifier)
+                .scrollToHideFab(listState, viewModel),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 96.dp, bottom = if (isFloating) 120.dp else 80.dp) // 👈 顶部留出悬浮顶栏的高度
+        ) {
+            if (vehicle == null) {
+                item { EmptyVehicleCard(onAddVehicle) }
+            } else {
+                item { VehicleCard(vehicle) }
+                if (activeParking != null) {
+                    item(key = "active_parking_${activeParking.id}") {
+                        ActiveParkingCard(
+                            parking = activeParking,
+                            onClick = { onEditParking(activeParking) },
+                            onClear = onClearParking,
+                            onIgnore = onIgnoreParking
                         )
                     }
-                    if (costData.size >= 2) item { ChartCard(points = costData) }
-
-                    item {
-                        Text(
-                            text = "最近加油", style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                    }
-
-                    if (recentRecords.isEmpty()) item { EmptyRecordCard() }
-                    else items(recentRecords, key = { it.id }) { HomeFuelRecordItem(it) }
                 }
+                item { ConsumptionCard(statsSummary.totalCount, resolvedLatestConsumption, averageConsumption) }
+
+                item {
+                    ConsumptionStatsCard(
+                        summary = statsSummary, selectedRange = selectedRange,
+                        customYear = customYear, customMonth = customMonth,
+                        onRangeSelected = { selectedRange = it },
+                        onCustomMonthClick = { showYearMonthPicker = true }
+                    )
+                }
+                if (costData.size >= 2) item { ChartCard(points = costData) }
+
+                item {
+                    Text(
+                        text = "最近加油", style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
+                if (recentRecords.isEmpty()) item { EmptyRecordCard() }
+                else items(recentRecords, key = { it.id }) { HomeFuelRecordItem(it) }
             }
         }
 
+        // 👈 2. 顶层：悬浮顶栏（对齐到顶部，删除了内部旧的那个 MiuiTopBar）
+        MiuiTopBar(
+            modifier = Modifier.align(Alignment.TopCenter),
+            title = "随记油耗",
+            isGlassEnabled = isGlassEnabled
+        ) {
+            MiuiTextIconButton(text = "", icon = Icons.Default.Settings, onClick = onOpenSettings)
+        }
+
+        // 👈 3. 顶层：右下角 FAB 按钮
         if (vehicle != null) {
             AnimatedVisibility(
-                visible = viewModel.isBottomBarVisible,
+                visible = viewModel.isFabVisible,
                 enter = fadeIn() + scaleIn(initialScale = 0.8f),
                 exit = fadeOut() + scaleOut(targetScale = 0.8f),
                 modifier = Modifier.align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = if (isFloating) 94.dp else 52.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(end = 16.dp, bottom = 24.dp),
@@ -216,12 +251,13 @@ fun HomeScreen(
     }
 
     if (showYearMonthPicker) {
-        YearMonthPickerSheet(
+        // 👈 直接复用公共的年月选择弹窗（需在 components 里重命名为 MiuiYearMonthSheet，参数保持一致）
+        MiuiYearMonthSheet(
             initialYear = customYear, initialMonth = customMonth, availableYears = availableYears,
             onDismiss = { showYearMonthPicker = false },
             onConfirm = { y, m ->
                 customYear = y; customMonth = m
-                selectedRange = StatsRange.CUSTOM_MONTH
+                selectedRange = ExpenseRange.CUSTOM_MONTH
                 showYearMonthPicker = false
             }
         )
@@ -272,57 +308,29 @@ private fun StatItem(title: String, value: String, modifier: Modifier = Modifier
 }
 
 // =================================================
-// 统计卡片与年月选择
+// 统计卡片
 // =================================================
-
-private enum class StatsRange { ALL, MONTH, YEAR, CUSTOM_MONTH }
-
-private fun computeStatsRange(range: StatsRange, customYear: Int, customMonth: Int): Pair<Long?, Long?> {
-    if (range == StatsRange.ALL) return null to null
-    val cal = Calendar.getInstance().apply {
-        timeInMillis = System.currentTimeMillis()
-        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-    }
-    when (range) {
-        StatsRange.MONTH -> cal.set(Calendar.DAY_OF_MONTH, 1)
-        StatsRange.YEAR -> { cal.set(Calendar.MONTH, Calendar.JANUARY); cal.set(Calendar.DAY_OF_MONTH, 1) }
-        StatsRange.CUSTOM_MONTH -> {
-            cal.set(Calendar.YEAR, customYear)
-            if (customMonth == 0) { cal.set(Calendar.MONTH, Calendar.JANUARY); cal.set(Calendar.DAY_OF_MONTH, 1) }
-            else { cal.set(Calendar.MONTH, customMonth - 1); cal.set(Calendar.DAY_OF_MONTH, 1) }
-        }
-        else -> {}
-    }
-    val start = cal.timeInMillis
-    val endCal = cal.clone() as Calendar
-    when (range) {
-        StatsRange.MONTH -> endCal.add(Calendar.MONTH, 1)
-        StatsRange.YEAR -> endCal.add(Calendar.YEAR, 1)
-        StatsRange.CUSTOM_MONTH -> if (customMonth == 0) endCal.add(Calendar.YEAR, 1) else endCal.add(Calendar.MONTH, 1)
-        else -> {}
-    }
-    return start to (endCal.timeInMillis)
-}
 
 @Composable
 private fun ConsumptionStatsCard(
-    summary: StatisticsSummary, selectedRange: StatsRange, customYear: Int, customMonth: Int,
-    onRangeSelected: (StatsRange) -> Unit, onCustomMonthClick: () -> Unit
+    summary: StatisticsSummary, selectedRange: ExpenseRange, customYear: Int, customMonth: Int,
+    onRangeSelected: (ExpenseRange) -> Unit, onCustomMonthClick: () -> Unit
 ) {
     MiuiCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("油耗统计", fontSize = 15.sp, fontWeight = FontWeight.Bold)
 
             Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                StatsChip("全部", selectedRange == StatsRange.ALL) { onRangeSelected(StatsRange.ALL) }
-                StatsChip("本月", selectedRange == StatsRange.MONTH) { onRangeSelected(StatsRange.MONTH) }
-                StatsChip("今年", selectedRange == StatsRange.YEAR) { onRangeSelected(StatsRange.YEAR) }
+                // 👈 全部替换为 MiuiFilterChip
+                MiuiFilterChip("全部", selectedRange == ExpenseRange.ALL) { onRangeSelected(ExpenseRange.ALL) }
+                MiuiFilterChip("本月", selectedRange == ExpenseRange.MONTH) { onRangeSelected(ExpenseRange.MONTH) }
+                MiuiFilterChip("今年", selectedRange == ExpenseRange.YEAR) { onRangeSelected(ExpenseRange.YEAR) }
                 val customLabel = when (selectedRange) {
-                    StatsRange.CUSTOM_MONTH if customMonth == 0 -> "${customYear}全年"
-                    StatsRange.CUSTOM_MONTH if customMonth > 0 -> "${customYear}年${customMonth}月"
+                    ExpenseRange.CUSTOM_MONTH if customMonth == 0 -> "${customYear}全年"
+                    ExpenseRange.CUSTOM_MONTH if customMonth > 0 -> "${customYear}年${customMonth}月"
                     else -> "选年月"
                 }
-                StatsChip(customLabel, selectedRange == StatsRange.CUSTOM_MONTH, onCustomMonthClick)
+                MiuiFilterChip(customLabel, selectedRange == ExpenseRange.CUSTOM_MONTH, onCustomMonthClick)
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -330,7 +338,7 @@ private fun ConsumptionStatsCard(
                 StatItem("累计加油", "%.2f L".format(summary.totalVolume), Modifier.weight(1f))
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                StatItem("累计花费", "¥%.2f".format(summary.totalCost), Modifier.weight(1f))
+                StatItem("累计花费", summary.totalCost.toMoneyText(), Modifier.weight(1f))
                 StatItem("平均油价", summary.averagePrice?.let { "%.2f 元/L".format(it) } ?: "--", Modifier.weight(1f))
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -340,54 +348,6 @@ private fun ConsumptionStatsCard(
         }
     }
 }
-
-@Composable
-private fun StatsChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier.clip(RoundedCornerShape(10.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        Text(text, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun YearMonthPickerSheet(
-    initialYear: Int, initialMonth: Int, availableYears: List<Int>,
-    onDismiss: () -> Unit, onConfirm: (Int, Int) -> Unit
-) {
-    var year by remember(initialYear) { mutableIntStateOf(initialYear) }
-    var month by remember(initialMonth) { mutableIntStateOf(initialMonth) }
-    val monthValues = remember { listOf(0) + (1..12).toList() }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss, sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("取消", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.clickable(onClick = onDismiss).padding(8.dp))
-                Text("选择年月", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text("确定", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onConfirm(year, month) }.padding(8.dp))
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                WheelList(
-                    selectedValue = year, items = availableYears, modifier = Modifier.weight(1.4f),
-                    visibleCount = 3, style = WheelStyle.WithBackground, itemLabel = { "${it}年" }, onChange = { year = it }
-                )
-                WheelList(
-                    selectedValue = month, items = monthValues, modifier = Modifier.weight(1f),
-                    visibleCount = 3, style = WheelStyle.WithBackground, itemLabel = { if (it == 0) "全年" else "%02d 月".format(it) }, onChange = { month = it }
-                )
-            }
-        }
-    }
-}
-
 // =================================================
 // 趋势图
 // =================================================
@@ -399,7 +359,7 @@ private fun ChartCard(points: List<CostPoint>) {
     val monthlyPoints = remember(points) {
         val grouped = mutableMapOf<Pair<Int, Int>, Double>()
         points.forEach {
-            if (!it.value.isFinite()) return@forEach // 🚨 核心修复 4：累加前拦截非有限值
+            if (!it.value.isFinite()) return@forEach
             val c = Calendar.getInstance().apply { timeInMillis = it.timestamp }
             val key = c.get(Calendar.YEAR) to (c.get(Calendar.MONTH) + 1)
             grouped[key] = (grouped[key] ?: 0.0) + it.value
@@ -447,7 +407,6 @@ private fun ChartCard(points: List<CostPoint>) {
     val scrollState = rememberScrollState()
     val visibleCount = 10
 
-    // 🚨 核心修复 5：废弃易挂起的 firstOrNull，改用 snapshotFlow 监听并自动滚动
     LaunchedEffect(monthlyPoints.size) {
         if (monthlyPoints.size > visibleCount) {
             snapshotFlow { scrollState.maxValue }
@@ -507,11 +466,12 @@ private fun HomeFuelRecordItem(record: FuelRecord) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
-                    Text(homeRecordDateFormat.format(Date(record.timestamp)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // 👈 日期用扩展函数
+                    Text(record.timestamp.toDateTimeText(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(if (record.isFull) "已加满" else "未加满", style = MaterialTheme.typography.labelSmall, color = if (record.isFull) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     if (record.hasMissedRecord) Text("含漏记 %.2f L".format(record.missedVolume ?: 0.0), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text("¥%.2f".format(record.actualPaidAmount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(record.actualPaidAmount.toMoneyText(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -579,48 +539,30 @@ private fun ActiveParkingCard(parking: ExpenseRecord, onClick: () -> Unit, onCle
                     if (detailText.isNotBlank()) Text(detailText, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    if (!parking.notificationIgnored) CompactTextButton("忽略", MaterialTheme.colorScheme.onSurfaceVariant, onIgnore)
-                    CompactTextButton("取车", MaterialTheme.colorScheme.primary) { showClearConfirm = true }
+                    // 👈 统一替换为 MiuiTextButton
+                    if (!parking.notificationIgnored) MiuiTextButton("忽略", MaterialTheme.colorScheme.onSurfaceVariant, onIgnore)
+                    MiuiTextButton("取车", MaterialTheme.colorScheme.primary) { showClearConfirm = true }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(durationText, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (parking.amount > 0) Text("¥%.2f".format(parking.amount), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (parking.amount > 0) Text(parking.amount.toMoneyText(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 
     if (showClearConfirm) {
-        Dialog(onDismissRequest = { showClearConfirm = false }) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                    Text("已取车", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
-                    Spacer(Modifier.height(12.dp))
-                    Text("确定已取车？卡片会从首页移除。", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 20.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(20.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TextButton(onClick = { showClearConfirm = false }, modifier = Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(22.dp), colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                            Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-                        }
-                        TextButton(onClick = { showClearConfirm = false; onClear() }, modifier = Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(22.dp), colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary)) {
-                            Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onPrimary)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CompactTextButton(text: String, color: Color, onClick: () -> Unit) {
-    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
-        Text(text, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = color, maxLines = 1)
+        // 👈 直接复用 MiuiConfirmDialog
+        MiuiConfirmDialog(
+            title = "已取车",
+            message = "确定已取车？卡片会从首页移除。",
+            confirmText = "确定",
+            onConfirm = {
+                showClearConfirm = false
+                onClear()
+            },
+            onDismiss = { showClearConfirm = false }
+        )
     }
 }
 

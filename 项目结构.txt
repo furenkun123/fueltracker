@@ -59,10 +59,13 @@
 *   **`VehicleScreen.kt`** - **添加/编辑车辆页**。调用车型选择器。
 
 #### 📁 `com.fueltracker.ui.components` (通用 UI 组件)
-
-*   **`DatePickerDialog.kt`** - **日期时间选择弹窗**。月历 + 滚轮。
-*   **`WheelList.kt`** - **通用滚轮选择器**。支持自定义样式、吸附。
-
+ui/components/
+├── MiuiBasicComponents.kt   👈 通用小控件（Chip、小按钮）
+├── MiuiDialogs.kt           👈 所有弹窗集合（隐私、确认、更新、说明）
+├── DatePickerDialog.kt      👈 日期时间选择器（日历+滚轮）
+├── WheelList.kt             👈 基础滚轮（被日期、年月选择调用）
+├── ScrollHideEffect.kt      👈 滑动隐藏底栏的 Modifier 扩展
+└── ExpenseCards.kt          👈 费用页专属的业务大卡片（趋势图、结构图）
 #### 📁 `com.fueltracker.ui.miui` (MIUI 风格组件)
 
 *   **`MiuiButton.kt`** - **按钮组件**。普通按钮、带图标按钮。
