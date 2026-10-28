@@ -74,17 +74,19 @@ fun MiuiNavigationBar(
     } else Modifier
 
     val borderStroke = if (useGlass) {
-        BorderStroke(
-            width = 0.5.dp,
-            // 暗色下边框稍微亮一点点，勾勒轮廓
-            color = if (isLight) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.2f)
-        )
-    } else {
+        // 悬浮+玻璃：微弱高光白边
+        BorderStroke(0.5.dp, if (isLight) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.15f))
+    } else if (isFloating) {
+        // 悬浮+实心：灰色轮廓线，防止和白底重合
         BorderStroke(1.dp, if (isLight) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.1f))
+    } else {
+        // 固定贴底：彻底不要边框，避免出现白线
+        null
     }
 
     // 阴影：固定模式下不需要四周阴影，只需要顶部的一点点投影
     val shadowModifier = if (isFloating) {
+        // 悬浮模式：四周大阴影
         Modifier.shadow(
             elevation = if (useGlass) 16.dp else 24.dp,
             shape = capsuleShape,
@@ -93,19 +95,10 @@ fun MiuiNavigationBar(
             clip = false
         )
     } else {
-        Modifier.shadow(6.dp) // 固定底栏给一点顶部阴影
+        // 固定模式：取消四周阴影，避免四周出现发光/白边
+        Modifier
     }
 
-//    val borderStroke = if (useGlass) {
-//        // 玻璃模式：微弱的高光白边
-//        BorderStroke(0.5.dp, if (isLight) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.15f))
-//    } else {
-//        // 实心模式：加一条灰色边框，即使底栏和背景都是纯白，也能立刻分辨出来
-//        BorderStroke(
-//            width = 1.dp,
-//            color = if (isLight) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.1f)
-//        )
-//    }
 
     // 核心调整：动态设置外部 Box 的宽高和 padding
     Box(
