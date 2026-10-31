@@ -32,3 +32,5 @@ build/
 *.keystore
 *.p12
 *.txt
+# 汽车车辆数据库
+app/src/main/assets/car_brands.json
