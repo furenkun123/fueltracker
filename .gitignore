@@ -31,3 +31,4 @@ build/
 *.jks
 *.keystore
 *.p12
+*.txt
