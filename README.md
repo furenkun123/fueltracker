@@ -51,4 +51,4 @@ FuelTracker is licensed under the Apache License, Version 2.0.
 
 See the [LICENSE](LICENSE) file for the full license text.
 
-Copyright 2026 FuelTracker Contributors.
+Copyright 2026 furenkun123
