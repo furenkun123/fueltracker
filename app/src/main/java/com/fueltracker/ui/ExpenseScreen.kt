@@ -11,9 +11,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -22,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,12 +52,12 @@ import com.fueltracker.data.FuelRecord
 import com.fueltracker.ui.components.ExpenseDetailItemCard
 import com.fueltracker.ui.components.ExpenseStructureCard
 import com.fueltracker.ui.components.ExpenseTrendCard
+import com.fueltracker.ui.components.LazyColumnScrollbar
 import com.fueltracker.ui.components.MiuiConfirmDialog
 import com.fueltracker.ui.components.MiuiYearMonthSheet
 import com.fueltracker.ui.components.SummaryCard
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miui.MiuiCard
-import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.buildMonthTrend
 import com.fueltracker.util.buildStructureData
@@ -62,8 +68,6 @@ import com.fueltracker.util.inRange
 import com.fueltracker.util.toDateTimeText
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 import java.util.Calendar
 
 private const val CATEGORY_FUEL = "加油"
@@ -96,15 +100,12 @@ fun ExpenseScreen(
     onSelectedCategoryChange: (String?) -> Unit,
     onAddExpense: () -> Unit,
     onEditExpense: (ExpenseRecord) -> Unit,
-    onEditFuel: (FuelRecord) -> Unit,
-    hazeState: HazeState? = null,
-    isGlassEnabled: Boolean = false
+    onEditFuel: (FuelRecord) -> Unit
 ) {
     val context = LocalContext.current
     val expenses by viewModel.expenses.collectAsState()
     val fuelRecords by viewModel.records.collectAsState()
 
-    // 合并为一个删除状态
     var deletingItem by remember { mutableStateOf<ExpenseListItem?>(null) }
     var selectedRange by remember { mutableStateOf(ExpenseRange.ALL) }
     var customYear by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
@@ -175,22 +176,46 @@ fun ExpenseScreen(
     val listState = rememberLazyListState()
     val isFloating = viewModel.isFloatingBottomBar
 
-    // 👈 替换为纯净的 Box 结构
     Box(modifier = Modifier.fillMaxSize()) {
-        if (isEmpty) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("还没有费用记录\n点右下角 ＋ 添加", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // 统一用 LazyColumn，空状态也放进去，确保标题在所有状态下都能显示并跟随滚动
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .scrollToHideFab(listState, viewModel),
+            contentPadding = PaddingValues(
+                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 24.dp,
+                bottom = if (isFloating) 120.dp else 80.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // 标题作为第一个 item，跟随列表滚动
+            item(key = "expenses_title") {
+                Text(
+                    text = "费用",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = (-15).dp)
+                        .padding(horizontal = 15.dp, vertical = 0.dp)
+                )
             }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (hazeState != null) Modifier.hazeSource(state = hazeState) else Modifier)
-                    .scrollToHideFab(listState, viewModel),
-                contentPadding = PaddingValues(top = 96.dp, bottom = if (isFloating) 120.dp else 80.dp), // 👈 顶部留白
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+
+            if (isEmpty) {
+                item(key = "empty_state") {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "还没有费用记录\n点右下角 ＋ 添加",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
                 item("summary") {
                     SummaryCard(summary, selectedRange, rangeLabel, { selectedRange = it }, { showYearMonthPicker = true })
                 }
@@ -253,12 +278,10 @@ fun ExpenseScreen(
                 }
             }
         }
-
-        // 👈 悬浮顶栏放在 Box 内部
-        MiuiTopBar(
-            modifier = Modifier.align(Alignment.TopCenter),
-            title = "费用",
-            isGlassEnabled = isGlassEnabled
+        LazyColumnScrollbar(
+            listState = listState,
+            modifier = Modifier.align(Alignment.CenterEnd),
+            width = 5.dp
         )
 
         // 👈 悬浮按钮
@@ -266,13 +289,27 @@ fun ExpenseScreen(
             visible = viewModel.isFabVisible,
             enter = fadeIn() + scaleIn(initialScale = 0.8f),
             exit = fadeOut() + scaleOut(targetScale = 0.8f),
-            modifier = Modifier.align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = if (isFloating) 104.dp else 52.dp)
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = 28.dp,
+                    bottom = if (isFloating) 104.dp else 84.dp
+                )
         ) {
             FloatingActionButton(
-                onClick = onAddExpense, modifier = Modifier.padding(end = 16.dp, bottom = 24.dp),
-                containerColor = Color(0xFFFF9500), contentColor = Color.White, shape = CircleShape
-            ) { Icon(Icons.Default.Receipt, "记费用") }
+                onClick = onAddExpense,
+                containerColor = Color(0xFFFF9500),
+                contentColor = Color.White,
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 0.dp,
+                    pressedElevation = 0.dp,
+                    focusedElevation = 0.dp,
+                    hoveredElevation = 0.dp
+                )
+            ) {
+                Icon(Icons.Default.Receipt, "记费用")
+            }
         }
     }
 
@@ -282,7 +319,6 @@ fun ExpenseScreen(
         }
     }
 
-    // 高度合并的删除弹窗
     deletingItem?.let { item ->
         val isFuel = item is ExpenseListItem.Fuel
         val title = if (isFuel) "删除加油记录" else "删除费用记录"

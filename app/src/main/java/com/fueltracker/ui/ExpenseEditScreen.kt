@@ -19,18 +19,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -51,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -60,9 +58,9 @@ import com.fueltracker.data.ExpenseCategoryStore
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.ui.components.MiuiConfirmDialog
 import com.fueltracker.ui.components.MiuiDatePickerDialog
+import com.fueltracker.ui.miui.MiuiBackButton
 import com.fueltracker.ui.miui.MiuiButton
 import com.fueltracker.ui.miui.MiuiCard
-import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.util.toDateTimeText
 import com.fueltracker.viewmodel.MainViewModel
 
@@ -95,23 +93,38 @@ fun ExpenseEditScreen(
     val amount = amountText.toDoubleOrNull()
     val canSave = amount != null && amount > 0 && !isSaving
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            // 👈 替换为统一的 MiuiTopBar
-            MiuiTopBar(
-                title = if (isEditMode) "编辑费用" else "记费用",
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
-                }
-            )
-        }
-    ) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).imePadding().navigationBarsPadding()
-                .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .height(42.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MiuiBackButton(onClick = onBack)
+
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = if (isEditMode) "编辑费用记录" else "记费用",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
             // 分类
             ExpenseFormCard {
                 Text("分类", fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -157,7 +170,6 @@ fun ExpenseEditScreen(
                             .clickable { showDatePicker = true }.padding(horizontal = 14.dp),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        // 👈 使用公共扩展函数替代了 dateFormatter
                         Text(timestamp.toDateTimeText(), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -169,7 +181,6 @@ fun ExpenseEditScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            // 👈 替换为 MiuiButton
             MiuiButton(
                 text = if (isEditMode) "保存修改" else "保存",
                 enabled = canSave,
@@ -188,6 +199,7 @@ fun ExpenseEditScreen(
             Spacer(Modifier.height(24.dp))
         }
     }
+
 
     if (showDatePicker) {
         MiuiDatePickerDialog(

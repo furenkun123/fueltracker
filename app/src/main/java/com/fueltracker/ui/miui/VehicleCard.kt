@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,11 +44,8 @@ fun VehicleCard(
             )
     ) {
         Column(
-            modifier = Modifier.padding(
-                horizontal = 16.dp,
-                vertical = 14.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             // 第一行：品牌 + 车系 + 当前车辆标签 + (可选)切换按钮
             Row(
@@ -102,24 +98,6 @@ fun VehicleCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // 第三行：参数展示 (油箱 / 燃油)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(28.dp)
-            ) {
-                MiuiInfoItem(
-                    title = "油箱",
-                    value = "%.0f L".format(vehicle.tankCapacity)
-                )
-
-                MiuiInfoItem(
-                    title = "燃油",
-                    value = "${vehicle.fuelGrade} (${vehicle.fuelType})"
-                )
-            }
         }
     }
 }
@@ -150,28 +128,5 @@ private fun CurrentVehicleBadge() {
                 fontWeight = FontWeight.Medium
             )
         }
-    }
-}
-
-@Composable
-fun MiuiInfoItem(
-    title: String,
-    value: String
-) {
-    Column {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(2.dp))
-
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
     }
 }

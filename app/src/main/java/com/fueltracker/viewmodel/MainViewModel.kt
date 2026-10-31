@@ -49,11 +49,7 @@ class MainViewModel(
     var isBackupOperationRunning by mutableStateOf(false); private set
     var isBottomBarVisible by mutableStateOf(true); private set
 
-    fun updateBottomBarVisibility(visible: Boolean) {
-        if (isBottomBarVisible != visible) isBottomBarVisible = visible
-    }
-
-    // 控制是否使用悬浮底栏（默认 true）
+    // 控制底栏样式的状态（默认 true 悬浮）
     var isFloatingBottomBar by mutableStateOf(true)
         private set
 

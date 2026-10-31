@@ -1,24 +1,48 @@
 package com.fueltracker.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fueltracker.ui.components.MiuiConfirmDialog // 👈 引入确认弹窗
-import com.fueltracker.ui.miui.*
+import com.fueltracker.ui.components.MiuiConfirmDialog
+import com.fueltracker.ui.miui.MiuiButton
+import com.fueltracker.ui.miui.MiuiGroupCard
+import com.fueltracker.ui.miui.MiuiInputItem
+import com.fueltracker.ui.miui.MiuiSectionHeader
+import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.viewmodel.MainViewModel
+import com.kyant.backdrop.Backdrop
 
 @Composable
 fun InitialRecordScreen(
     viewModel: MainViewModel,
+    backdrop: Backdrop,
+    isGlassEnabled: Boolean = false,
     onCompleted: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -26,7 +50,6 @@ fun InitialRecordScreen(
     var odometer by remember { mutableStateOf("") }
     var currentFuel by remember { mutableStateOf("") }
 
-    // 👇 控制“跳过”确认弹窗的显示
     var showSkipConfirm by remember { mutableStateOf(false) }
 
     val currentVehicle = vehicle
@@ -43,7 +66,6 @@ fun InitialRecordScreen(
     val isFuelValid = fuelValue == null || (fuelValue >= 0 && fuelValue <= currentVehicle.tankCapacity)
     val canSave = odometerValue != null && odometerValue >= 0 && isFuelValid
 
-    // 👇 拦截系统返回键，不直接退出，而是弹窗确认
     BackHandler(enabled = true) {
         showSkipConfirm = true
     }
@@ -51,14 +73,18 @@ fun InitialRecordScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
+            // 🚨 修复：右上角「跳过」作为 action 传入，
+            // 不传 navigationIcon（取消左上角返回按钮）
             MiuiTopBar(
-                title = "首次记录",
-                // 取消左上角的返回按钮
-                navigationIcon = null,
-                // 👇 右上角提供显式的“跳过”按钮
+                backdrop = backdrop,
+                isGlassEnabled = isGlassEnabled,
                 action = {
                     TextButton(onClick = { showSkipConfirm = true }) {
-                        Text("跳过", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                        Text(
+                            text = "跳过",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 14.sp
+                        )
                     }
                 }
             )
@@ -134,7 +160,6 @@ fun InitialRecordScreen(
         }
     }
 
-    // 👇 跳过时的确认弹窗
     if (showSkipConfirm) {
         MiuiConfirmDialog(
             title = "确定要跳过吗？",
@@ -144,7 +169,7 @@ fun InitialRecordScreen(
             confirmColor = MaterialTheme.colorScheme.error,
             onConfirm = {
                 showSkipConfirm = false
-                onBack() // 执行原本的返回逻辑
+                onBack()
             },
             onDismiss = {
                 showSkipConfirm = false

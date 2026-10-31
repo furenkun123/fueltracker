@@ -6,16 +6,45 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,15 +60,15 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CATEGORY_PARKING
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.notif.ParkingNotification
+import com.fueltracker.ui.miui.MiuiBackButton
 import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.util.LocationHelper
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
-// 👇 扩展函数：简化判空和去空格
+// 扩展函数：简化判空和去空格
 private fun String?.toCleanString(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParkingScreen(
     viewModel: MainViewModel,
@@ -103,22 +132,45 @@ fun ParkingScreen(
 
     val amount = amountText.toDoubleOrNull() ?: 0.0
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text(if (isEditMode) "编辑停车" else "记停车", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
+    // 👇 移除 Scaffold 和 TopAppBar，改用 LazyColumn 支撑页面
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .imePadding()
+            .navigationBarsPadding(),
+        contentPadding = PaddingValues(
+            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 16.dp,
+            bottom = 24.dp,
+            start = 16.dp,
+            end = 16.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // 👇 1. 标题与返回键作为第一个 item
+        item(key = "parking_title") {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            ) {
+                // 👇 去掉背景圆底，只保留 IconButton 的点击波纹
+                MiuiBackButton(onClick = onBack)
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = if (isEditMode) "编辑停车" else "记停车",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).imePadding().navigationBarsPadding()
-                .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // 1. 位置选择卡片
+
+        // 👇 2. 位置选择卡片
+        item {
             ParkingFormCard {
                 ParkingInputField(
                     value = locationName, onValueChange = { locationName = it },
@@ -131,9 +183,6 @@ fun ParkingScreen(
                     }
                 )
 
-                // ==========================================
-                // 1. 定位结果区块
-                // ==========================================
                 locationCandidate?.let { candidate ->
                     Spacer(Modifier.height(10.dp))
                     Row(
@@ -174,16 +223,12 @@ fun ParkingScreen(
                         selected = false,
                         onClick = {
                             locationName = candidate
-                            locationCandidate = null // 填入后清空候选
+                            locationCandidate = null
                         },
                         cornerRadius = 20.dp, paddingH = 14.dp, paddingV = 8.dp, fontSize = 13.sp
                     )
                 }
 
-                // ==========================================
-                // 2. 最近使用区块
-                // ==========================================
-                // 👇 核心去重：过滤掉当前已填的值，同时过滤掉定位候选的值，防止两个区块出现一样的内容
                 val displayRecentLocations = recentLocations.filter {
                     it != locationName && it != locationCandidate
                 }
@@ -212,32 +257,45 @@ fun ParkingScreen(
                     }
                 }
             }
+        }
 
-            // 2. 楼层与区域（使用统一组件）
+        // 👇 3. 楼层与区域
+        item {
             ParkingOptionSection(
                 title = "楼层", options = listOf("B1", "B2", "B3", "B4", "LG1", "LG2", "P1", "P2"),
                 currentValue = floor, onValueChange = { floor = it }, placeholder = "或手动输入楼层（如 B2）"
             )
+        }
 
+        item {
             ParkingOptionSection(
                 title = "区域", options = listOf("A区", "B区", "C区", "D区"),
                 currentValue = area, onValueChange = { area = it }, placeholder = "或手动输入区域（如 东区）"
             )
+        }
 
-            // 3. 车位号与金额、备注
+        // 👇 4. 车位号与金额、备注
+        item {
             ParkingFormCard {
                 ParkingInputField(spotNumber, { spotNumber = it }, "车位号", "如：135")
             }
+        }
+
+        item {
             ParkingFormCard {
                 ParkingInputField(amountText, { amountText = it }, "停车费（可选）", "如：5.00", "元", KeyboardType.Decimal)
             }
+        }
+
+        item {
             ParkingFormCard {
                 ParkingInputField(note, { note = it }, "备注（可选）", "如：电梯口旁边")
             }
+        }
 
+        // 👇 5. 保存按钮
+        item {
             Spacer(Modifier.height(8.dp))
-
-            // 4. 保存按钮
             Button(
                 onClick = {
                     if (isSaving) return@Button
@@ -278,13 +336,12 @@ fun ParkingScreen(
             ) {
                 Text(if (isEditMode) "保存修改" else "保存停车", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 // ============================================================
-// 抽离出的通用组件
+// 抽离出的通用组件（无需修改）
 // ============================================================
 
 @Composable
@@ -294,7 +351,6 @@ private fun ParkingFormCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
-/** 👇 合并后的统一 Chip 组件 */
 @Composable
 private fun CustomChip(
     text: String, selected: Boolean, onClick: () -> Unit,
@@ -309,7 +365,6 @@ private fun CustomChip(
     }
 }
 
-/** 👇 抽离的楼层/区域选择模块，减少重复代码 */
 @Composable
 private fun ParkingOptionSection(title: String, options: List<String>, currentValue: String, onValueChange: (String) -> Unit, placeholder: String) {
     ParkingFormCard {

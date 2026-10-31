@@ -1,6 +1,5 @@
 package com.fueltracker.ui
 
-// 👇 引入公共组件
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,10 +8,14 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
+import com.fueltracker.ui.components.LazyColumnScrollbar
 import com.fueltracker.ui.components.MiuiBottomSheetWrapper
 import com.fueltracker.ui.components.MiuiConfirmDialog
 import com.fueltracker.ui.components.MiuiFilterChip
@@ -49,13 +53,10 @@ import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miui.MiuiCard
-import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.IntervalConfidence
 import com.fueltracker.viewmodel.MainViewModel
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -67,8 +68,6 @@ private val RECORD_DATE_FORMAT by lazy { SimpleDateFormat("yyyy-MM-dd HH:mm", Lo
 @Composable
 fun RecordsScreen(
     viewModel: MainViewModel,
-    isGlassEnabled: Boolean = false,
-    hazeState: HazeState? = null,
     onEdit: (FuelRecord) -> Unit
 ) {
     val records by viewModel.records.collectAsState()
@@ -116,16 +115,32 @@ fun RecordsScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
-        // 👇 1. 底层滚动列表（挂载 hazeSource）
+        // 👇 1. 底层滚动列表
         LazyColumn(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                // 👈 优化：只有在开启了效果且 hazeState 不为空时才挂载，防止崩溃
-                .then(if (hazeState != null) Modifier.hazeSource(state = hazeState) else Modifier)
                 .scrollToHideFab(listState, viewModel),
-            contentPadding = PaddingValues(top = 96.dp, bottom = if (isFloating) 120.dp else 80.dp) // 👈 顶部留白给悬浮顶栏
+            // 🚨 改动：内容内边距改为与首页一致（statusBars + 24dp），顶部不再预留 96dp
+            contentPadding = PaddingValues(
+                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 24.dp,
+                bottom = if (isFloating) 120.dp else 80.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            // 🚨 新增：标题作为第一个 item，跟随列表滚动，样式与首页 "随记油耗" 一致
+            item(key = "records_title") {
+                Text(
+                    text = "加油记录",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = (-15).dp)
+                        .padding(horizontal = 15.dp, vertical = 0.dp)
+                )
+            }
+
             item(key = "filter_bar") {
                 RecordFilterBar(filterType, selectedYear, selectedMonth, selectedDay, { filterType = it }, { showDatePicker = true })
             }
@@ -140,13 +155,11 @@ fun RecordsScreen(
                 }
             }
         }
-
-        // 👇 2. 悬浮顶栏（放在 Box 内部，用 align 悬浮）
-        MiuiTopBar(
-            modifier = Modifier.align(Alignment.TopCenter),
-            title = "全部加油记录",
-            isGlassEnabled = isGlassEnabled
+        LazyColumnScrollbar(
+            listState = listState,
+            modifier = Modifier.align(Alignment.CenterEnd)
         )
+
     }
 
     if (showDatePicker) {
@@ -179,8 +192,7 @@ private fun RecordStatistics(displayRecords: List<FuelRecord>, vehicle: Vehicle?
         if (displayRecords.isEmpty()) null else FuelCalculator.calculateSummary(allRecords = displayRecords, vehicle = vehicle).averageConsumption
     }
 
-    // 👈 直接复用公共 MiuiCard
-    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
@@ -202,7 +214,6 @@ private fun RecordFilterBar(filterType: String, year: Int, month: Int, day: Int,
     val customText = remember(year, month, day) { if (day == 0) "${year}.${month}月 ▼" else "${year}.${month}.${day} ▼" }
 
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        // 👈 复用 MiuiFilterChip（原本是胶囊形 FilterCapsule，为了全局统一，这里使用标准 Chip）
         MiuiFilterChip("全部", filterType == "全部") { onFilterChange("全部") }
         MiuiFilterChip("本月", filterType == "本月") { onFilterChange("本月") }
         MiuiFilterChip(customText, filterType == "按时间", onMonthClick)
@@ -220,9 +231,10 @@ private fun FuelRecordCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     val timeText = remember(record.timestamp) { RECORD_DATE_FORMAT.format(Date(record.timestamp)) }
 
-    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // 顶栏：时间 + 标签 + 操作
+    // 👇 1. 外部绝对不要 vertical padding
+    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        // 👇 2. 内部上下 padding 从 12.dp 降到 10.dp，行间距从 8.dp 降到 6.dp
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 FlowRow(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(timeText, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
@@ -237,13 +249,11 @@ private fun FuelRecordCard(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    // 👈 替换为公共 MiuiTextButton
                     MiuiTextButton("编辑", MaterialTheme.colorScheme.primary, onEdit)
                     MiuiTextButton("删除", Color(0xFFFF3B30).copy(alpha = 0.8f)) { showDeleteDialog = true }
                 }
             }
 
-            // 核心数据
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Row(verticalAlignment = Alignment.Bottom) {
@@ -263,10 +273,10 @@ private fun FuelRecordCard(
                 }
             }
 
-            // 补充细节
             val hasExtraInfo = (record.odometer ?: 0.0) > 0 || record.remainingFuel != null || record.hasMissedRecord || record.note.isNotBlank()
             if (hasExtraInfo) {
-                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                // 👇 3. 底部补充信息的灰底块，上下 padding 也从 6 降到 4
+                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     if ((record.odometer ?: 0.0) > 0) Text("仪表盘里程: ${record.odometer!!.toInt()} km", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     record.remainingFuel?.takeIf { it.isFinite() }?.let { Text("加油后剩余: %.2f L".format(it), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     if (record.hasMissedRecord) Text("漏记数据: 约 ${record.missedOdometer ?: 0.0} km / ${record.missedVolume ?: 0.0} L", fontSize = 11.sp, color = Color(0xFFFF9500))
@@ -277,7 +287,6 @@ private fun FuelRecordCard(
     }
 
     if (showDeleteDialog) {
-        // 👈 直接使用公共的底部弹窗版确认框
         MiuiConfirmDialog(
             title = "删除记录",
             message = "确定删除该条加油记录吗？删除后相关油耗计算将重新推导。",
@@ -318,7 +327,6 @@ private fun DatePicker3WheelSheet(initialYear: Int, initialMonth: Int, initialDa
         if (tempDay > maxDays) tempDay = maxDays
     }
 
-    // 👈 直接使用公共的底部弹窗外壳
     MiuiBottomSheetWrapper(
         title = "选择日期",
         onDismiss = onDismiss,

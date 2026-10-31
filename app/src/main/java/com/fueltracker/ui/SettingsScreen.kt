@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -37,15 +38,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.CallToAction
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -60,8 +60,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,8 +68,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -99,6 +96,7 @@ import com.fueltracker.ui.components.InstructionsDialog
 import com.fueltracker.ui.components.MiuiConfirmDialog
 import com.fueltracker.ui.components.PrivacyDialog
 import com.fueltracker.ui.components.UpdateHistoryDialog
+import com.fueltracker.ui.miui.MiuiBackButton
 import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.ui.miui.MiuiSwitch
 import com.fueltracker.ui.theme.ThemeMode
@@ -132,7 +130,6 @@ private const val KeyAboutSection = "section_about"
 // 主页面
 // ============================================================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: MainViewModel,
@@ -213,21 +210,39 @@ fun SettingsScreen(
 
     // --- 界面结构 ---
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        TopAppBar(
-            title = { Text("设置与数据", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-        )
+        // 👇 替换掉原本的 TopAppBar，高度严格对齐首页的 48dp
+        // 检查外层 Box/Column 的背景色，必须是 MaterialTheme.colorScheme.background
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.background) // 👈 确保这里是动态背景，不要写死 Color.White
+                .statusBarsPadding()
+                .height(48.dp)
+                .padding(horizontal = 4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MiuiBackButton(onClick = onBack)
+
+                Text(
+                    text = "设置与数据",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+            }
+        }
 
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxWidth().weight(1f),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            // 1. 顶部留白稍微留一点（8dp）
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+            // 2. 把间距从 20.dp 改为 12.dp（或者 14.dp），让整体变得紧凑
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // 1. 车辆管理
             item {
@@ -237,9 +252,26 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("车辆管理", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        TextButton(onClick = onAddVehicle, enabled = !viewModel.isBackupOperationRunning) {
-                            Text("＋ 添加车辆", fontSize = 14.sp)
+                        Text(
+                            text = "车辆管理",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground // 👈 强制使用与背景相反的颜色
+                        )
+                        TextButton(
+                            onClick = onAddVehicle,
+                            enabled = !viewModel.isBackupOperationRunning,
+                            // 👈 可选：为了让按钮在禁用时更清晰，可以显式设置颜色（如果是启用状态，用 Primary 就行）
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary,
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Text(
+                                text = "＋ 添加车辆",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium // 加一点字重，更好看
+                            )
                         }
                     }
                     if (vehicles.isEmpty()) {
@@ -345,18 +377,24 @@ fun SettingsScreen(
                 ) {
 
 
-                    // 悬浮式底栏开关
+                    // 👇 1. 第一行：悬浮式底栏开关（主开关）
                     Row(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
                             .clickable { viewModel.toggleFloatingBottomBar() }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.CropFree, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Icon(
+                            Icons.Default.CallToAction,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("悬浮式底栏", fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(Modifier.height(2.dp))
                             Text(
                                 if (viewModel.isFloatingBottomBar) "当前为悬浮胶囊样式" else "当前为经典固定贴底样式",
                                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -368,42 +406,46 @@ fun SettingsScreen(
                         )
                     }
 
-                    // 👇 核心修改：只有在开启悬浮底栏时，才显示液态玻璃效果
-                    AnimatedVisibility(
-                        visible = viewModel.isFloatingBottomBar,
-                        enter = ExpandSpec + FadeInSpec,
-                        exit = ShrinkSpec + FadeOutSpec
-                    ) {
-                        Column {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
-                            Row(
-                                modifier = Modifier.fillMaxWidth()
-                                    .clickable { viewModel.toggleGlassEffect() }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.BlurOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("磨砂底栏效果", fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        if (viewModel.isGlassEffectEnabled) "已开启，底栏呈现模糊效果" else "已关闭，底栏呈现纯色效果",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                MiuiSwitch(
-                                    checked = viewModel.isGlassEffectEnabled,
-                                    onCheckedChange = { viewModel.toggleGlassEffect() }
+                    // 👇 2. 只有开启悬浮底栏时，才显示磨砂效果开关
+                    if (viewModel.isFloatingBottomBar) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            thickness = 0.6.dp,
+                            modifier = Modifier.padding(start = 16.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.toggleGlassEffect() }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.BlurOn,
+                                null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("磨砂底栏效果", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    if (viewModel.isGlassEffectEnabled) "已开启，底栏使用磨砂效果" else "已关闭，底栏使用纯色背景",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            MiuiSwitch(
+                                checked = viewModel.isGlassEffectEnabled,
+                                onCheckedChange = { viewModel.toggleGlassEffect() }
+                            )
                         }
                     }
 
-                    // 👇 这里保留一条分割线，用来隔开下面的主题模式
+                    // 👇 3. 这里的底部分割线，用来隔开下面的主题模式选项
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
-
                     // 👇 2. 第二行开始：深色/浅色模式选项
                     ThemeMode.entries.forEach { mode ->
                         val selected = currentThemeMode == mode
@@ -413,7 +455,6 @@ fun SettingsScreen(
                             ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
                             ThemeMode.LIGHT -> Icons.Default.LightMode
                             ThemeMode.DARK -> Icons.Default.DarkMode
-                            else -> Icons.Default.Settings // 兜底，防止有新增模式报错
                         }
 
                         Row(

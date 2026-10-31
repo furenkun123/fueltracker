@@ -10,9 +10,6 @@ import androidx.compose.ui.graphics.Color
  */
 object MiuiColors {
 
-    val Background: Color
-        @Composable get() = MaterialTheme.colorScheme.background
-
     val Primary: Color
         @Composable get() = MaterialTheme.colorScheme.primary
 
@@ -22,7 +19,4 @@ object MiuiColors {
     val SecondaryText: Color
         @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 
-    /** 主按钮上的白色文字; 深色下也走主题, 一般是白色/深色 */
-    val White: Color
-        @Composable get() = MaterialTheme.colorScheme.onPrimary
 }

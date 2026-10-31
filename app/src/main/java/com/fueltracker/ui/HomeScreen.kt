@@ -1,6 +1,8 @@
 package com.fueltracker.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -15,10 +17,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,14 +35,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -67,8 +74,6 @@ import com.fueltracker.ui.components.MiuiYearMonthSheet
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miui.MiuiButton
 import com.fueltracker.ui.miui.MiuiCard
-import com.fueltracker.ui.miui.MiuiTextIconButton
-import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.ui.miui.VehicleCard
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.FuelCalculator
@@ -77,12 +82,11 @@ import com.fueltracker.util.computeExpenseRange
 import com.fueltracker.util.toDateTimeText
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
 import java.util.Calendar
 import kotlin.time.Duration.Companion.seconds
+
 
 private data class CostPoint(val timestamp: Long, val value: Double)
 
@@ -100,9 +104,7 @@ fun HomeScreen(
     onEditParking: (ExpenseRecord) -> Unit,
     onClearParking: () -> Unit,
     onIgnoreParking: () -> Unit,
-    onOpenSettings: () -> Unit,
-    hazeState: HazeState? = null,
-    isGlassEnabled: Boolean = false
+    onCollapseProgressChange: (Float) -> Unit = {},
 ) {
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
@@ -111,7 +113,7 @@ fun HomeScreen(
         val list = records
             .filter { (deliveryDate == null || it.timestamp >= deliveryDate) && !it.isInitialRecord }
             .sortedByDescending { it.timestamp }
-        list to list.take(5)
+        list to list.take(15)
     }
 
     val costData = remember(displayRecords) {
@@ -150,25 +152,81 @@ fun HomeScreen(
     }
 
     val listState = rememberLazyListState()
+
+    val density = LocalDensity.current
+
+    val targetCollapseProgress by remember(listState) {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                val threshold = with(density) { 60.dp.toPx() }
+                (
+                        listState.firstVisibleItemScrollOffset.toFloat() /
+                                threshold
+                        ).coerceIn(0f, 1f)
+            }
+        }
+    }
+
+
+
+
+// 平滑过渡，避免标题尺寸突然变化
+    val collapseProgress by animateFloatAsState(
+        targetValue = targetCollapseProgress,
+        animationSpec = tween(durationMillis = 180),
+        label = "topBarCollapse"
+    )
     val isFloating = viewModel.isFloatingBottomBar
 
-    // 👈 外层只保留一个 Box
-    Box(modifier = Modifier.fillMaxSize()) {
+    LaunchedEffect(collapseProgress) {
+        onCollapseProgressChange(collapseProgress)
+    }
 
-        // 👈 1. 底层：LazyColumn（挂载 hazeSource，顶部留白 96dp）
+    // 外层 Box：用于放置独立悬浮的 FAB
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // 1. 列表铺满整个屏幕
         LazyColumn(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (hazeState != null) Modifier.hazeSource(state = hazeState) else Modifier)
                 .scrollToHideFab(listState, viewModel),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(top = 96.dp, bottom = if (isFloating) 120.dp else 80.dp) // 👈 顶部留出悬浮顶栏的高度
+            contentPadding = PaddingValues(
+                // 初始状态为标题区域预留空间
+                // 滚动时，这段空间随列表一起滚动
+                top = WindowInsets.statusBars
+                    .asPaddingValues()
+                    .calculateTopPadding() + 24.dp
+            )
         ) {
+            item(key = "home_title") {
+                Text(
+                    text = "随记油耗",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = (-15).dp)
+                        .padding(
+                            horizontal = 15.dp,
+                            vertical = 0.dp
+                        )
+                )
+            }
+
             if (vehicle == null) {
-                item { EmptyVehicleCard(onAddVehicle) }
+                item {
+                    EmptyVehicleCard(onAddVehicle)
+                }
             } else {
-                item { VehicleCard(vehicle) }
+                item {
+                    VehicleCard(vehicle)
+                }
+
                 if (activeParking != null) {
                     item(key = "active_parking_${activeParking.id}") {
                         ActiveParkingCard(
@@ -179,51 +237,70 @@ fun HomeScreen(
                         )
                     }
                 }
-                item { ConsumptionCard(statsSummary.totalCount, resolvedLatestConsumption, averageConsumption) }
+
+                item {
+                    ConsumptionCard(
+                        statsSummary.totalCount,
+                        resolvedLatestConsumption,
+                        averageConsumption
+                    )
+                }
 
                 item {
                     ConsumptionStatsCard(
-                        summary = statsSummary, selectedRange = selectedRange,
-                        customYear = customYear, customMonth = customMonth,
+                        summary = statsSummary,
+                        selectedRange = selectedRange,
+                        customYear = customYear,
+                        customMonth = customMonth,
                         onRangeSelected = { selectedRange = it },
-                        onCustomMonthClick = { showYearMonthPicker = true }
+                        onCustomMonthClick = {
+                            showYearMonthPicker = true
+                        }
                     )
                 }
-                if (costData.size >= 2) item { ChartCard(points = costData) }
+
+                if (costData.size >= 2) {
+                    item {
+                        ChartCard(points = costData)
+                    }
+                }
 
                 item {
                     Text(
-                        text = "最近加油", style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground,
+                        text = "最近加油",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
 
-                if (recentRecords.isEmpty()) item { EmptyRecordCard() }
-                else items(recentRecords, key = { it.id }) { HomeFuelRecordItem(it) }
+                if (recentRecords.isEmpty()) {
+                    item {
+                        EmptyRecordCard()
+                    }
+                } else {
+                    items(recentRecords, key = { it.id }) {
+                        HomeFuelRecordItem(it)
+                    }
+                }
             }
         }
 
-        // 👈 2. 顶层：悬浮顶栏（对齐到顶部，删除了内部旧的那个 MiuiTopBar）
-        MiuiTopBar(
-            modifier = Modifier.align(Alignment.TopCenter),
-            title = "随记油耗",
-            isGlassEnabled = isGlassEnabled
-        ) {
-            MiuiTextIconButton(text = "", icon = Icons.Default.Settings, onClick = onOpenSettings)
-        }
-
-        // 👈 3. 顶层：右下角 FAB 按钮
+        // 3. FAB：仍然独立悬浮在右下角
         if (vehicle != null) {
             AnimatedVisibility(
                 visible = viewModel.isFabVisible,
                 enter = fadeIn() + scaleIn(initialScale = 0.8f),
                 exit = fadeOut() + scaleOut(targetScale = 0.8f),
-                modifier = Modifier.align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = if (isFloating) 94.dp else 52.dp)
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = 28.dp,
+                        bottom = if (isFloating) 104.dp else 84.dp
+                    )
             ) {
                 Column(
-                    modifier = Modifier.padding(end = 16.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalAlignment = Alignment.End
                 ) {
@@ -232,18 +309,38 @@ fun HomeScreen(
                         enter = fadeIn() + scaleIn(initialScale = 0.8f),
                         exit = fadeOut() + scaleOut(targetScale = 0.8f)
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.End) {
-                            FabActionItem("🅿", "停车") { fabExpanded = false; onAddParking() }
-                            FabActionItem("⛽", "加油") { fabExpanded = false; onAddFuel() }
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            FabActionItem("🅿", "停车") {
+                                fabExpanded = false
+                                onAddParking()
+                            }
+
+                            FabActionItem("⛽", "加油") {
+                                fabExpanded = false
+                                onAddFuel()
+                            }
                         }
                     }
+
                     FloatingActionButton(
                         onClick = { fabExpanded = !fabExpanded },
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
-                        shape = CircleShape
+                        shape = CircleShape,
+                        elevation = FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 0.dp,
+                            pressedElevation = 0.dp,
+                            focusedElevation = 0.dp,
+                            hoveredElevation = 0.dp
+                        )
                     ) {
-                        Icon(if (fabExpanded) Icons.Default.Close else Icons.Default.Add, null)
+                        Icon(
+                            if (fabExpanded) Icons.Default.Close else Icons.Default.Add,
+                            contentDescription = null
+                        )
                     }
                 }
             }
@@ -552,7 +649,6 @@ private fun ActiveParkingCard(parking: ExpenseRecord, onClick: () -> Unit, onCle
     }
 
     if (showClearConfirm) {
-        // 👈 直接复用 MiuiConfirmDialog
         MiuiConfirmDialog(
             title = "已取车",
             message = "确定已取车？卡片会从首页移除。",

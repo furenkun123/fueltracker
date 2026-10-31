@@ -19,8 +19,8 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
-val appVersionCode = 47
-val appVersionName = "1.68"
+val appVersionCode = 48
+val appVersionName = "1.69"
 
 android {
     namespace = "com.fueltracker"
@@ -97,7 +97,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.test)
+
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -109,8 +109,7 @@ dependencies {
 
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.haze.core)
-    implementation(libs.haze.blur)
-    implementation(libs.haze.blur.materials)
+    implementation(libs.backdrop)
+    implementation(libs.kyant.shapes)
 
 }

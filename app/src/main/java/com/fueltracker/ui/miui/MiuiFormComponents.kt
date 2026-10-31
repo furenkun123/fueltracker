@@ -18,6 +18,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance // 👈 引入亮度判断
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -30,21 +32,27 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun MiuiSectionHeader(title: String) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     Text(
         text = title,
         fontSize = 13.sp,
         fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // 👈 强制反色（灰黑 / 灰白）
+        color = if (isLight) Color(0xFF666666) else Color(0xFFAAAAAA),
         modifier = Modifier.padding(start = 12.dp, bottom = 6.dp)
     )
 }
 
 @Composable
 fun MiuiGroupCard(content: @Composable ColumnScope.() -> Unit) {
+    // 确保卡片背景色在不同模式下都有层次感
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val cardBg = if (isLight) MaterialTheme.colorScheme.surface else Color(0xFF1C1C1E)
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface
+        color = cardBg
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             content()
@@ -60,6 +68,10 @@ fun MiuiInputItem(
     placeholder: String = "",
     keyboardType: KeyboardType = KeyboardType.Text
 ) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val textColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
+    val placeholderColor = if (isLight) Color(0xFF1F1F1F).copy(alpha = 0.4f) else Color(0xFFE6E6E6).copy(alpha = 0.4f)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -69,7 +81,8 @@ fun MiuiInputItem(
         Text(
             text = label,
             fontSize = 15.sp,
-            color = MaterialTheme.colorScheme.onSurface,
+            // 👈 强制反色
+            color = textColor,
             modifier = Modifier.width(110.dp)
         )
         BasicTextField(
@@ -78,7 +91,8 @@ fun MiuiInputItem(
             modifier = Modifier.weight(1f),
             textStyle = TextStyle(
                 fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onSurface,
+                // 👈 强制反色
+                color = textColor,
                 fontWeight = FontWeight.Medium
             ),
             singleLine = true,
@@ -89,7 +103,8 @@ fun MiuiInputItem(
                         Text(
                             text = placeholder,
                             fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            // 👈 占位符颜色
+                            color = placeholderColor
                         )
                     }
                     innerTextField()
@@ -103,8 +118,18 @@ fun MiuiInputItem(
 fun MiuiClickableItem(
     label: String,
     value: String,
+    placeholder: String = "请选择", // 👈 新增占位符参数
     onClick: () -> Unit
 ) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val textColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
+
+    // 👇 占位符用 60% 透明度，清晰且不刺眼
+    val placeholderColor = if (isLight) Color(0xFF1F1F1F).copy(alpha = 0.6f) else Color(0xFFE6E6E6).copy(alpha = 0.6f)
+
+    // 👇 实际选中的值用主题色，如果是暗色模式觉得太暗，可以使用高亮蓝
+    val activeValueColor = if (isLight) MaterialTheme.colorScheme.primary else Color(0xFF66B2FF)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -115,16 +140,13 @@ fun MiuiClickableItem(
         Text(
             text = label,
             fontSize = 15.sp,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = textColor,
             modifier = Modifier.width(110.dp)
         )
         Text(
-            text = value.ifBlank { "请选择" },
+            text = value.ifBlank { placeholder }, // 👈 使用传入的 placeholder
             fontSize = 15.sp,
-            color = if (value.isBlank())
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            else
-                MaterialTheme.colorScheme.primary,
+            color = if (value.isBlank()) placeholderColor else activeValueColor,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f)
         )

@@ -3,7 +3,20 @@ package com.fueltracker.ui
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,39 +24,50 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.data.Trim
+import com.fueltracker.ui.miui.MiuiBackButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private const val TAG = "PickerScreen"
 
-// 👇 优化 1：抽取数据库加载检查，消除三个页面 load 块的重复
 private suspend fun ensureDbLoaded(db: CarDatabase) {
     check(db.ensureCatalogLoaded() != null) { "车型目录加载失败" }
 }
 
-// ============================================================
-// 车系选择
-// ============================================================
 @Composable
 fun SeriesSelectorScreen(brand: String, onBack: () -> Unit, onSelected: (String) -> Unit, onManualInput: (String) -> Unit = onSelected) {
     val appContext = LocalContext.current.applicationContext
@@ -59,27 +83,22 @@ fun SeriesSelectorScreen(brand: String, onBack: () -> Unit, onSelected: (String)
     )
 }
 
-// ============================================================
-// 年款选择
-// ============================================================
 @Composable
 fun YearSelectorScreen(brand: String, series: String, onBack: () -> Unit, onSelected: (String) -> Unit, onManualInput: (String) -> Unit = onSelected) {
     val appContext = LocalContext.current.applicationContext
     val db = remember(appContext) { CarDatabase.get(appContext) }
     PickerListScreen(
         title = "选择年款", subtitle = "$brand · $series", manualTitle = "手动输入年款",
-        manualPlaceholder = "未找到年款？如：2024款", searchPlaceholder = "", showSearch = false,
+        manualPlaceholder = "未找到年款？如：2024款", searchPlaceholder = "搜索年款，或直接输入...",
         presetLabel = "年款", emptyHint = "暂无预置年款，可手动输入", loadKey = brand to series,
         load = { withContext(Dispatchers.IO) { ensureDbLoaded(db); db.years(brand, series) } },
         itemKey = { it }, itemSearchText = { it },
         row = { year, onClick -> PickerRow(text = year, onClick = onClick) },
         onBack = onBack, onSelected = onSelected, onManualInput = onManualInput
+        // 👆 删除了 showSearch = false，现在它也会拥有搜索框和联动逻辑
     )
 }
 
-// ============================================================
-// 车型选择
-// ============================================================
 @Composable
 fun TrimSelectorScreen(brand: String, series: String, year: String, onBack: () -> Unit, onSelected: (Trim) -> Unit, onManualInput: (String) -> Unit = { onSelected(Trim(name = it)) }) {
     val appContext = LocalContext.current.applicationContext
@@ -95,9 +114,6 @@ fun TrimSelectorScreen(brand: String, series: String, year: String, onBack: () -
     )
 }
 
-// ============================================================
-// 通用选择器
-// ============================================================
 @Composable
 private fun <T> PickerListScreen(
     title: String, subtitle: String, manualTitle: String, manualPlaceholder: String,
@@ -131,69 +147,113 @@ private fun <T> PickerListScreen(
         if (query.isEmpty()) all else all.filter { itemSearchText(it).contains(query, ignoreCase = true) }
     }
 
-    PickerScaffold(title, subtitle, onBack, search, { search = it }, searchPlaceholder, loading, loadError, showSearch) {
+    // 👇 核心联动逻辑：如果有搜索框，点击键盘搜索键且没结果时，直接触发手动输入
+    val onSearchAction = {
+        if (filtered.isEmpty() && search.isNotBlank()) {
+            onManualInput(search.trim())
+        }
+    }
+
+    PickerScaffold(
+        title, subtitle, onBack, search, { search = it },
+        searchPlaceholder, loading, loadError, showSearch, onSearchAction
+    ) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
-            item(key = "manual_header") { ManualInputCard(manualTitle, manualPlaceholder, loadKey, onManualInput) }
+
+            // 👇 如果【没有】搜索框（比如选年款），保留原本的手动输入卡片
+            if (!showSearch) {
+                item(key = "manual_header") {
+                    ManualInputCard(manualTitle, manualPlaceholder, loadKey, onManualInput)
+                }
+            }
 
             if (filtered.isNotEmpty()) {
                 item(key = "preset_header") { PresetHeader("预置$presetLabel") }
                 itemsIndexed(filtered, key = { index, item -> "$index:${itemKey(item)}" }) { _, item ->
                     row(item) { onSelected(item) }
                 }
-            } else if (loadError == null && search.isNotBlank()) {
-                item(key = "no_match") { NoMatchText("未找到匹配的$presetLabel") }
-            } else if (loadError == null && emptyHint != null) {
-                item(key = "empty_hint") { NoMatchText(emptyHint) }
+            } else {
+                if (loadError == null) {
+                    if (search.isNotBlank()) {
+                        // 👇 如果【有】搜索框，且搜索为空，出现“使用xxx”的按钮
+                        item(key = "manual_fallback") {
+                            EmptyPickerState(search, "未找到与 \"$search\" 相关的$presetLabel") {
+                                onManualInput(search.trim())
+                            }
+                        }
+                    } else if (emptyHint != null) {
+                        item(key = "empty_hint") { NoMatchText(emptyHint) }
+                    }
+                }
             }
         }
     }
 }
 
-// ============================================================
-// 通用页面框架
-// ============================================================
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PickerScaffold(
     title: String, subtitle: String, onBack: () -> Unit, search: String,
     onSearchChange: (String) -> Unit, placeholder: String, loading: Boolean,
-    errorMessage: String?, showSearch: Boolean, content: @Composable () -> Unit
+    errorMessage: String?, showSearch: Boolean, onSearchAction: () -> Unit,
+    content: @Composable () -> Unit
 ) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        if (subtitle.isNotBlank()) Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        }
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            if (showSearch) PickerSearchBox(search, onSearchChange, placeholder)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .imePadding()
+    ) {
+        // 标题与返回键齐平
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            MiuiBackButton(onClick = onBack)
 
-            if (errorMessage != null && !loading) {
-                Text(errorMessage, fontSize = 12.sp, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+            Spacer(Modifier.width(12.dp))
+
+            val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+            val titleColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
+            val subTitleColor = if (isLight) Color(0xFF1F1F1F).copy(alpha = 0.6f) else Color(0xFFE6E6E6).copy(alpha = 0.6f)
+
+            Column {
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = titleColor
+                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        fontSize = 10.sp,
+                        color = subTitleColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+        }
 
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                if (loading) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                else content()
+        if (showSearch) {
+            PickerSearchBox(search, onSearchChange, placeholder, onSearchAction)
+        }
+
+        if (errorMessage != null && !loading) {
+            Text(errorMessage, fontSize = 12.sp, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+        }
+
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (loading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else {
+                content()
             }
         }
     }
 }
 
-// ============================================================
-// 核心抽离组件（移除重复的输入框和列表行）
-// ============================================================
-
-/** 👇 优化 2：统一处理 BasicTextField 的 placeholder 逻辑 */
 @Composable
 private fun PickerTextField(
     value: String, onValueChange: (String) -> Unit, placeholder: String,
@@ -214,7 +274,6 @@ private fun PickerTextField(
     )
 }
 
-/** 👇 优化 3：统一处理列表行的背景和底部 Divider */
 @Composable
 private fun PickerItemWrapper(onClick: () -> Unit, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
@@ -228,6 +287,8 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
     val keyboard = LocalSoftwareKeyboardController.current
     var value by remember(resetKey) { mutableStateOf("") }
     val trimmedValue = value.trim()
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val inputBg = if (isLight) Color.Black.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.12f)
 
     fun submit() {
         if (trimmedValue.isEmpty()) return
@@ -242,7 +303,7 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
                 value = value, onValueChange = { value = it }, placeholder = placeholder,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { submit() }),
-                modifier = Modifier.weight(1f).height(38.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 10.dp)
+                modifier = Modifier.weight(1f).height(38.dp).clip(RoundedCornerShape(8.dp)).background(inputBg).padding(horizontal = 10.dp)
             )
             Spacer(Modifier.width(8.dp))
             Button(onClick = { submit() }, enabled = trimmedValue.isNotEmpty(), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 12.dp), modifier = Modifier.height(38.dp)) {
@@ -253,19 +314,25 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
 }
 
 @Composable
-private fun PickerSearchBox(value: String, onValueChange: (String) -> Unit, placeholder: String) {
+private fun PickerSearchBox(value: String, onValueChange: (String) -> Unit, placeholder: String, onSearchAction: () -> Unit) {
     val keyboard = LocalSoftwareKeyboardController.current
-    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(48.dp).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 12.dp)) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val bg = if (isLight) Color.Black.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.12f)
+
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(42.dp).clip(RoundedCornerShape(21.dp)).background(bg).padding(horizontal = 12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             PickerTextField(
                 value = value, onValueChange = onValueChange, placeholder = placeholder,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                keyboardActions = KeyboardActions(onSearch = {
+                    onSearchAction()
+                    keyboard?.hide()
+                }),
                 modifier = Modifier.weight(1f)
             )
-            if (value.isNotEmpty()) IconButton(onClick = { onValueChange("") }) { Icon(Icons.Default.Clear, "清除", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp)) }
+            if (value.isNotEmpty()) IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Clear, "清除", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp)) }
         }
     }
 }
@@ -274,7 +341,74 @@ private fun PickerSearchBox(value: String, onValueChange: (String) -> Unit, plac
 private fun PresetHeader(text: String) = Text(text, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
 
 @Composable
-private fun NoMatchText(text: String) = Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { Text(text, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+private fun NoMatchText(text: String) {
+    // 👇 统一改为卡片式的提示
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(vertical = 32.dp, horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.SearchOff, // 如果你没导入这个图标，记得 Alt+Enter
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.size(48.dp)
+        )
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+// 👇 统一的搜索空状态与手动输入联动组件
+@Composable
+private fun EmptyPickerState(searchText: String, hint: String, onManualInput: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp) // 紧贴搜索框下方
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(vertical = 32.dp, horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.SearchOff,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.size(48.dp)
+        )
+
+        Text(
+            text = hint,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
+        // 按钮样式与品牌页保持一致
+        Button(
+            onClick = onManualInput,
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text = "使用 \"$searchText\" 作为结果",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
 
 @Composable
 private fun PickerRow(text: String, onClick: () -> Unit) {

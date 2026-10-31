@@ -49,10 +49,8 @@ object UpdateLogManager {
         45 to listOf(
             "代码精简优化"
         ),
-        47 to listOf(
-            "代码结构优化",
-            "底栏UI调整",
-            "悬浮底栏太难调了，就这样吧"
+        48 to listOf(
+            "UI调整"
         )
         // 后续版本继续追加
     )
@@ -69,7 +67,7 @@ object UpdateLogManager {
         40 to "1.61",
         41 to "1.62",
         45 to "1.66",
-        47 to "1.68"
+        48 to "1.69"
     )
 
     /**
