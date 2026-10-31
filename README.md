@@ -32,3 +32,23 @@
 
 ---
 *如果觉得好用，欢迎点个 ⭐ Star！*
+
+## 开源协议（License）
+
+FuelTracker 采用 **Apache License 2.0** 开源协议。
+
+你可以在遵守 Apache License 2.0 协议条款的前提下，自由使用、复制、修改和分发本项目的源代码，包括用于商业用途。
+
+使用、修改或分发本项目时，请保留原有版权声明、许可证文件及协议要求的相关声明。
+
+完整协议内容请查看项目根目录下的 [LICENSE](LICENSE) 文件。
+
+本项目使用的第三方开源依赖遵循各自的许可证协议。
+
+---
+
+FuelTracker is licensed under the Apache License, Version 2.0.
+
+See the [LICENSE](LICENSE) file for the full license text.
+
+Copyright 2026 FuelTracker Contributors.
