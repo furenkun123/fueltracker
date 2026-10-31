@@ -1,3 +1,4 @@
+
 package com.fueltracker.ui.miui
 
 import androidx.compose.foundation.background
@@ -24,14 +25,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.vibrancy
 
 @Composable
 fun MiuiTopBar(
@@ -42,9 +50,13 @@ fun MiuiTopBar(
     action: (@Composable () -> Unit)? = null,
     showActionArea: Boolean = true
 ) {
-    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val statusBarHeight =
+        WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
     val actionAreaHeight = 48.dp
-    val totalHeight = statusBarHeight + if (showActionArea) actionAreaHeight else 0.dp
+    val totalHeight =
+        statusBarHeight + if (showActionArea) actionAreaHeight else 0.dp
+
     val barColor = MaterialTheme.colorScheme.background
 
     Box(
@@ -52,62 +64,105 @@ fun MiuiTopBar(
             .fillMaxWidth()
             .height(totalHeight)
     ) {
-        // 👇 状态栏模糊区域
-        if (statusBarHeight > 0.dp) {
+        // 整体连续玻璃背景
+        if (isGlassEnabled) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(statusBarHeight)
-                    .align(Alignment.TopCenter)
+                    .height(totalHeight)
             ) {
-                if (isGlassEnabled) {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .drawPlainBackdrop(
-                                backdrop = backdrop,
-                                shape = { RectangleShape },
-                                effects = { blur(12.dp.toPx()) },
-                                // 👈 建议加上一层半透明底色，让模糊更有质感（可根据喜好调整 alpha）
-                                onDrawSurface = { drawRect(barColor.copy(alpha = 0.5f)) }
-                            )
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            // 👈 替换了原来的测试代码 Color.Red
-                            .background(barColor)
-                    )
-                }
-            }
-        }
-
-        // 👇 顶部操作区域：透明，不模糊
-        if (showActionArea) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(actionAreaHeight)
-                    .align(Alignment.BottomCenter)
-            ) {
-                Row(
+                // 第一层：清晰背景
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = 16.dp, end = 28.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (navigationIcon != null) {
-                        navigationIcon()
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
+                        .drawPlainBackdrop(
+                            backdrop = backdrop,
+                            shape = { RectangleShape },
+                            effects = {},
+                            onDrawSurface = {
+                                drawRect(Color.Transparent)
+                            }
+                        )
+                )
 
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    if (action != null) {
-                        Box(Modifier.offset(y = 4.dp)) {
-                            action()
+                // 第二层：模糊背景，使用渐变遮罩
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .height(totalHeight)
+                        .graphicsLayer {
+                            compositingStrategy = CompositingStrategy.Offscreen
                         }
+                        .drawWithContent {
+                            drawContent()
+
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    colorStops = arrayOf(
+                                        0.0f to Color.White,
+                                        0.25f to Color.White,
+                                        0.45f to Color.White.copy(alpha = 0.65f),
+                                        0.65f to Color.White.copy(alpha = 0.15f),
+                                        0.75f to Color.Transparent,
+                                        1.0f to Color.Transparent
+                                    )
+                                ),
+                                blendMode = BlendMode.DstIn
+                            )
+                        }
+                        .drawPlainBackdrop(
+                            backdrop = backdrop,
+                            shape = { RectangleShape },
+                            effects = {
+                                vibrancy()
+                                blur(24.dp.toPx())
+                            },
+                            onDrawSurface = {
+                                drawRect(
+                                    barColor.copy(
+                                        alpha = if (barColor.luminance() > 0.5f) {
+                                            0.28f
+                                        } else {
+                                            0.36f
+                                        }
+                                    )
+                                )
+                            }
+                        )
+                )
+            }
+
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(barColor)
+            )
+        }
+
+        // 操作区域：保留原来的布局
+        if (showActionArea) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        top = statusBarHeight,
+                        start = 16.dp,
+                        end = 28.dp
+                    )
+                    .height(actionAreaHeight),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (navigationIcon != null) {
+                    navigationIcon()
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                if (action != null) {
+                    Box(Modifier.offset(y = 4.dp)) {
+                        action()
                     }
                 }
             }
@@ -142,6 +197,7 @@ fun MiuiTopBarIconButton(
         )
     }
 }
+
 @Composable
 fun MiuiBackButton(
     onClick: () -> Unit,
@@ -149,15 +205,14 @@ fun MiuiBackButton(
 ) {
     Box(
         modifier = modifier
-            .size(40.dp) // 保持 40dp 的舒适点击热区
-            .clip(CircleShape) // 让点击水波纹呈圆形，且不超出边界
+            .size(40.dp)
+            .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
             contentDescription = "返回",
-            // 👇 关键修复：改为 onBackground，绝对跟随页面底色反色
             tint = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.size(22.dp)
         )

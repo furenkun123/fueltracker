@@ -1,6 +1,8 @@
+
 package com.fueltracker.ui.miui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -24,21 +26,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
+
 
 @Composable
 fun MiuiNavigationBar(
@@ -49,7 +49,6 @@ fun MiuiNavigationBar(
     content: @Composable RowScope.() -> Unit
 ) {
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-
     val capsuleShape = if (isFloating) {
         RoundedCornerShape(32.dp)
     } else {
@@ -69,78 +68,50 @@ fun MiuiNavigationBar(
                 }
             )
     ) {
-        if (isFloating) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .softFloatingShadow(
-                        isLight = isLight,
-                        cornerRadius = 32.dp,
-                        blurRadius = 30f,
-                        spread = 3f
-                    )
-            ) {
-                NavigationBarSurface(
-                    backdrop = backdrop,
+        val shadowModifier = if (isFloating) {
+            if (isGlassEnabled) {
+                Modifier.shadow(
+                    elevation = 8.dp,
                     shape = capsuleShape,
-                    isFloating = true,
-                    isLight = isLight,
-                    isGlassEnabled = isGlassEnabled,
-                    content = content
+                    ambientColor = Color.Black.copy(alpha = 0.05f),
+                    spotColor = Color.Black.copy(alpha = 0.08f),
+                    clip = false
+                )
+            } else {
+                Modifier.shadow(
+                    elevation = 16.dp,
+                    shape = capsuleShape,
+                    ambientColor = if (isLight) {
+                        Color.Black.copy(alpha = 0.08f)
+                    } else {
+                        Color.Black.copy(alpha = 0.4f)
+                    },
+                    spotColor = if (isLight) {
+                        Color.Black.copy(alpha = 0.12f)
+                    } else {
+                        Color.Black.copy(alpha = 0.6f)
+                    },
+                    clip = false
                 )
             }
         } else {
+            Modifier
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(shadowModifier)
+                .clip(capsuleShape)
+        ) {
             NavigationBarSurface(
                 backdrop = backdrop,
                 shape = capsuleShape,
-                isFloating = false,
+                isFloating = isFloating,
                 isLight = isLight,
-                isGlassEnabled = false,
+                isGlassEnabled = isGlassEnabled,
                 content = content
             )
-        }
-    }
-}
-
-private fun Modifier.softFloatingShadow(
-    isLight: Boolean,
-    cornerRadius: Dp = 32.dp,
-    blurRadius: Float = 30f,
-    spread: Float = 3f
-): Modifier = this.drawBehind {
-    val right = size.width - spread
-    val bottom = size.height - spread
-    val radius = cornerRadius.toPx()
-
-    drawIntoCanvas { canvas ->
-        fun drawShadow(color: Color, blur: Float, offsetY: Float) {
-            val paint = android.graphics.Paint(
-                android.graphics.Paint.ANTI_ALIAS_FLAG
-            ).apply {
-                this.color = android.graphics.Color.WHITE
-                setShadowLayer(blur, 0f, offsetY, color.toArgb())
-            }
-
-            canvas.nativeCanvas.drawRoundRect(
-                spread,
-                spread,
-                right,
-                bottom,
-                radius,
-                radius,
-                paint
-            )
-
-            paint.clearShadowLayer()
-        }
-
-        if (isLight) {
-            drawShadow(Color.Black.copy(alpha = 0.22f), blurRadius, 0f)
-            drawShadow(Color.Black.copy(alpha = 0.12f), 12f, 3f)
-        } else {
-
-            drawShadow(Color.Black.copy(alpha = 0.55f), 22f, 5f)
-            drawShadow(Color.Black.copy(alpha = 0.30f), 8f, 2f)
         }
     }
 }
@@ -154,59 +125,108 @@ private fun NavigationBarSurface(
     isGlassEnabled: Boolean,
     content: @Composable RowScope.() -> Unit
 ) {
-    val barColor = if (isLight) {
+    // 玻璃雾面：保留背景颜色层次，但避免背景清晰透出
+
+    val solidColor = if (isLight) {
         Color.White
     } else {
-        Color(0xFF303034)
+        Color(0xFF1C1C1E)
     }
 
-    val borderColor = if (isLight) {
-        Color.White.copy(alpha = 0.65f)
-    } else {
-        Color.White.copy(alpha = 0.035f)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-    ) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         if (isFloating && isGlassEnabled) {
             Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .drawPlainBackdrop(
-                        backdrop = backdrop,
-                        shape = { shape },
-                        effects = {
-                            blur(16.dp.toPx())
-                        },
-                        onDrawSurface = {
-                            drawRect(barColor.copy(alpha = 0.58f))
-                        }
-                    )
-            )
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // 第一层：带透镜折射的玻璃背景
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(shape)
+                        .drawPlainBackdrop(
+                            backdrop = backdrop,
+                            shape = { shape },
+                            effects = {
+                                vibrancy()
+
+                                blur(2.dp.toPx())
+
+                                // 真正的背景透镜折射
+                                lens(
+                                    refractionHeight = 28.dp.toPx(),
+                                    refractionAmount = 40.dp.toPx()
+                                )
+                            },
+                            onDrawSurface = {
+                                drawRect(
+                                    if (isLight) {
+                                        Color.White.copy(alpha = 0.10f)
+                                    } else {
+                                        Color(0xFF25252B).copy(alpha = 0.14f)
+                                    }
+                                )
+                            }
+                        )
+                )
+
+
+                // 第三层：柔和轮廓
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .border(
+                            width = 0.7.dp,
+                            color = if (isLight) {
+                                Color.Black.copy(alpha = 0.07f)
+                            } else {
+                                Color.White.copy(alpha = 0.09f)
+                            },
+                            shape = shape
+                        )
+                )
+                // 中央水滴透镜：单独测试中心折射效果
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .clip(RoundedCornerShape(32.dp))
+                        .drawPlainBackdrop(
+                            backdrop = backdrop,
+                            shape = { RoundedCornerShape(32.dp) },
+                            effects = {
+                                vibrancy()
+                                blur(1.dp.toPx())
+                                lens(
+                                    refractionHeight = 30.dp.toPx(),
+                                    refractionAmount = 49.dp.toPx()
+                                )
+                            },
+                            onDrawSurface = {
+                                // 不额外绘制明显的白色表面
+                                drawRect(Color.Transparent)
+                            }
+                        )
+                )
+
+                // 第四层：导航内容，必须最后绘制
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = content
+                )
+            }
         } else {
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .background(barColor)
+                    .background(solidColor)
             )
         }
 
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .drawBehind {
-                    drawRoundRect(
-                        color = borderColor,
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                            if (isFloating) 32.dp.toPx() else 0f
-                        ),
-                        style = Stroke(width = 0.8.dp.toPx())
-                    )
-                }
-        )
 
         Row(
             modifier = Modifier
@@ -235,7 +255,6 @@ fun RowScope.MiuiNavigationItem(
     label: String
 ) {
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-
     val activeColor = if (selected) {
         MiuiColors.Primary
     } else {
@@ -270,7 +289,7 @@ fun RowScope.MiuiNavigationItem(
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
                 .background(selectedBg)
-                .padding(horizontal = 40.dp, vertical = 9.dp),
+                .padding(horizontal = 20.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -281,7 +300,7 @@ fun RowScope.MiuiNavigationItem(
                 modifier = Modifier.size(22.dp)
             )
 
-            Spacer(Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             Text(
                 text = label,
