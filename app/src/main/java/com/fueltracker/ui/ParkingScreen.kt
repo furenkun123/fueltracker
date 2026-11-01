@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CATEGORY_PARKING
 import com.fueltracker.data.ExpenseRecord
-import com.fueltracker.notif.ParkingNotification
 import com.fueltracker.ui.miui.MiuiBackButton
 import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.util.LocationHelper
@@ -78,7 +77,6 @@ fun ParkingScreen(
 ) {
     val isEditMode = record != null
     val context = LocalContext.current
-    val vehicle by viewModel.currentVehicle.collectAsState()
     val expenses by viewModel.expenses.collectAsState()
 
     // 提取常用位置
@@ -309,7 +307,8 @@ fun ParkingScreen(
                     val newRecord = record?.copy(
                         category = CATEGORY_PARKING, amount = amount,
                         locationName = cleanLoc, floor = cleanFloor, area = cleanArea,
-                        spotNumber = cleanSpot, note = note.trim()
+                        spotNumber = cleanSpot, note = note.trim(),
+                                notificationIgnored = false
                     ) ?: ExpenseRecord(
                         vehicleId = 0, timestamp = System.currentTimeMillis(), category = CATEGORY_PARKING, amount = amount,
                         locationName = cleanLoc, floor = cleanFloor, area = cleanArea, spotNumber = cleanSpot,
@@ -319,13 +318,15 @@ fun ParkingScreen(
                     val onResult: (Result<Unit>) -> Unit = { result ->
                         isSaving = false
                         if (result.isSuccess) {
-                            val vId = vehicle?.id
-                            if ((!isEditMode || record.isActive) && vId != null && vId > 0) {
-                                ParkingNotification.show(context, vId, cleanLoc, cleanFloor, cleanArea, cleanSpot)
-                            }
+                            // 通知由 MainViewModel.parkingNotificationState 统一驱动，
+                            // 此处不手动 show/cancel
                             onSaved()
                         } else {
-                            Toast.makeText(context, "保存失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                context,
+                                "保存失败：${result.exceptionOrNull()?.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
                     if (isEditMode) viewModel.updateExpense(newRecord, onResult) else viewModel.addExpense(newRecord, onResult)

@@ -140,6 +140,54 @@ class MainViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), null)
 
     // =========================================================
+// 停车通知同步（唯一入口）
+//
+// 关键点：
+// - 用底层 DAO Flow 组合，避免 currentVehicle/activeParking
+//   的 stateIn 初始值 null 造成"误判为无停车"
+// - stateIn 初始值为 NotReady，首次真实数据到达前
+//   UI 层不会执行任何 cancel/show
+// - 切换车辆、重启、DB 增删改，都通过此流自动同步
+// =========================================================
+    val parkingNotificationState: StateFlow<ParkingNotificationState> =
+        combine(
+            vehicleDao.observeCurrentVehicle(),
+            _currentVehicleOverride,
+            vehicleDao.observeAllVehicles()
+        ) { dbVehicle, overrideVehicle, allVehicles ->
+            overrideVehicle ?: dbVehicle
+            ?: allVehicles.firstOrNull { it.isCurrent }
+            ?: allVehicles.firstOrNull()
+        }
+            .distinctUntilChanged { old, new -> old?.id == new?.id }
+            .flatMapLatest { vehicle ->
+                if (vehicle == null) {
+                    flowOf<ParkingNotificationState>(ParkingNotificationState.Hidden)
+                } else {
+                    expenseDao.observeActiveParking(vehicle.id).map { parking ->
+                        // ⚠️ 若 ExpenseRecord 的"通知已忽略"字段名不是
+                        //    notificationIgnored（比如 isNotificationIgnored），
+                        //    请按实际字段名调整此处判断。
+                        if (parking != null && parking.isActive && !parking.notificationIgnored) {
+                            ParkingNotificationState.Visible(
+                                vehicleId = vehicle.id,
+                                locationName = parking.locationName,
+                                floor = parking.floor,
+                                area = parking.area,
+                                spotNumber = parking.spotNumber
+                            )
+                        } else {
+                            ParkingNotificationState.Hidden
+                        }
+                    }
+                }
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(STOP_TIMEOUT),
+                ParkingNotificationState.NotReady
+            )
+    // =========================================================
     // 油耗计算状态
     // =========================================================
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -725,4 +773,18 @@ class MainViewModel(
             false
         }
     }
+}
+sealed interface ParkingNotificationState {
+    /** 数据库首次加载完成前，禁止任何通知操作（防止重启误取消） */
+    data object NotReady : ParkingNotificationState
+    /** 当前车辆没有有效的激活停车记录，应取消通知 */
+    data object Hidden : ParkingNotificationState
+    /** 应显示的通知内容 */
+    data class Visible(
+        val vehicleId: Long,
+        val locationName: String?,
+        val floor: String?,
+        val area: String?,
+        val spotNumber: String?
+    ) : ParkingNotificationState
 }

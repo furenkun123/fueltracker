@@ -43,6 +43,7 @@ import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.fueltracker.viewmodel.ParkingNotificationState
 
 @Composable
 fun FuelTrackerApp(
@@ -79,10 +80,20 @@ fun FuelTrackerApp(
     val expenseSelectedCategory = viewModel.expenseSelectedCategory
 
     val activeParking by viewModel.activeParking.collectAsState()
+    val parkingNotificationState by viewModel.parkingNotificationState.collectAsState()
 
-    LaunchedEffect(activeParking) {
-        if (activeParking == null) {
-            ParkingNotification.cancel(context)
+    LaunchedEffect(parkingNotificationState) {
+        when (val s = parkingNotificationState) {
+            ParkingNotificationState.NotReady -> Unit  // 加载中，不动现有通知
+            ParkingNotificationState.Hidden -> ParkingNotification.cancel(context)
+            is ParkingNotificationState.Visible -> ParkingNotification.show(
+                context = context,
+                vehicleId = s.vehicleId,
+                locationName = s.locationName,
+                floor = s.floor,
+                area = s.area,
+                spotNumber = s.spotNumber
+            )
         }
     }
 
@@ -217,12 +228,12 @@ fun FuelTrackerApp(
 
                                     onClearParking = {
                                         viewModel.clearActiveParking()
-                                        ParkingNotification.cancel(context)
+
                                     },
 
                                     onIgnoreParking = {
                                         viewModel.ignoreActiveParkingNotification()
-                                        ParkingNotification.cancel(context)
+
                                     },
 
                                     onCollapseProgressChange = {
