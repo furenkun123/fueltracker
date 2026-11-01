@@ -61,6 +61,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 
 
 private val RECORD_DATE_FORMAT by lazy { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
@@ -114,21 +115,17 @@ fun RecordsScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
-        // 👇 1. 底层滚动列表
         LazyColumn(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .scrollToHideFab(listState, viewModel),
-            // 🚨 改动：内容内边距改为与首页一致（statusBars + 24dp），顶部不再预留 96dp
             contentPadding = PaddingValues(
                 top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 24.dp,
                 bottom = if (isFloating) 120.dp else 80.dp
             ),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // 🚨 新增：标题作为第一个 item，跟随列表滚动，样式与首页 "随记油耗" 一致
             item(key = "records_title") {
                 Text(
                     text = "加油记录",
@@ -151,7 +148,13 @@ fun RecordsScreen(
                 item(key = "empty_state") { EmptyRecordsState(modifier = Modifier.fillMaxWidth().height(300.dp)) }
             } else {
                 items(displayRecords, key = { it.id }) { record ->
-                    FuelRecordCard(record, consumptionMap[record.id], { viewModel.deleteRecord(record) }, { onEdit(record) })
+                    FuelRecordCard(
+                        record = record,
+                        calculationResult = consumptionMap[record.id],
+                        vehicle = vehicle,
+                        onDelete = { viewModel.deleteRecord(record) },
+                        onEdit = { onEdit(record) }
+                    )
                 }
             }
         }
@@ -159,7 +162,6 @@ fun RecordsScreen(
             listState = listState,
             modifier = Modifier.align(Alignment.CenterEnd)
         )
-
     }
 
     if (showDatePicker) {
@@ -226,21 +228,49 @@ private fun RecordFilterBar(filterType: String, year: Int, month: Int, day: Int,
 
 @Composable
 private fun FuelRecordCard(
-    record: FuelRecord, calculationResult: ConsumptionResult?, onDelete: () -> Unit, onEdit: () -> Unit
+    record: FuelRecord,
+    calculationResult: ConsumptionResult?,
+    vehicle: Vehicle?,
+    onDelete: () -> Unit,
+    onEdit: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     val timeText = remember(record.timestamp) { RECORD_DATE_FORMAT.format(Date(record.timestamp)) }
 
-    // 👇 1. 外部绝对不要 vertical padding
+    // 判断逻辑：勾选了加满，但填写的剩余油量和油箱容积相差超过 0.1L
+    val isRemainingFuelAnomaly = vehicle != null &&
+            vehicle.tankCapacity > 0.0 &&
+            record.isFull &&
+            record.remainingFuel != null &&
+            abs(record.remainingFuel - vehicle.tankCapacity) > 0.1
+
     MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        // 👇 2. 内部上下 padding 从 12.dp 降到 10.dp，行间距从 8.dp 降到 6.dp
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                FlowRow(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(timeText, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
-                    if (record.fuelGrade.isNotBlank()) TagChip(record.fuelGrade, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)
+                FlowRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        timeText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    if (record.fuelGrade.isNotBlank()) TagChip(
+                        record.fuelGrade,
+                        MaterialTheme.colorScheme.primary,
+                        MaterialTheme.colorScheme.primaryContainer
+                    )
                     if (record.isFull) TagChip("加满", Color(0xFF34C759), Color(0xFFE8F8EC))
                     if (record.hasMissedRecord) TagChip("含漏记", Color(0xFFFF9500), Color(0xFFFFF4E5))
+
+                    // 新增异常提示标签
+                    if (isRemainingFuelAnomaly) {
+                        TagChip("油量异常", Color(0xFFFF3B30), Color(0xFFFFE5E5))
+                    }
 
                     when {
                         calculationResult?.isOutlier == true -> TagChip("偏离值", Color(0xFFFF3B30), Color(0xFFFFE5E5))
@@ -275,10 +305,18 @@ private fun FuelRecordCard(
 
             val hasExtraInfo = (record.odometer ?: 0.0) > 0 || record.remainingFuel != null || record.hasMissedRecord || record.note.isNotBlank()
             if (hasExtraInfo) {
-                // 👇 3. 底部补充信息的灰底块，上下 padding 也从 6 降到 4
                 Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     if ((record.odometer ?: 0.0) > 0) Text("仪表盘里程: ${record.odometer!!.toInt()} km", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    record.remainingFuel?.takeIf { it.isFinite() }?.let { Text("加油后剩余: %.2f L".format(it), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+
+                    // 剩余油量文本标红
+                    record.remainingFuel?.takeIf { it.isFinite() }?.let {
+                        Text(
+                            text = "加油后剩余: %.2f L".format(it),
+                            fontSize = 11.sp,
+                            color = if (isRemainingFuelAnomaly) Color(0xFFFF3B30) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     if (record.hasMissedRecord) Text("漏记数据: 约 ${record.missedOdometer ?: 0.0} km / ${record.missedVolume ?: 0.0} L", fontSize = 11.sp, color = Color(0xFFFF9500))
                     if (record.note.isNotBlank()) Text("备注: ${record.note}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
                 }

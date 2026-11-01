@@ -41,9 +41,9 @@ import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.ui.miui.MiuiTopBarIconButton
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
+import com.fueltracker.viewmodel.ParkingNotificationState
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.fueltracker.viewmodel.ParkingNotificationState
 
 @Composable
 fun FuelTrackerApp(
@@ -106,19 +106,20 @@ fun FuelTrackerApp(
     val isGlassEnabled = viewModel.isGlassEffectEnabled
 
     // ---------- 返回键处理 ----------
-    BackHandler(enabled = screen != AppScreen.HOME) {
+    // ---------- 统一返回逻辑 ----------
+    val handleBack: () -> Unit = {
         when (screen) {
-            AppScreen.RECORDS ->
+            AppScreen.RECORDS,
+            AppScreen.SETTINGS,
+            AppScreen.EXPENSES,
+            AppScreen.INITIAL_RECORD,
+            AppScreen.ADD_FUEL,
+            AppScreen.ADD_PARKING,
+            AppScreen.EDIT_PARKING ->
                 viewModel.navigateTo(AppScreen.HOME)
 
             AppScreen.ADD_VEHICLE ->
                 viewModel.navigateTo(addVehicleOrigin)
-
-            AppScreen.INITIAL_RECORD ->
-                viewModel.navigateTo(AppScreen.HOME)
-
-            AppScreen.ADD_FUEL ->
-                viewModel.navigateTo(AppScreen.HOME)
 
             AppScreen.EDIT_FUEL -> {
                 viewModel.clearEditingStates()
@@ -130,12 +131,6 @@ fun FuelTrackerApp(
                 viewModel.navigateTo(AppScreen.SETTINGS)
             }
 
-            AppScreen.SETTINGS ->
-                viewModel.navigateTo(AppScreen.HOME)
-
-            AppScreen.EXPENSES ->
-                viewModel.navigateTo(AppScreen.HOME)
-
             AppScreen.ADD_EXPENSE ->
                 viewModel.navigateTo(AppScreen.EXPENSES)
 
@@ -144,17 +139,14 @@ fun FuelTrackerApp(
                 viewModel.navigateTo(AppScreen.EXPENSES)
             }
 
-            AppScreen.ADD_PARKING ->
-                viewModel.navigateTo(AppScreen.HOME)
-
-            AppScreen.EDIT_PARKING -> {
-                viewModel.clearEditingStates()
-                viewModel.navigateTo(AppScreen.HOME)
-            }
-
             AppScreen.HOME -> Unit
         }
     }
+
+    BackHandler(
+        enabled = screen != AppScreen.HOME,
+        onBack = handleBack
+    )
 
     // ============================================================
     // 全 App 内容层
@@ -482,7 +474,13 @@ fun FuelTrackerApp(
         MiuiTopBar(
             backdrop = appBackdrop,
             isGlassEnabled = isGlassEnabled,
+
+            // 只有主页面显示设置按钮
             showActionArea = screen == AppScreen.HOME,
+
+
+            navigationIcon = null,
+
             action = if (screen == AppScreen.HOME) {
                 {
                     MiuiTopBarIconButton(

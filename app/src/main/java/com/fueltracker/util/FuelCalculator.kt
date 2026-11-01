@@ -346,6 +346,17 @@ object FuelCalculator {
         if (records.isEmpty()) return Analysis(emptyList(), emptyList(), emptyMap(), emptySet(), null, false)
 
         val deliveryDate = vehicle?.deliveryDate?.takeIf { it > 0L }
+
+        // 👇 新增：提取有效的初始记录
+        val initialRecord = records.asSequence()
+            .filter { it.isInitialRecord }
+            .filter { deliveryDate == null || it.timestamp >= deliveryDate }
+            .minByOrNull { it.timestamp }
+
+        val initialOdo = initialRecord?.odometer?.takeIf { it.isFinite() && it > 0.0 }
+        val initialFuel = initialRecord?.initialFuel?.takeIf { it.isFinite() && it >= 0.0 }
+            ?: initialRecord?.remainingFuel?.takeIf { it.isFinite() && it >= 0.0 }
+
         val visibleRecords = records.asSequence()
             .filter { isFuelVisible(it, deliveryDate) }
             .sortedWith(RECORD_COMPARATOR)
@@ -368,18 +379,91 @@ object FuelCalculator {
         }
 
         val tankCapacity = vehicle?.tankCapacity?.takeIf { it.isFinite() && it > 0.0 }
-        val initialOdometer = vehicle?.initialOdometer?.takeIf { it.isFinite() && it > 0.0 }
-        val firstAnchor = findFirstAnchor(visibleRecords, nextValidIndex, priorValidOdometer, tankCapacity, initialOdometer)
-            ?: run {
-                val rejected = HashMap<Int, String>()
-                visibleRecords.forEachIndexed { index, record -> if (record.isFull) rejected[index] = REASON_NO_ANCHOR }
-                return Analysis(visibleRecords, emptyList(), rejected, emptySet(), null, false)
-            }
+
+        // 👇 修改：优先用初始记录的里程，其次才用提车里程
+        val effectiveInitialOdometer = initialOdo
+            ?: vehicle?.initialOdometer?.takeIf { it.isFinite() && it > 0.0 }
+
+        val firstAnchor = findFirstAnchor(
+            visibleRecords, nextValidIndex, priorValidOdometer, tankCapacity, effectiveInitialOdometer
+        ) ?: run {
+            val rejected = HashMap<Int, String>()
+            visibleRecords.forEachIndexed { index, record -> if (record.isFull) rejected[index] = REASON_NO_ANCHOR }
+            return Analysis(visibleRecords, emptyList(), rejected, emptySet(), null, false)
+        }
 
         val results = ArrayList<ConsumptionResult>()
         val rejected = HashMap<Int, String>()
         val usedRecordIds = mutableSetOf<Long>()
         val state = SegmentState()
+
+        // 👇 新增：计算“初始记录 -> 第一条满箱”的初始区间
+        if (initialRecord != null && initialOdo != null && initialFuel != null && tankCapacity != null) {
+            val anchorRecord = visibleRecords[firstAnchor.index]
+            val anchorTime = anchorRecord.timestamp
+            val startTime = initialRecord.timestamp
+
+            if (initialOdo < firstAnchor.odometer && startTime < anchorTime) {
+                var intermediateFuel = initialFuel
+                var hasInvalid = false
+
+                // 累加这期间所有的加油量
+                for (r in visibleRecords) {
+                    if (r.timestamp <= startTime) continue
+                    if (r.timestamp >= anchorTime) break
+
+                    // 如果中途有漏记，说明数据不完整，初始区间无法准确计算
+                    if (r.hasMissedRecord) {
+                        hasInvalid = true
+                        break
+                    }
+
+                    if (r.volume.isFinite() && r.volume > 0.0) {
+                        intermediateFuel += r.volume
+                        if (!intermediateFuel.isFinite()) {
+                            hasInvalid = true
+                            break
+                        }
+                    }
+                }
+
+                if (!hasInvalid) {
+                    // 初始区间耗油量 = 初始油量 + 期间加油量 - 满箱容量
+                    val fuelUsed = intermediateFuel - tankCapacity
+                    val distance = firstAnchor.odometer - initialOdo
+
+                    if (fuelUsed.isFinite() && fuelUsed > 0.0 && distance.isFinite() && distance > 0.0) {
+                        val consumption = fuelUsed / distance * 100.0
+                        // 如果算出的油耗在合理范围内，则采纳
+                        if (consumption.isFinite() && consumption in MIN_HARD_CONSUMPTION..MAX_HARD_CONSUMPTION) {
+                            val quality = IntervalQuality(
+                                startOdometerEstimated = false,
+                                intervalRecordCount = visibleRecords.count { it.timestamp in startTime..anchorTime } + 1,
+                                confidenceScore = 0.80, // 初始区间由于精度问题，给个中等置信度
+                                confidence = IntervalConfidence.MEDIUM
+                            )
+                            results.add(
+                                ConsumptionResult(
+                                    recordId = anchorRecord.id, // 结果挂在第一个满箱记录上
+                                    startOdometer = initialOdo,
+                                    endOdometer = firstAnchor.odometer,
+                                    distance = distance,
+                                    fuelUsed = fuelUsed,
+                                    consumption = consumption,
+                                    isEstimated = true,
+                                    algorithm = "INITIAL_TO_FULL",
+                                    quality = quality,
+                                    startTimestamp = startTime,
+                                    endTimestamp = anchorTime
+                                )
+                            )
+                            // 标记该满箱记录已被使用，防止后续重复计算或进入 pending
+                            usedRecordIds.add(anchorRecord.id)
+                        }
+                    }
+                }
+            }
+        }
 
         var segmentStartOdometer = firstAnchor.odometer
         var segmentStartEstimated = firstAnchor.isEstimated

@@ -2,7 +2,6 @@ package com.fueltracker.util
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import androidx.room.withTransaction
 import com.fueltracker.data.AppDatabase
 import com.fueltracker.data.CustomCategoryEntity
@@ -23,9 +22,7 @@ object BackupManager {
 
     private const val FORMAT_VERSION = 2
     private val SUPPORTED_VERSIONS = setOf(1, 2)
-    private const val TAG = "BackupManager"
 
-    // 👇 在这里定义快照数据类，放在 object 内部、函数外部
     private data class BackupSnapshot(
         val vehicles: List<Vehicle>,
         val records: List<FuelRecord>,
@@ -56,13 +53,20 @@ object BackupManager {
         }
 
         vehicles.forEach { vehicle ->
-            require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
-                "数据库存在油箱容量非正数的车辆，无法备份"
+            // 👇 修复：保留完整的校验逻辑和右大括号
+            if (vehicle.fuelType != "纯电动") {
+                require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
+                    "数据库存在油箱容量非正数的燃油车，无法备份"
+                }
+            } else {
+                require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity >= 0.0) {
+                    "数据库存在容量非法的纯电动车，无法备份"
+                }
             }
             requireNullableFiniteNonNegative(vehicle.officialConsumption, "车辆官方油耗")
             requireFiniteNonNegative(vehicle.initialOdometer, "车辆初始里程")
             requireFiniteNonNegative(vehicle.initialFuel, "车辆初始油量")
-        }
+        } // 👈 这个括号必须有！
 
         records.forEach { record ->
             require(record.timestamp > 0L) { "数据库存在无效加油时间，无法备份" }
@@ -148,14 +152,9 @@ object BackupManager {
         }
     }
 
-    // ============================================================
-    // 备份
-    // ============================================================
-
     suspend fun createBackupJson(context: Context): String = withContext(Dispatchers.IO) {
         val db = AppDatabase.getInstance(context)
 
-        // 👇 用自己定义的 BackupSnapshot 替换不存在的 Quadruple
         val snapshot = db.withTransaction {
             BackupSnapshot(
                 vehicles = db.vehicleDao().getAllVehicles(),
@@ -239,17 +238,12 @@ object BackupManager {
                     })
                 }
             })
-            // 👇 必须使用 snapshot.categories，确保导出时数据和分类在同一事务快照下
             put("customCategories", JSONArray().apply {
                 snapshot.categories.forEach { put(it) }
             })
         }
         root.toString(2)
     }
-
-    // ============================================================
-    // 恢复
-    // ============================================================
 
     suspend fun restoreFromJson(context: Context, jsonText: String): List<String>? =
         withContext(Dispatchers.IO) {
@@ -271,10 +265,16 @@ object BackupManager {
                 val initialOdometer = json.requireDouble("initialOdometer")
                 val initialFuel = json.requireDouble("initialFuel")
                 val officialConsumption = json.getNullableDouble("officialConsumption")
+                val fuelType = json.requireString("fuelType")
+
+                // 👇 修复：只保留这个 if-else 校验，彻底删掉后面的 require(tankCapacity > 0)
+                if (fuelType != "纯电动") {
+                    require(tankCapacity.isFinite() && tankCapacity > 0.0) { "燃油车油箱容量必须大于 0" }
+                } else {
+                    require(tankCapacity.isFinite() && tankCapacity >= 0.0) { "纯电动车容量不能为负数" }
+                }
 
                 if (id <= 0L) throw IllegalArgumentException("车辆 ID 非法")
-                requireFiniteNonNegative(tankCapacity, "车辆油箱容量")
-                require(tankCapacity > 0.0) { "车辆油箱容量必须大于 0" }
                 requireFiniteNonNegative(initialOdometer, "车辆初始里程")
                 requireFiniteNonNegative(initialFuel, "车辆初始油量")
                 requireNullableFiniteNonNegative(officialConsumption, "车辆官方油耗")
@@ -286,7 +286,7 @@ object BackupManager {
                         series = json.requireString("series"),
                         year = json.requireInt("year"),
                         model = json.requireString("model"),
-                        fuelType = json.requireString("fuelType"),
+                        fuelType = fuelType,
                         fuelGrade = json.requireString("fuelGrade"),
                         tankCapacity = tankCapacity,
                         officialConsumption = officialConsumption,
@@ -454,10 +454,6 @@ object BackupManager {
             customCategories
         }
 
-    // ============================================================
-    // 文件读写
-    // ============================================================
-
     suspend fun writeBackupToUri(context: Context, uri: Uri) =
         withContext(Dispatchers.IO) {
             val json = createBackupJson(context)
@@ -476,10 +472,6 @@ object BackupManager {
             restoreFromJson(context, json)
         }
 }
-
-// ============================================================
-// 严格的数据校验与 JSON 解析辅助
-// ============================================================
 
 private fun requireFiniteNonNegative(value: Double, fieldName: String) {
     require(value.isFinite() && value >= 0.0) { "备份文件损坏：${fieldName}必须是有效的非负数" }

@@ -21,7 +21,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +49,10 @@ import com.fueltracker.util.toMoneyText
 import com.fueltracker.util.toPercentText
 import com.fueltracker.util.toPlainMoneyText
 import kotlinx.coroutines.flow.firstOrNull
+import java.util.Locale
+import com.fueltracker.ui.components.MiuiBottomSheetWrapper
+import com.fueltracker.ui.components.WheelList
+import com.fueltracker.ui.components.WheelStyle
 
 @Composable
 fun SummaryCard(
@@ -88,77 +95,174 @@ fun ExpenseTrendCard(
     val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
     val textMeasurer = rememberTextMeasurer()
 
+    // 弹窗与临时选中状态
+    var showYearPicker by remember { mutableStateOf(false) }
+    var tempSelectedYear by remember { mutableStateOf<Int?>(null) }
+
+    val selectedYearText = if (selectedYear == null) "全部年份" else "${selectedYear}年"
+
     MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.padding(16.dp)) {
-            Text(
-                if (selectedYear == null) "费用趋势 · 全部" else "费用趋势 · ${selectedYear}年",
-                fontSize = 13.sp, fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                MiuiFilterChip("全部", selectedYear == null) { onYearSelected(null) }
-                years.forEach { y -> MiuiFilterChip("${y}年", selectedYear == y) { onYearSelected(y) } }
+            // 标题行
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    if (selectedYear == null) "费用趋势 · 全部" else "费用趋势 · ${selectedYear}年",
+                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                )
+
+                MiuiFilterChip(
+                    text = "$selectedYearText ▼",
+                    selected = true,
+                    onClick = {
+                        tempSelectedYear = selectedYear
+                        showYearPicker = true
+                    }
+                )
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(16.dp))
 
             if (points.isEmpty()) {
-                Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
                     Text("该范围暂无费用记录", fontSize = 12.sp, color = onSurfaceVariantColor)
                 }
-                return@Column
-            }
+            } else {
+                val maxValue = points.maxOf { it.value }
+                val yMax = if (maxValue > 0) maxValue * 1.15 else 1.0
 
-            val maxValue = points.maxOf { it.value }
-            val yMax = if (maxValue > 0) maxValue * 1.15 else 1.0
-
-            val valueLayouts = remember(points, onSurfaceColor) {
-                points.map { textMeasurer.measure(it.value.toIntMoneyText(), TextStyle(color = onSurfaceColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)) }
-            }
-            val timeLayouts = remember(points, onSurfaceVariantColor) {
-                points.mapIndexed { index, point ->
-                    val label = if (index == 0 || points[index - 1].year != point.year) "${point.year % 100}年${point.month}月" else "${point.month}月"
-                    textMeasurer.measure(label, TextStyle(color = onSurfaceVariantColor, fontSize = 8.sp))
+                val valueLayouts = remember(points, onSurfaceColor) {
+                    points.map {
+                        textMeasurer.measure(
+                            it.value.toIntMoneyText(),
+                            TextStyle(color = onSurfaceColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        )
+                    }
                 }
-            }
 
-            val chartAreaHeight = 94.dp
-            val timeAxisHeight = 18.dp
-            val scrollState = rememberScrollState()
-            val visibleCount = 13
-            val barCount = points.size
-
-            LaunchedEffect(barCount, selectedYear) {
-                if (barCount > visibleCount) {
-                    snapshotFlow { scrollState.maxValue }.firstOrNull { it > 0 }?.let { scrollState.scrollTo(it) }
-                } else {
-                    scrollState.scrollTo(0)
+                val timeLayouts = remember(points, onSurfaceVariantColor) {
+                    points.map { point ->
+                        val label = String.format(Locale.getDefault(), "%02d/%02d", point.year % 100, point.month)
+                        textMeasurer.measure(label, TextStyle(color = onSurfaceVariantColor, fontSize = 9.sp))
+                    }
                 }
-            }
 
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val chartWidth = if (barCount <= visibleCount) maxWidth else (maxWidth / visibleCount) * barCount
-                Box(Modifier.fillMaxWidth().horizontalScroll(scrollState)) {
-                    Canvas(Modifier.width(chartWidth).height(chartAreaHeight + timeAxisHeight + 16.dp)) {
-                        val slotWidth = size.width / barCount
-                        val barWidth = (slotWidth * 0.5f).coerceIn(4.dp.toPx(), 40.dp.toPx())
-                        val chartHeight = size.height - timeAxisHeight.toPx() - 16.dp.toPx()
-                        val topPadding = 16.dp.toPx()
+                val scrollState = rememberScrollState()
+                val visibleCount = 10 // 当前你设置的 10 个月
+                val barCount = points.size
 
-                        points.forEachIndexed { index, point ->
-                            val center = index * slotWidth + slotWidth / 2f
-                            val barHeight = (chartHeight * (point.value / yMax).toFloat().coerceIn(0f, 1f)).coerceAtLeast(2.dp.toPx())
-                            val barTop = topPadding + chartHeight - barHeight
+                LaunchedEffect(barCount, selectedYear) {
+                    if (barCount > visibleCount) {
+                        snapshotFlow { scrollState.maxValue }.firstOrNull { it > 0 }?.let { scrollState.scrollTo(it) }
+                    } else {
+                        scrollState.scrollTo(0)
+                    }
+                }
 
-                            drawRoundRect(
-                                if (index == barCount - 1) primaryColor else primaryColor.copy(alpha = 0.55f),
-                                Offset(center - barWidth / 2f, barTop), Size(barWidth, barHeight), CornerRadius(4.dp.toPx())
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val chartWidth = if (barCount <= visibleCount) maxWidth else (maxWidth / visibleCount) * barCount
+
+                    Box(Modifier.fillMaxWidth().horizontalScroll(scrollState)) {
+                        Canvas(Modifier.width(chartWidth).height(180.dp)) {
+                            val topSpace = 32.dp.toPx()
+                            val chartHeight = 110.dp.toPx()
+                            val bottomY = topSpace + chartHeight
+
+                            val slotWidth = size.width / barCount
+
+                            val coordinates = points.mapIndexed { index, point ->
+                                val x = index * slotWidth + slotWidth / 2f
+                                val y = bottomY - (chartHeight * (point.value / yMax).toFloat().coerceIn(0f, 1f))
+                                Offset(x, y)
+                            }
+
+                            val areaPath = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(coordinates.first().x, bottomY)
+                                coordinates.forEach { lineTo(it.x, it.y) }
+                                lineTo(coordinates.last().x, bottomY)
+                                close()
+                            }
+                            drawPath(
+                                path = areaPath,
+                                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    colors = listOf(primaryColor.copy(alpha = 0.3f), Color.Transparent),
+                                    startY = topSpace,
+                                    endY = bottomY
+                                )
                             )
-                            drawText(valueLayouts[index], topLeft = Offset(center - valueLayouts[index].size.width / 2f, barTop - valueLayouts[index].size.height - 2.dp.toPx()))
-                            drawText(timeLayouts[index], topLeft = Offset(center - timeLayouts[index].size.width / 2f, topPadding + chartHeight + 4.dp.toPx()))
+
+                            val linePath = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(coordinates.first().x, coordinates.first().y)
+                                coordinates.drop(1).forEach { lineTo(it.x, it.y) }
+                            }
+                            drawPath(
+                                path = linePath,
+                                color = primaryColor,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                            )
+
+                            points.forEachIndexed { index, point ->
+                                val centerPoint = coordinates[index]
+
+                                drawCircle(color = Color.White, radius = 3.5.dp.toPx(), center = centerPoint)
+                                drawCircle(color = primaryColor, radius = 2.5.dp.toPx(), center = centerPoint)
+
+                                val textLayout = valueLayouts[index]
+                                val textX = (centerPoint.x - textLayout.size.width / 2f).coerceIn(0f, size.width - textLayout.size.width)
+
+                                var isAbove = index == 0 || point.value >= points[index - 1].value
+
+                                if (isAbove && (centerPoint.y - textLayout.size.height - 4.dp.toPx() < 0f)) {
+                                    isAbove = false
+                                }
+                                if (!isAbove && (centerPoint.y + textLayout.size.height + 4.dp.toPx() > bottomY - 16.dp.toPx())) {
+                                    isAbove = true
+                                }
+
+                                val textY = if (isAbove) {
+                                    centerPoint.y - textLayout.size.height - 4.dp.toPx()
+                                } else {
+                                    centerPoint.y + 4.dp.toPx()
+                                }
+
+                                drawText(textLayout, topLeft = Offset(textX, textY))
+
+                                val timeLayout = timeLayouts[index]
+                                val timeX = (centerPoint.x - timeLayout.size.width / 2f).coerceIn(0f, size.width - timeLayout.size.width)
+                                val timeY = bottomY + 6.dp.toPx()
+
+                                drawText(timeLayout, topLeft = Offset(timeX, timeY))
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+
+    // 👇 核心修复：弹窗放在 Canvas 和 BoxWithConstraints 外部，直接放在 Composable 函数内
+    if (showYearPicker) {
+        val yearOptions = listOf<Int?>(null) + years
+
+        MiuiBottomSheetWrapper(
+            title = "选择年份",
+            onDismiss = { showYearPicker = false },
+            onConfirm = {
+                onYearSelected(tempSelectedYear)
+                showYearPicker = false
+            }
+        ) {
+            WheelList(
+                selectedValue = tempSelectedYear,
+                items = yearOptions,
+                modifier = Modifier.fillMaxWidth(),
+                visibleCount = 3,
+                style = WheelStyle.WithBackground,
+                itemLabel = { it?.let { y -> "${y}年" } ?: "全部年份" },
+                onChange = { tempSelectedYear = it }
+            )
         }
     }
 }
