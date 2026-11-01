@@ -1,5 +1,6 @@
 package com.fueltracker.ui
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -65,6 +67,9 @@ fun InitialRecordScreen(
     val fuelValue = currentFuel.toDoubleOrNull()
     val isFuelValid = fuelValue == null || (fuelValue >= 0 && fuelValue <= currentVehicle.tankCapacity)
     val canSave = odometerValue != null && odometerValue >= 0 && isFuelValid
+
+    val context = LocalContext.current
+    var isSaving by remember { mutableStateOf(false) }
 
     BackHandler(enabled = true) {
         showSkipConfirm = true
@@ -149,10 +154,21 @@ fun InitialRecordScreen(
 
             MiuiButton(
                 text = "开始记录",
-                enabled = canSave,
+                enabled = canSave && !isSaving,
                 onClick = {
-                    viewModel.addInitialRecord(odometerValue, fuelValue)
-                    onCompleted()
+                    isSaving = true
+                    viewModel.addInitialRecord(odometerValue, fuelValue) { result ->
+                        isSaving = false
+                        if (result.isSuccess) {
+                            onCompleted()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "保存失败：${result.exceptionOrNull()?.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
                 }
             )
 

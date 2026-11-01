@@ -335,14 +335,26 @@ class MainViewModel(
     // =========================================================
     // 车辆操作
     // =========================================================
-    fun addVehicle(vehicle: Vehicle, onComplete: (() -> Unit)? = null) {
+    fun addVehicle(vehicle: Vehicle, onComplete: (Result<Unit>) -> Unit = {}) {
         viewModelScope.launch {
-            try {
+            val result = try {
+                // 👇 底层兜底校验（防止 UI 绕过）
+                require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) { "车辆品牌和车型不能为空" }
+                require(vehicle.initialOdometer >= 0.0) { "提车里程不能为负数" }
+                if (vehicle.fuelType != "纯电动") {
+                    require(vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0" }
+                }
+
                 val newId = vehicleDao.insertAsCurrent(vehicle.copy(isCurrent = true))
                 _currentVehicleOverride.value = vehicle.copy(id = newId, isCurrent = true)
-                onComplete?.invoke()
-            } catch (e: CancellationException) { throw e
-            } catch (e: Exception) { Log.e(TAG, "addVehicle failed", e) }
+                Result.success(Unit)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "addVehicle failed", e)
+                Result.failure(e)
+            }
+            onComplete(result)
         }
     }
 
@@ -366,24 +378,34 @@ class MainViewModel(
         }
     }
 
-    fun updateVehicle(vehicle: Vehicle) {
+    fun updateVehicle(vehicle: Vehicle, onComplete: (Result<Unit>) -> Unit = {}) {
         viewModelScope.launch {
             val prev = _currentVehicleOverride.value
-            try {
+            val result = try {
+                // 👇 底层兜底校验
+                require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) { "车辆品牌和车型不能为空" }
+                require(vehicle.initialOdometer >= 0.0) { "提车里程不能为负数" }
+                if (vehicle.fuelType != "纯电动") {
+                    require(vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0" }
+                }
+
                 val old = vehicleDao.getVehicleById(vehicle.id) ?: throw IllegalArgumentException("车辆不存在")
                 val updated = vehicle.copy(isCurrent = old.isCurrent)
                 if (currentVehicle.value?.id == vehicle.id || prev?.id == vehicle.id) {
                     _currentVehicleOverride.value = updated
                 }
-                // 👇 DAO 必须返回 Int
                 if (vehicleDao.update(updated) != 1) {
                     throw IllegalStateException("更新失败，车辆可能已被删除")
                 }
-            } catch (e: CancellationException) { throw e
+                Result.success(Unit)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "updateVehicle failed", e)
                 _currentVehicleOverride.value = prev
+                Result.failure(e)
             }
+            onComplete(result)
         }
     }
 
@@ -631,10 +653,10 @@ class MainViewModel(
     // =========================================================
     // 初始记录与备份恢复
     // =========================================================
-    fun addInitialRecord(odometer: Double?, currentFuel: Double?) {
+    fun addInitialRecord(odometer: Double?, currentFuel: Double?, onComplete: (Result<Unit>) -> Unit = {}) {
         viewModelScope.launch {
-            try {
-                val vehicle = getCurrentVehicleFromDatabase() ?: return@launch
+            val result = try {
+                val vehicle = getCurrentVehicleFromDatabase() ?: throw IllegalStateException("当前无车辆，无法保存初始记录")
                 requireNullableNonNegative(odometer, "初始里程")
                 requireNullableNonNegative(currentFuel, "当前油量")
 
@@ -653,10 +675,14 @@ class MainViewModel(
                         )
                     )
                 }
-            } catch (e: CancellationException) { throw e
+                Result.success(Unit)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "addInitialRecord failed", e)
+                Result.failure(e)
             }
+            onComplete(result)
         }
     }
 

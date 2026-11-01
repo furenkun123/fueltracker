@@ -1,16 +1,42 @@
 package com.fueltracker.ui
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,7 +52,12 @@ import com.fueltracker.data.Vehicle
 import com.fueltracker.ui.components.MiuiBottomSheetWrapper
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
-import com.fueltracker.ui.miui.*
+import com.fueltracker.ui.miui.MiuiBackButton
+import com.fueltracker.ui.miui.MiuiButton
+import com.fueltracker.ui.miui.MiuiClickableItem
+import com.fueltracker.ui.miui.MiuiGroupCard
+import com.fueltracker.ui.miui.MiuiInputItem
+import com.fueltracker.ui.miui.MiuiSectionHeader
 import com.fueltracker.viewmodel.MainViewModel
 import java.util.Calendar
 import java.util.Locale
@@ -64,8 +95,11 @@ fun VehicleScreen(
 ) {
     val isEditMode = vehicle != null
     val context = LocalContext.current
+    var isSaving by remember { mutableStateOf(false) }
     val carDatabase = remember { CarDatabase.get(context) }
     var allBrands by remember { mutableStateOf<List<CarBrand>>(emptyList()) }
+
+
 
     // 👇 双保险：直接判断当前背景的亮度，决定文字用黑还是白
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
@@ -109,9 +143,18 @@ fun VehicleScreen(
         deliveryDateMillis?.let { java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(java.util.Date(it)) } ?: "未填写"
     }
 
-    val canSave = brand.isNotBlank() && model.isNotBlank() &&
-            (fuelType == "纯电动" || tankCapacity.toDoubleOrNull() != null) &&
-            initialOdometer.toDoubleOrNull() != null
+    // 提前解析数值
+    val parsedCapacity = tankCapacity.toDoubleOrNull()
+    val parsedOdometer = initialOdometer.toDoubleOrNull()
+
+// 校验逻辑：
+// 1. 品牌、车型必填
+// 2. 非纯电：油箱容量必填且必须 > 0
+// 3. 提车里程必填且必须 >= 0
+    val isCapacityValid = fuelType == "纯电动" || (parsedCapacity != null && parsedCapacity > 0.0)
+    val isOdometerValid = parsedOdometer != null && parsedOdometer >= 0.0
+
+    val canSave = brand.isNotBlank() && model.isNotBlank() && isCapacityValid && isOdometerValid
 
     if (showCarPicker) {
         BackHandler { showCarPicker = false }
@@ -231,6 +274,15 @@ fun VehicleScreen(
                 HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
                 MiuiInputItem("油箱容量 (L)", tankCapacity, { tankCapacity = it }, "例如：50", KeyboardType.Decimal)
+                // 👇 新增：油箱错误提示
+                if (tankCapacity.isNotBlank() && (parsedCapacity == null || parsedCapacity <= 0.0)) {
+                    Text(
+                        text = "油箱容量必须大于 0",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 20.dp, top = 4.dp, bottom = 8.dp)
+                    )
+                }
                 HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
             }
 
@@ -238,29 +290,54 @@ fun VehicleScreen(
             HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
             MiuiInputItem("提车里程 (km)", initialOdometer, { initialOdometer = it }, "例如：20", KeyboardType.Decimal)
+            // 👇 新增：里程错误提示
+            if (initialOdometer.isNotBlank() && (parsedOdometer == null || parsedOdometer < 0.0)) {
+                Text(
+                    text = "提车里程不能为负数",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 20.dp, top = 4.dp, bottom = 8.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(28.dp))
 
         MiuiButton(
             text = if (isEditMode) "保存修改" else "确认添加",
-            enabled = canSave,
+            enabled = canSave && !isSaving,  // 👈 增加防抖
             onClick = {
+                isSaving = true
                 val parsedYear = year.removeSuffix("年").toIntOrNull() ?: Calendar.getInstance().get(Calendar.YEAR)
-                val parsedCapacity = tankCapacity.toDoubleOrNull() ?: 0.0
-                val parsedOdometer = initialOdometer.toDoubleOrNull() ?: 0.0
+
+                // 纯电车型 parsedCapacity 为 null 时，保留旧的 tankCapacity，防止被覆盖成 0
+                val finalCapacity = parsedCapacity ?: (vehicle?.tankCapacity ?: 0.0)
+                val finalOdometer = parsedOdometer ?: 0.0
 
                 val baseVehicle = (vehicle ?: Vehicle(brand="", series="", model="", year=0, fuelType="", fuelGrade="", tankCapacity=0.0, initialOdometer=0.0)).copy(
                     brand = brand.trim(), series = series.trim(), model = model.trim(),
                     year = parsedYear, fuelType = fuelType.trim(), fuelGrade = fuelGrade.trim(),
-                    tankCapacity = parsedCapacity, initialOdometer = parsedOdometer, deliveryDate = deliveryDateMillis
+                    tankCapacity = finalCapacity, initialOdometer = finalOdometer, deliveryDate = deliveryDateMillis
                 )
 
+                // 👇 统一回调处理
+                val onResult: (Result<Unit>) -> Unit = { result ->
+                    isSaving = false
+                    if (result.isSuccess) {
+                        onSaved()
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "保存失败：${result.exceptionOrNull()?.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+
                 if (isEditMode) {
-                    viewModel.updateVehicle(baseVehicle)
-                    onSaved()
+                    viewModel.updateVehicle(baseVehicle, onResult)
                 } else {
-                    viewModel.addVehicle(baseVehicle.copy(isCurrent = true)) { onSaved() }
+                    viewModel.addVehicle(baseVehicle.copy(isCurrent = true), onResult)
                 }
             }
         )
