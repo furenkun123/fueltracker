@@ -35,10 +35,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +65,7 @@ import com.fueltracker.ui.miui.MiuiButton
 import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.util.toDateTimeText
 import com.fueltracker.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun ExpenseEditScreen(
@@ -73,8 +76,10 @@ fun ExpenseEditScreen(
 ) {
     val context = LocalContext.current
     val isEditMode = record != null
+    val scope = rememberCoroutineScope()
 
-    var customCategories by remember { mutableStateOf(ExpenseCategoryStore.getCustom()) }
+    val customCategories by ExpenseCategoryStore.customCategories.collectAsState()
+
     val allCategories = remember(customCategories) { DEFAULT_EXPENSE_CATEGORIES + customCategories }
 
     var category by remember(record) { mutableStateOf(record?.category ?: DEFAULT_EXPENSE_CATEGORIES.first()) }
@@ -218,9 +223,10 @@ fun ExpenseEditScreen(
             confirmText = "创建", confirmEnabled = trimmedNewName.isNotEmpty() && !isDuplicate,
             onConfirm = {
                 if (trimmedNewName.isNotEmpty()) {
-                    ExpenseCategoryStore.add(trimmedNewName)
-                    customCategories = ExpenseCategoryStore.getCustom()
-                    category = trimmedNewName
+                    scope.launch {
+                        ExpenseCategoryStore.add(trimmedNewName)
+                        category = trimmedNewName
+                    }
                 }
                 showAddCategoryDialog = false
             },
@@ -235,7 +241,6 @@ fun ExpenseEditScreen(
             onSave = { newName ->
                 viewModel.renameExpenseCategory(cat, newName) { result ->
                     result.onSuccess {
-                        customCategories = ExpenseCategoryStore.getCustom()
                         if (category == cat) category = newName.trim()
                         editingCategory = null
                     }.onFailure { error ->
@@ -244,10 +249,12 @@ fun ExpenseEditScreen(
                 }
             },
             onDelete = {
-                ExpenseCategoryStore.remove(cat)
-                customCategories = ExpenseCategoryStore.getCustom()
-                if (category == cat) category = DEFAULT_EXPENSE_CATEGORIES.first()
-                editingCategory = null
+                scope.launch {
+                    ExpenseCategoryStore.remove(cat)
+                    // customCategories 会在 StateFlow 中自动更新，不需要手动赋值
+                    if (category == cat) category = DEFAULT_EXPENSE_CATEGORIES.first()
+                    editingCategory = null
+                }
             },
             onDismiss = { editingCategory = null }
         )

@@ -1,104 +1,91 @@
 package com.fueltracker.data
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
-import android.util.Log
+import androidx.core.content.edit // 👈 新增：KTX edit 扩展函数
+import androidx.room.withTransaction // 👈 新增：Room withTransaction 扩展函数
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 object ExpenseCategoryStore {
 
-    private const val PREFS = "expense_category_prefs"
-    private const val KEY_CUSTOM = "custom_categories"
+    private lateinit var db: AppDatabase
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private lateinit var prefs: SharedPreferences
+    // 内存缓存：便于 UI 同步调用 getCustom()
+    private val _customCategories = MutableStateFlow<List<String>>(emptyList())
+    val customCategories: StateFlow<List<String>> = _customCategories.asStateFlow()
 
     fun init(context: Context) {
-        if (!::prefs.isInitialized) {
-            prefs = context.applicationContext
-                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (::db.isInitialized) return
+        db = AppDatabase.getInstance(context)
+        val dao = db.customCategoryDao()
+
+        scope.launch {
+            // 1. 先尝试迁移旧的 SP 数据
+            val prefs = context.getSharedPreferences("expense_category_prefs", Context.MODE_PRIVATE)
+            val hasMigrated = prefs.getBoolean("migrated_to_room", false)
+
+            if (!hasMigrated) {
+                val oldSet = prefs.getStringSet("custom_categories", emptySet()).orEmpty()
+                if (oldSet.isNotEmpty()) {
+                    val entities = oldSet.map { CustomCategoryEntity(it) }
+                    dao.insertAll(entities)
+                }
+                // 👇 修复警告：改用 KTX 的 edit { } 写法，更加简洁
+                prefs.edit {
+                    putBoolean("migrated_to_room", true)
+                    remove("custom_categories")
+                }
+            }
+
+            // 2. 迁移完成后再开启监听，并同步给缓存
+            dao.observeAll().collect {
+                _customCategories.value = it
+            }
         }
     }
-    private fun normalize(categories: List<String>): Set<String> {
-        val result = LinkedHashSet<String>()
-        for (raw in categories) {
-            val name = raw.trim()
-            if (name.isEmpty()) continue
-            // 过滤默认分类（大小写不敏感）
-            if (DEFAULT_EXPENSE_CATEGORIES.any { it.equals(name, ignoreCase = true) }) continue
-            // 去重（大小写不敏感），保留第一个出现的写法
-            if (result.any { it.equals(name, ignoreCase = true) }) continue
-            result.add(name)
-        }
-        return result
-    }
 
-    fun getCustom(): List<String> =
-        prefs.getStringSet(KEY_CUSTOM, emptySet())
-            ?.toList()
-            ?.sorted()
-            .orEmpty()
+    // 同步返回缓存数据
+    fun getCustom(): List<String> = _customCategories.value
 
-    fun add(name: String) {
+    // 以下方法改为 suspend，交由协程处理
+    suspend fun add(name: String) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         if (DEFAULT_EXPENSE_CATEGORIES.any { it.equals(trimmed, ignoreCase = true) }) return
 
-        val current = prefs.getStringSet(KEY_CUSTOM, emptySet()).orEmpty()
-        if (current.any { it.equals(trimmed, ignoreCase = true) }) return   // 👈 核心
-
-        val newSet = current.toMutableSet().apply { add(trimmed) }
-        prefs.edit { putStringSet(KEY_CUSTOM, newSet) }
+        // Room 主键冲突会报错，利用 IGNORE 静默忽略
+        db.customCategoryDao().insert(CustomCategoryEntity(trimmed))
     }
 
-    fun remove(name: String) {
-        val current = prefs.getStringSet(KEY_CUSTOM, emptySet()).orEmpty()
-        val filtered = current.filterNot { it.equals(name, ignoreCase = true) }.toSet()
-        prefs.edit { putStringSet(KEY_CUSTOM, filtered) }
+    suspend fun remove(name: String) {
+        // 忽略大小写删除
+        db.customCategoryDao().getAll()
+            .filter { it.equals(name, ignoreCase = true) }
+            .forEach { db.customCategoryDao().delete(it) }
     }
 
-    @Suppress("UseKtx")
-    fun update(oldName: String, newName: String): Boolean {
+    suspend fun update(oldName: String, newName: String): Boolean {
         val trimmed = newName.trim()
         if (trimmed.isEmpty()) return false
-
         if (DEFAULT_EXPENSE_CATEGORIES.any { it.equals(trimmed, ignoreCase = true) }) return false
 
-        val current = prefs.getStringSet(KEY_CUSTOM, emptySet()).orEmpty()
+        val current = db.customCategoryDao().getAll()
+        val actualOld = current.firstOrNull { it.equals(oldName, ignoreCase = true) } ?: return false
 
-        // ① 用 ignoreCase 找到实际存储的原值，防止 UI 传的 oldName 和 SP 里的写法不一致
-        val actualOld = current.firstOrNull { it.equals(oldName, ignoreCase = true) }
-            ?: return false
-
-        // ② 新名和实际存储值完全一致（含大小写）才视为「无变化」
-        //    如果只有大小写差异，视为用户有意规范写法，允许改动
         if (trimmed == actualOld) return false
-
-        // ③ 冲突检查要排除 actualOld 自身（而不是用户传入的 oldName）
         if (current.any { it != actualOld && it.equals(trimmed, ignoreCase = true) }) return false
 
-        val newSet = current.toMutableSet()
-        newSet.remove(actualOld)
-        newSet.add(trimmed)
-        return prefs.edit().putStringSet(KEY_CUSTOM, newSet).commit()
-    }
-
-    /**
-     * 同步版本，供事务内需要确认成败的场景使用（如备份恢复）。
-     *
-     * 这里刻意不用 KTX 的 edit(commit = true) {} —— 它丢弃了 commit() 的返回值，
-     * 无法得知写入是否成功，会破坏 BackupManager 的「DB + SP 原子恢复」逻辑。
-     *
-     * @return true 表示确实写入成功
-     */
-    @Suppress("UseKtx", "ApplySharedPref")
-    fun replaceAllSync(categories: List<String>): Boolean {
-        return ::prefs.isInitialized && try {
-            prefs.edit()
-                .putStringSet(KEY_CUSTOM, normalize(categories))
-                .commit()            // ← 唯一能拿到 Boolean 结果的写法
-        } catch (e: Exception) {
-            Log.e("ExpenseCategoryStore", "replaceAllSync failed", e)
-            false
+        // 由于主键是 name，改名相当于 删旧增新
+        db.withTransaction { // 👈 import 加上后，这里就不会再报错了
+            db.customCategoryDao().delete(actualOld)
+            db.customCategoryDao().insert(CustomCategoryEntity(trimmed))
         }
+        return true
     }
 }

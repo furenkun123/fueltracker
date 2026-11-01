@@ -82,24 +82,31 @@ object XiaoxiongCsvImporter {
                     FALLBACKUNITPRICE
                 }
 
-                // 修复：计算出的油量必须有限且大于 0，防止 Double.MAX_VALUE / 0.01 溢出
-                val volume = row.paidAmount / unitPrice
+                // 👇 修复 1：确定有效的原价（若原价小于实付，说明数据异常，直接丢弃原价）
+                val validOriginalPrice = row.originalPrice.takeIf { it >= row.paidAmount - 0.01 && it > 0.0 }
+
+                // 👇 修复 2：优先用原价计算升数，保证 volume * unitPrice == totalAmount
+                val volume = if (validOriginalPrice != null) {
+                    validOriginalPrice / unitPrice
+                } else {
+                    row.paidAmount / unitPrice
+                }
+
                 if (!volume.isFinite() || volume <= 0.0) {
                     skipCount++
                     return@mapNotNull null
                 }
 
-                // 修复：合并备注信息，避免“估算”覆盖“油灯亮”
+                // 合并备注信息，避免“估算”覆盖“油灯亮”
                 val noteParts = mutableListOf("小熊导入")
                 if (isEstimated) noteParts.add("单价异常(油量估算)")
                 if (row.hasWarningLight) noteParts.add("油灯亮")
                 val finalNote = noteParts.joinToString(" · ")
 
-                // 👇 核心修复：计算折扣并清洗原价
-                // 只有当原价确实大于实付金额（差值超过 0.01）时，才保留原价并计算优惠
-                val validTotalAmount = row.originalPrice.takeIf { it > row.paidAmount + 0.01 }
-                val finalDiscount = validTotalAmount?.let {
-                    it - row.paidAmount
+                // 👇 修复 3：计算优惠金额，容差设定为 0.01
+                val finalDiscount = validOriginalPrice?.let { orig ->
+                    val diff = orig - row.paidAmount
+                    if (diff > 0.01) diff else null
                 }
 
                 FuelRecord(
@@ -109,11 +116,8 @@ object XiaoxiongCsvImporter {
                     volume = volume,
                     unitPrice = unitPrice,
                     actualPaidAmount = row.paidAmount,
-
-                    // 👇 替换这里的赋值
-                    totalAmount = validTotalAmount,
+                    totalAmount = validOriginalPrice,
                     discount = finalDiscount,
-
                     fuelGrade = normalizeFuelGrade(row.fuelGrade),
                     isFull = row.isFull,
                     note = finalNote,

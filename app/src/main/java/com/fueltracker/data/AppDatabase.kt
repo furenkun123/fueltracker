@@ -12,9 +12,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         Vehicle::class,
         FuelRecord::class,
-        ExpenseRecord::class
+        ExpenseRecord::class,
+        CustomCategoryEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +25,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun fuelDao(): FuelDao
 
     abstract fun expenseDao(): ExpenseDao
+
+    abstract fun customCategoryDao(): CustomCategoryDao
 
 
     companion object {
@@ -86,6 +89,14 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
         }
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `custom_categories` " +
+                            "(`name` TEXT NOT NULL, PRIMARY KEY(`name`))"
+                )
+            }
+        }
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -94,7 +105,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "fuel_tracker.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4,MIGRATION_4_5)
                     .build()
                     .also {
                         INSTANCE = it

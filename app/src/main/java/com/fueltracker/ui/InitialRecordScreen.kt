@@ -65,8 +65,16 @@ fun InitialRecordScreen(
 
     val odometerValue = odometer.toDoubleOrNull()
     val fuelValue = currentFuel.toDoubleOrNull()
-    val isFuelValid = fuelValue == null || (fuelValue >= 0 && fuelValue <= currentVehicle.tankCapacity)
-    val canSave = odometerValue != null && odometerValue >= 0 && isFuelValid
+
+    // 👇 新增：先确保车辆的油箱容量本身是合法的有限数值
+    val isCapacitySane = currentVehicle.tankCapacity.isFinite() && currentVehicle.tankCapacity > 0.0
+
+    // 👇 修改：在正常容量的前提下，再判断输入值
+    val isFuelValid = fuelValue == null || (
+            fuelValue.isFinite() && fuelValue >= 0 && isCapacitySane && fuelValue <= currentVehicle.tankCapacity
+            )
+
+    val canSave = odometerValue != null && odometerValue.isFinite() && odometerValue >= 0 && isFuelValid
 
     val context = LocalContext.current
     var isSaving by remember { mutableStateOf(false) }

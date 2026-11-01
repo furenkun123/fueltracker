@@ -328,7 +328,15 @@ class MainViewModel(
 
     private suspend fun requireVehicleExists(vehicleId: Long): Vehicle {
         require(vehicleId > 0L) { "车辆 ID 无效" }
-        return vehicleDao.getVehicleById(vehicleId) ?: throw IllegalArgumentException("车辆不存在：$vehicleId")
+        val vehicle = vehicleDao.getVehicleById(vehicleId) ?: throw IllegalArgumentException("车辆不存在：$vehicleId")
+
+        // 👇 兜底：如果数据库里查出这辆车的油箱容量已经是 Infinity，直接拦截
+        if (vehicle.fuelType != "纯电动") {
+            require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
+                "该车辆的油箱容量数据异常，请先前往设置编辑车辆修正"
+            }
+        }
+        return vehicle
     }
 
     // =========================================================
@@ -337,11 +345,12 @@ class MainViewModel(
     fun addVehicle(vehicle: Vehicle, onComplete: (Result<Unit>) -> Unit = {}) {
         viewModelScope.launch {
             val result = try {
-                // 👇 底层兜底校验（防止 UI 绕过）
                 require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) { "车辆品牌和车型不能为空" }
-                require(vehicle.initialOdometer >= 0.0) { "提车里程不能为负数" }
+
+                // 👇 加上 isFinite() 校验
+                require(vehicle.initialOdometer.isFinite() && vehicle.initialOdometer >= 0.0) { "提车里程必须是有效的非负数" }
                 if (vehicle.fuelType != "纯电动") {
-                    require(vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0" }
+                    require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0 的有限数值" }
                 }
 
                 val newId = vehicleDao.insertAsCurrent(vehicle.copy(isCurrent = true))
@@ -381,11 +390,12 @@ class MainViewModel(
         viewModelScope.launch {
             val prev = _currentVehicleOverride.value
             val result = try {
-                // 👇 底层兜底校验
                 require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) { "车辆品牌和车型不能为空" }
-                require(vehicle.initialOdometer >= 0.0) { "提车里程不能为负数" }
+
+                // 👇 加上 isFinite() 校验
+                require(vehicle.initialOdometer.isFinite() && vehicle.initialOdometer >= 0.0) { "提车里程必须是有效的非负数" }
                 if (vehicle.fuelType != "纯电动") {
-                    require(vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0" }
+                    require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0 的有限数值" }
                 }
 
                 val old = vehicleDao.getVehicleById(vehicle.id) ?: throw IllegalArgumentException("车辆不存在")

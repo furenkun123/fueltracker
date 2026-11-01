@@ -57,23 +57,45 @@ fun computeSummary(
     rangeLabel: String
 ): ExpenseSummary {
     val (start, end) = rangeBounds
+
+    // 数据过滤依然使用完整的时间范围（确保本月哪怕有未来录入的数据也被包含在内）
     val filteredExpenses = expenses.filter { inRange(it.timestamp, start, end) }
     val filteredFuel = fuelRecords.filter { !it.isInitialRecord && inRange(it.timestamp, start, end) }
     val total = filteredExpenses.sumOf { it.amount } + filteredFuel.sumOf { it.actualPaidAmount }
     val count = filteredExpenses.size + filteredFuel.size
 
     val daysInRange = if (start == null || end == null) null else {
+        // 获取今天 23:59:59.999 的时间戳
+        val todayEnd = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+
+        // 关键截断：如果统计范围的 end 超过了今天（如本月、今年），则分母计算截止到“今天”
+        // 如果是历史完整周期，actualEnd 保持为原本的 end
+        val actualEnd = end.coerceAtMost(todayEnd)
+
         val s = Calendar.getInstance().apply { timeInMillis = start }
-        val e = Calendar.getInstance().apply { timeInMillis = end }
+        val e = Calendar.getInstance().apply { timeInMillis = actualEnd }
+
         var days = 0
         while (s.before(e)) {
             s.add(Calendar.DAY_OF_MONTH, 1)
             days++
         }
+        // 兜底：防止 start > todayEnd 导致 days 为 0 的情况
         days.coerceAtLeast(1)
     }
 
-    return ExpenseSummary(rangeLabel, total, count, if (daysInRange != null) total / daysInRange else 0.0, daysInRange != null)
+    return ExpenseSummary(
+        rangeLabel = rangeLabel,
+        totalAmount = total,
+        count = count,
+        dailyAverage = if (daysInRange != null) total / daysInRange else 0.0,
+        showDaily = daysInRange != null
+    )
 }
 
 fun buildMonthTrend(

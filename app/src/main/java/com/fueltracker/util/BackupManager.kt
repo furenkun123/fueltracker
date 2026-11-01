@@ -5,7 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.room.withTransaction
 import com.fueltracker.data.AppDatabase
-import com.fueltracker.data.ExpenseCategoryStore
+import com.fueltracker.data.CustomCategoryEntity
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
@@ -25,16 +25,19 @@ object BackupManager {
     private val SUPPORTED_VERSIONS = setOf(1, 2)
     private const val TAG = "BackupManager"
 
+    // 👇 在这里定义快照数据类，放在 object 内部、函数外部
+    private data class BackupSnapshot(
+        val vehicles: List<Vehicle>,
+        val records: List<FuelRecord>,
+        val expenses: List<ExpenseRecord>,
+        val categories: List<String>
+    )
+
     fun generateFileName(): String {
         val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         return "随记油耗备份$dateStr.json"
     }
 
-    /**
-     * 导出前校验。
-     * 这里的规则必须与 restoreFromJson 中的恢复校验保持一致，
-     * 否则可能出现“备份能导出但无法恢复”的情况。
-     */
     private fun validateSnapshot(
         vehicles: List<Vehicle>,
         records: List<FuelRecord>,
@@ -151,16 +154,20 @@ object BackupManager {
 
     suspend fun createBackupJson(context: Context): String = withContext(Dispatchers.IO) {
         val db = AppDatabase.getInstance(context)
+
+        // 👇 用自己定义的 BackupSnapshot 替换不存在的 Quadruple
         val snapshot = db.withTransaction {
-            Triple(
-                db.vehicleDao().getAllVehicles(),
-                db.fuelDao().getAllRecords(),
-                db.expenseDao().getAll()
+            BackupSnapshot(
+                vehicles = db.vehicleDao().getAllVehicles(),
+                records = db.fuelDao().getAllRecords(),
+                expenses = db.expenseDao().getAll(),
+                categories = db.customCategoryDao().getAll()
             )
         }
-        val vehicles = snapshot.first
-        val records = snapshot.second
-        val expenses = snapshot.third
+
+        val vehicles = snapshot.vehicles
+        val records = snapshot.records
+        val expenses = snapshot.expenses
 
         validateSnapshot(vehicles, records, expenses)
 
@@ -217,7 +224,6 @@ object BackupManager {
                         put("id", e.id)
                         put("vehicleId", e.vehicleId)
                         put("timestamp", e.timestamp)
-                        // 导出时统一 trim，与恢复时的归一化保持一致
                         put("category", e.category.trim())
                         put("amount", e.amount)
                         put("locationName", e.locationName ?: JSONObject.NULL)
@@ -233,8 +239,9 @@ object BackupManager {
                     })
                 }
             })
+            // 👇 必须使用 snapshot.categories，确保导出时数据和分类在同一事务快照下
             put("customCategories", JSONArray().apply {
-                ExpenseCategoryStore.getCustom().forEach { put(it) }
+                snapshot.categories.forEach { put(it) }
             })
         }
         root.toString(2)
@@ -244,10 +251,6 @@ object BackupManager {
     // 恢复
     // ============================================================
 
-    /**
-     * 恢复 JSON 到数据库，并返回备份中包含的自定义分类。
-     * 返回 null 表示备份（如旧版 v1）不含自定义分类字段，调用方应保留原有分类。
-     */
     suspend fun restoreFromJson(context: Context, jsonText: String): List<String>? =
         withContext(Dispatchers.IO) {
             val root = JSONObject(jsonText)
@@ -256,15 +259,10 @@ object BackupManager {
                 throw IllegalArgumentException("不支持的备份版本：$version")
             }
 
-            // ---------- 读取业务数组 ----------
-            // v2：三个数组都必须存在且类型正确；
-            // v1：vehicles 必须存在，fuelRecords / expenses 缺失时视为空数组（兼容旧格式）；
-            // 任何版本都不能接受“连 vehicles 都没有”的文件，避免损坏文件被当成空备份而清库。
             val vehicleArray = root.readBusinessArray("vehicles", required = true)
             val recordArray = root.readBusinessArray("fuelRecords", required = version >= 2)
             val expenseArray = root.readBusinessArray("expenses", required = version >= 2)
 
-            // ---------- 严格解析车辆 ----------
             val vehicles = mutableListOf<Vehicle>()
             for (i in 0 until vehicleArray.length()) {
                 val json = vehicleArray.getJSONObject(i)
@@ -308,7 +306,6 @@ object BackupManager {
                 )
             }
 
-            // ---------- 严格解析加油记录 ----------
             val records = mutableListOf<FuelRecord>()
             for (i in 0 until recordArray.length()) {
                 val json = recordArray.getJSONObject(i)
@@ -321,12 +318,8 @@ object BackupManager {
                 val isInitial = json.requireBoolean("isInitialRecord")
                 val hasMissed = json.requireBoolean("hasMissedRecord")
 
-                if (id <= 0L || vehicleId <= 0L) {
-                    throw IllegalArgumentException("记录 ID 或车辆 ID 非法")
-                }
-                if (ts <= 0L) {
-                    throw IllegalArgumentException("记录时间戳非法")
-                }
+                if (id <= 0L || vehicleId <= 0L) throw IllegalArgumentException("记录 ID 或车辆 ID 非法")
+                if (ts <= 0L) throw IllegalArgumentException("记录时间戳非法")
 
                 requireFiniteNonNegative(volume, "加油量")
                 requireFiniteNonNegative(unitPrice, "加油单价")
@@ -340,7 +333,6 @@ object BackupManager {
                     require(unitPrice > 0.0) { "普通加油记录的单价必须大于 0" }
                 }
 
-                // 可空数值字段统一补非负校验，避免负里程 / 负油量进入数据库
                 val odometer = json.getNullableDouble("odometer")
                 requireNullableFiniteNonNegative(odometer, "加油里程")
                 val remainingFuel = json.getNullableDouble("remainingFuel")
@@ -353,76 +345,47 @@ object BackupManager {
                 val missedVol = json.getNullableDouble("missedVolume")
                 requireNullableFiniteNonNegative(missedVol, "漏记加油量")
                 if (hasMissed) {
-                    require(missedOdo != null && missedOdo > 0.0) {
-                        "启用漏记时，漏记里程必须大于 0"
-                    }
-                    require(missedVol != null && missedVol > 0.0) {
-                        "启用漏记时，漏记油量必须大于 0"
-                    }
-                    if (odometer != null) {
-                        require(missedOdo < odometer) { "漏记里程必须小于当前里程" }
-                    }
+                    require(missedOdo != null && missedOdo > 0.0) { "启用漏记时，漏记里程必须大于 0" }
+                    require(missedVol != null && missedVol > 0.0) { "启用漏记时，漏记油量必须大于 0" }
+                    if (odometer != null) require(missedOdo < odometer) { "漏记里程必须小于当前里程" }
                 } else {
-                    require(missedOdo == null && missedVol == null) {
-                        "未勾选漏记时，漏记字段必须为空"
-                    }
+                    require(missedOdo == null && missedVol == null) { "未勾选漏记时，漏记字段必须为空" }
                 }
 
-                // 原价 / 优惠 / 实付关系。discount 的非负检查必须在 total 分支外，
-                // 否则 total == null 时负数优惠会漏检。
                 val total = json.getNullableDouble("totalAmount")
                 val discount = json.getNullableDouble("discount")
                 requireNullableFiniteNonNegative(total, "原价")
                 requireNullableFiniteNonNegative(discount, "优惠金额")
 
-                if (discount != null && total == null) {
-                    throw IllegalArgumentException("存在优惠金额时必须提供原价")
-                }
+                if (discount != null && total == null) throw IllegalArgumentException("存在优惠金额时必须提供原价")
                 if (total != null) {
                     if (discount != null) {
                         require(discount <= total) { "优惠金额不能超过原价" }
-                        require(abs((total - discount) - actualPaidAmount) <= 0.05) {
-                            "原价减去优惠金额应等于实付金额"
-                        }
+                        require(abs((total - discount) - actualPaidAmount) <= 0.05) { "原价减去优惠金额应等于实付金额" }
                     } else {
-                        require(abs(total - actualPaidAmount) <= 0.05) {
-                            "原价应等于实付金额"
-                        }
+                        require(abs(total - actualPaidAmount) <= 0.05) { "原价应等于实付金额" }
                     }
                     if (!isInitial) {
-                        require(abs((volume * unitPrice) - total) <= 0.1) {
-                            "加油量乘以单价应近似等于原价"
-                        }
+                        require(abs((volume * unitPrice) - total) <= 0.1) { "加油量乘以单价应近似等于原价" }
                     }
                 }
 
                 records.add(
                     FuelRecord(
-                        id = id,
-                        vehicleId = vehicleId,
-                        timestamp = ts,
-                        fuelGrade = json.requireString("fuelGrade"),
-                        odometer = odometer,
-                        volume = volume,
-                        totalAmount = total,
-                        discount = discount,
-                        actualPaidAmount = actualPaidAmount,
-                        unitPrice = unitPrice,
-                        remainingFuel = remainingFuel,
-                        isFull = json.requireBoolean("isFull"),
-                        isInitialRecord = isInitial,
-                        initialFuel = initialFuelValue,
-                        hasMissedRecord = hasMissed,
-                        missedOdometer = missedOdo,
-                        missedVolume = missedVol,
-                        note = json.optString("note", ""),
-                        consumption = null // 恢复时强制清空缓存
+                        id = id, vehicleId = vehicleId, timestamp = ts,
+                        fuelGrade = json.requireString("fuelGrade"), odometer = odometer,
+                        volume = volume, totalAmount = total, discount = discount,
+                        actualPaidAmount = actualPaidAmount, unitPrice = unitPrice,
+                        remainingFuel = remainingFuel, isFull = json.requireBoolean("isFull"),
+                        isInitialRecord = isInitial, initialFuel = initialFuelValue,
+                        hasMissedRecord = hasMissed, missedOdometer = missedOdo,
+                        missedVolume = missedVol, note = json.optString("note", ""),
+                        consumption = null
                     )
                 )
             }
             requireUniqueIds(records.map { it.id }, "加油记录")
 
-            // ---------- 严格解析费用记录 ----------
             val expenses = mutableListOf<ExpenseRecord>()
             for (i in 0 until expenseArray.length()) {
                 val json = expenseArray.getJSONObject(i)
@@ -432,24 +395,15 @@ object BackupManager {
                 val category = json.requireString("category").trim()
                 val amount = json.requireDouble("amount")
 
-                if (id <= 0L || vehicleId <= 0L) {
-                    throw IllegalArgumentException("费用记录 ID 或车辆 ID 非法")
-                }
-                if (ts <= 0L) {
-                    throw IllegalArgumentException("费用记录时间戳非法")
-                }
-                if (category.isBlank()) {
-                    throw IllegalArgumentException("费用分类不能为空")
-                }
+                if (id <= 0L || vehicleId <= 0L) throw IllegalArgumentException("费用记录 ID 或车辆 ID 非法")
+                if (ts <= 0L) throw IllegalArgumentException("费用记录时间戳非法")
+                if (category.isBlank()) throw IllegalArgumentException("费用分类不能为空")
                 requireFiniteNonNegative(amount, "费用金额")
 
                 expenses.add(
                     ExpenseRecord(
-                        id = id,
-                        vehicleId = vehicleId,
-                        timestamp = ts,
-                        category = category,
-                        amount = amount,
+                        id = id, vehicleId = vehicleId, timestamp = ts,
+                        category = category, amount = amount,
                         locationName = json.getNullableString("locationName"),
                         floor = json.getNullableString("floor"),
                         area = json.getNullableString("area"),
@@ -465,82 +419,36 @@ object BackupManager {
             }
             requireUniqueIds(expenses.map { it.id }, "费用记录")
 
-            // ---------- 自定义分类严格解析 ----------
-            // 区分“字段缺失”和“字段类型错误”：缺失返回 null，类型错误直接失败。
             val customCategories = if (root.has("customCategories") && !root.isNull("customCategories")) {
-                val arr = root.optJSONArray("customCategories")
-                    ?: throw IllegalArgumentException("customCategories 字段类型错误")
+                val arr = root.optJSONArray("customCategories") ?: throw IllegalArgumentException("customCategories 字段类型错误")
                 (0 until arr.length()).map { idx ->
                     val item = arr.opt(idx)
-                    if (item !is String) {
-                        throw IllegalArgumentException("customCategories[$idx] 不是字符串")
-                    }
+                    if (item !is String) throw IllegalArgumentException("customCategories[$idx] 不是字符串")
                     val name = item.trim()
                     require(name.isNotEmpty()) { "customCategories[$idx] 为空" }
                     name
                 }
-            } else {
-                null
-            }
+            } else null
 
-            // ---------- 关联关系校验 ----------
             val validVehicleIds = vehicles.map { it.id }.toSet()
-            val badFuelReferences = records.count { it.vehicleId !in validVehicleIds }
-            val badExpenseReferences = expenses.count { it.vehicleId !in validVehicleIds }
-            if (badFuelReferences > 0) {
-                throw IllegalArgumentException(
-                    "备份文件损坏：$badFuelReferences 条加油记录引用了不存在的车辆"
-                )
-            }
-            if (badExpenseReferences > 0) {
-                throw IllegalArgumentException(
-                    "备份文件损坏：$badExpenseReferences 条费用记录引用了不存在的车辆"
-                )
-            }
+            if (records.any { it.vehicleId !in validVehicleIds }) throw IllegalArgumentException("备份文件损坏：加油记录引用了不存在的车辆")
+            if (expenses.any { it.vehicleId !in validVehicleIds }) throw IllegalArgumentException("备份文件损坏：费用记录引用了不存在的车辆")
 
-            // 恢复时统一归一化激活状态：非停车一律非激活，停车每车最多一条激活
             val validExpenses = normalizeActiveParking(expenses)
-
             val db = AppDatabase.getInstance(context)
 
-// 保存原始自定义分类，用于事务失败时回滚 SP
-            val oldCustomCategories = ExpenseCategoryStore.getCustom()
+            db.withTransaction {
+                db.expenseDao().deleteAll()
+                db.fuelDao().deleteAll()
+                db.vehicleDao().deleteAll()
+                vehicles.forEach { db.vehicleDao().insert(it) }
+                records.forEach { db.fuelDao().insert(it) }
+                validExpenses.forEach { db.expenseDao().insert(it) }
 
-            try {
-                db.withTransaction {
-                    // 1. 清空并导入数据库
-                    db.expenseDao().deleteAll()
-                    db.fuelDao().deleteAll()
-                    db.vehicleDao().deleteAll()
-                    vehicles.forEach { db.vehicleDao().insert(it) }
-                    records.forEach { db.fuelDao().insert(it) }
-                    validExpenses.forEach { db.expenseDao().insert(it) }
-
-                    // 2. 在事务内同步提交 SP：失败则抛异常使 DB 事务回滚
-                    //    注：customCategories == null 表示备份（如 v1）不含分类字段，保留原 SP 不动
-                    if (customCategories != null) {
-                        if (!ExpenseCategoryStore.replaceAllSync(customCategories)) {
-                            throw IllegalStateException("自定义分类写入失败，恢复已中止")
-                        }
-                    }
-                }
-                // 走到这里 = DB 提交成功 && SP 已同步更新
-            } catch (e: Exception) {
-                // DB 事务已回滚，但 SP 可能已提交 → 必须回滚 SP
-                // 使用 NonCancellable，防止外层协程取消打断回滚
+                db.customCategoryDao().deleteAll()
                 if (customCategories != null) {
-                    withContext(NonCancellable) {
-                        try {
-                            if (!ExpenseCategoryStore.replaceAllSync(oldCustomCategories)) {
-                                Log.e(TAG, "回滚自定义分类失败，SP 与 DB 已不一致，需手动修复", e)
-                            }
-                        } catch (rollbackError: Exception) {
-                            Log.e(TAG, "回滚自定义分类异常，SP 与 DB 已不一致，需手动修复", rollbackError)
-                            e.addSuppressed(rollbackError)
-                        }
-                    }
+                    db.customCategoryDao().insertAll(customCategories.map { CustomCategoryEntity(it) })
                 }
-                throw e
             }
 
             customCategories
@@ -574,9 +482,7 @@ object BackupManager {
 // ============================================================
 
 private fun requireFiniteNonNegative(value: Double, fieldName: String) {
-    require(value.isFinite() && value >= 0.0) {
-        "备份文件损坏：${fieldName}必须是有效的非负数"
-    }
+    require(value.isFinite() && value >= 0.0) { "备份文件损坏：${fieldName}必须是有效的非负数" }
 }
 
 private fun requireNullableFiniteNonNegative(value: Double?, fieldName: String) {
@@ -589,102 +495,62 @@ private fun requireUniqueIds(ids: List<Long>, tableName: String) {
     }
 }
 
-/**
- * 读取业务数组。
- * - required = true 时字段必须存在且类型正确；
- * - required = false 时缺失视为空数组，但类型错误仍直接失败。
- */
 private fun JSONObject.readBusinessArray(key: String, required: Boolean): JSONArray {
     val hasField = has(key) && !isNull(key)
     if (!hasField) {
-        if (required) {
-            throw IllegalArgumentException("备份文件缺失必需字段: $key")
-        }
+        if (required) throw IllegalArgumentException("备份文件缺失必需字段: $key")
         return JSONArray()
     }
-    return optJSONArray(key)
-        ?: throw IllegalArgumentException("备份文件字段类型错误: $key")
+    return optJSONArray(key) ?: throw IllegalArgumentException("备份文件字段类型错误: $key")
 }
 
-private fun normalizeActiveParking(
-    expenses: List<ExpenseRecord>
-): List<ExpenseRecord> {
+private fun normalizeActiveParking(expenses: List<ExpenseRecord>): List<ExpenseRecord> {
     val activeParkingWinnerByVehicle = expenses
         .asSequence()
         .filter { it.category == "停车" && it.isActive }
         .groupBy { it.vehicleId }
-        .mapValues { (_, records) ->
-            records.maxWithOrNull(
-                compareBy<ExpenseRecord> { it.timestamp }.thenBy { it.id }
-            )?.id
-        }
+        .mapValues { (_, records) -> records.maxWithOrNull(compareBy<ExpenseRecord> { it.timestamp }.thenBy { it.id })?.id }
 
     return expenses.map { expense ->
         when {
-            // 非停车费用不允许激活
-            expense.category != "停车" && expense.isActive ->
-                expense.copy(isActive = false)
-
-            // 每辆车只保留一条激活停车记录
-            expense.category == "停车" &&
-                    expense.isActive &&
-                    activeParkingWinnerByVehicle[expense.vehicleId] != expense.id ->
-                expense.copy(isActive = false)
-
+            expense.category != "停车" && expense.isActive -> expense.copy(isActive = false)
+            expense.category == "停车" && expense.isActive && activeParkingWinnerByVehicle[expense.vehicleId] != expense.id -> expense.copy(isActive = false)
             else -> expense
         }
     }
 }
 
-// ============================================================
-// 严格字段读取器
-// ============================================================
-
 private fun JSONObject.requireString(key: String): String {
-    if (!has(key) || isNull(key)) {
-        throw IllegalArgumentException("备份文件缺失必需字段: $key")
-    }
+    if (!has(key) || isNull(key)) throw IllegalArgumentException("备份文件缺失必需字段: $key")
     return getString(key)
 }
 
 private fun JSONObject.requireInt(key: String): Int {
-    if (!has(key) || isNull(key)) {
-        throw IllegalArgumentException("备份文件缺失必需字段: $key")
-    }
+    if (!has(key) || isNull(key)) throw IllegalArgumentException("备份文件缺失必需字段: $key")
     return getInt(key)
 }
 
 private fun JSONObject.requireLong(key: String): Long {
-    if (!has(key) || isNull(key)) {
-        throw IllegalArgumentException("备份文件缺失必需字段: $key")
-    }
+    if (!has(key) || isNull(key)) throw IllegalArgumentException("备份文件缺失必需字段: $key")
     return getLong(key)
 }
 
 private fun JSONObject.requireDouble(key: String): Double {
-    if (!has(key) || isNull(key)) {
-        throw IllegalArgumentException("备份文件缺失必需字段: $key")
-    }
+    if (!has(key) || isNull(key)) throw IllegalArgumentException("备份文件缺失必需字段: $key")
     val v = getDouble(key)
-    if (!v.isFinite()) {
-        throw IllegalArgumentException("备份文件字段非有限值: $key")
-    }
+    if (!v.isFinite()) throw IllegalArgumentException("备份文件字段非有限值: $key")
     return v
 }
 
 private fun JSONObject.requireBoolean(key: String): Boolean {
-    if (!has(key) || isNull(key)) {
-        throw IllegalArgumentException("备份文件缺失必需字段: $key")
-    }
+    if (!has(key) || isNull(key)) throw IllegalArgumentException("备份文件缺失必需字段: $key")
     return getBoolean(key)
 }
 
 private fun JSONObject.getNullableDouble(key: String): Double? {
     if (!has(key) || isNull(key)) return null
     val value = getDouble(key)
-    if (!value.isFinite()) {
-        throw IllegalArgumentException("备份文件字段非有限值: $key")
-    }
+    if (!value.isFinite()) throw IllegalArgumentException("备份文件字段非有限值: $key")
     return value
 }
 

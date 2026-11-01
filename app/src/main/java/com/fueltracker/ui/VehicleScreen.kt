@@ -151,8 +151,8 @@ fun VehicleScreen(
 // 1. 品牌、车型必填
 // 2. 非纯电：油箱容量必填且必须 > 0
 // 3. 提车里程必填且必须 >= 0
-    val isCapacityValid = fuelType == "纯电动" || (parsedCapacity != null && parsedCapacity > 0.0)
-    val isOdometerValid = parsedOdometer != null && parsedOdometer >= 0.0
+    val isCapacityValid = fuelType == "纯电动" || (parsedCapacity != null && parsedCapacity.isFinite() && parsedCapacity > 0.0)
+    val isOdometerValid = parsedOdometer != null && parsedOdometer.isFinite() && parsedOdometer >= 0.0
 
     val canSave = brand.isNotBlank() && model.isNotBlank() && isCapacityValid && isOdometerValid
 
