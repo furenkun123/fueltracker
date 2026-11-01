@@ -686,19 +686,12 @@ class MainViewModel(
 
         viewModelScope.launch {
             val res = try {
-                // 👇 BackupManager 返回 List<String>?
-                val restoredCategories = BackupManager.restoreFromUri(getApplication(), uri)
-                _currentVehicleOverride.value = null
-
-                if (restoredCategories != null) {
-                    try {
-                        ExpenseCategoryStore.replaceAll(restoredCategories)
-                    } catch (spError: Exception) {
-                        throw IllegalStateException("数据库恢复成功，但自定义分类更新失败", spError)
-                    }
-                }
+                // 统一在 BackupManager 内完成 DB + SP 的原子化恢复
+                BackupManager.restoreFromUri(getApplication(), uri)
+                _currentVehicleOverride.value = null   // 让 Room Flow 重新驱动当前车辆
                 Result.success(Unit)
-            } catch (e: CancellationException) { throw e
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "restoreBackup failed", e)
                 Result.failure(e)

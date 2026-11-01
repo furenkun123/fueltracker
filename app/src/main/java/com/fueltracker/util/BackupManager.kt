@@ -2,6 +2,7 @@ package com.fueltracker.util
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.room.withTransaction
 import com.fueltracker.data.AppDatabase
 import com.fueltracker.data.ExpenseCategoryStore
@@ -16,11 +17,13 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import kotlinx.coroutines.NonCancellable
 
 object BackupManager {
 
     private const val FORMAT_VERSION = 2
     private val SUPPORTED_VERSIONS = setOf(1, 2)
+    private const val TAG = "BackupManager"
 
     fun generateFileName(): String {
         val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -500,13 +503,44 @@ object BackupManager {
 
             val db = AppDatabase.getInstance(context)
 
-            db.withTransaction {
-                db.expenseDao().deleteAll()
-                db.fuelDao().deleteAll()
-                db.vehicleDao().deleteAll()
-                vehicles.forEach { db.vehicleDao().insert(it) }
-                records.forEach { db.fuelDao().insert(it) }
-                validExpenses.forEach { db.expenseDao().insert(it) }
+// 保存原始自定义分类，用于事务失败时回滚 SP
+            val oldCustomCategories = ExpenseCategoryStore.getCustom()
+
+            try {
+                db.withTransaction {
+                    // 1. 清空并导入数据库
+                    db.expenseDao().deleteAll()
+                    db.fuelDao().deleteAll()
+                    db.vehicleDao().deleteAll()
+                    vehicles.forEach { db.vehicleDao().insert(it) }
+                    records.forEach { db.fuelDao().insert(it) }
+                    validExpenses.forEach { db.expenseDao().insert(it) }
+
+                    // 2. 在事务内同步提交 SP：失败则抛异常使 DB 事务回滚
+                    //    注：customCategories == null 表示备份（如 v1）不含分类字段，保留原 SP 不动
+                    if (customCategories != null) {
+                        if (!ExpenseCategoryStore.replaceAllSync(customCategories)) {
+                            throw IllegalStateException("自定义分类写入失败，恢复已中止")
+                        }
+                    }
+                }
+                // 走到这里 = DB 提交成功 && SP 已同步更新
+            } catch (e: Exception) {
+                // DB 事务已回滚，但 SP 可能已提交 → 必须回滚 SP
+                // 使用 NonCancellable，防止外层协程取消打断回滚
+                if (customCategories != null) {
+                    withContext(NonCancellable) {
+                        try {
+                            if (!ExpenseCategoryStore.replaceAllSync(oldCustomCategories)) {
+                                Log.e(TAG, "回滚自定义分类失败，SP 与 DB 已不一致，需手动修复", e)
+                            }
+                        } catch (rollbackError: Exception) {
+                            Log.e(TAG, "回滚自定义分类异常，SP 与 DB 已不一致，需手动修复", rollbackError)
+                            e.addSuppressed(rollbackError)
+                        }
+                    }
+                }
+                throw e
             }
 
             customCategories
@@ -526,12 +560,11 @@ object BackupManager {
             } ?: throw IllegalStateException("无法创建备份文件")
         }
 
-    suspend fun restoreFromUri(context: Context, uri: Uri): List<String>? =
-        withContext(Dispatchers.IO) {
+    suspend fun restoreFromUri(context: Context, uri: Uri) =
+        withContext(Dispatchers.IO + NonCancellable) {
             val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use {
                 it.readText()
             } ?: throw IllegalStateException("无法读取备份文件")
-
             restoreFromJson(context, json)
         }
 }
