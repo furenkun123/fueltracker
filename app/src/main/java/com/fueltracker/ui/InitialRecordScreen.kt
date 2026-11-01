@@ -2,22 +2,25 @@ package com.fueltracker.ui
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -36,15 +40,11 @@ import com.fueltracker.ui.miui.MiuiButton
 import com.fueltracker.ui.miui.MiuiGroupCard
 import com.fueltracker.ui.miui.MiuiInputItem
 import com.fueltracker.ui.miui.MiuiSectionHeader
-import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.viewmodel.MainViewModel
-import com.kyant.backdrop.Backdrop
 
 @Composable
 fun InitialRecordScreen(
     viewModel: MainViewModel,
-    backdrop: Backdrop,
-    isGlassEnabled: Boolean = false,
     onCompleted: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -77,24 +77,8 @@ fun InitialRecordScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            // 🚨 修复：右上角「跳过」作为 action 传入，
-            // 不传 navigationIcon（取消左上角返回按钮）
-            MiuiTopBar(
-                backdrop = backdrop,
-                isGlassEnabled = isGlassEnabled,
-                action = {
-                    TextButton(onClick = { showSkipConfirm = true }) {
-                        Text(
-                            text = "跳过",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
+
+        ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -103,6 +87,37 @@ fun InitialRecordScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(modifier = Modifier.height(8.dp))
+
+            // 👇 大标题 + 跳过按钮（加底包围）
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "车辆初始信息",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                // 跳过按钮包围背景
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { showSkipConfirm = true }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "跳过",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             MiuiSectionHeader(title = "当前车辆信息")
             MiuiGroupCard {

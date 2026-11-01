@@ -314,7 +314,6 @@ fun FuelTrackerApp(
                     AppScreen.INITIAL_RECORD -> {
                         InitialRecordScreen(
                             viewModel = viewModel,
-                            backdrop = appBackdrop,
                             onCompleted = {
                                 viewModel.navigateTo(AppScreen.HOME)
                             },
