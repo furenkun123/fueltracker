@@ -95,6 +95,13 @@ object XiaoxiongCsvImporter {
                 if (row.hasWarningLight) noteParts.add("油灯亮")
                 val finalNote = noteParts.joinToString(" · ")
 
+                // 👇 核心修复：计算折扣并清洗原价
+                // 只有当原价确实大于实付金额（差值超过 0.01）时，才保留原价并计算优惠
+                val validTotalAmount = row.originalPrice.takeIf { it > row.paidAmount + 0.01 }
+                val finalDiscount = validTotalAmount?.let {
+                    it - row.paidAmount
+                }
+
                 FuelRecord(
                     vehicleId = vehicleId,
                     timestamp = timestamp,
@@ -102,7 +109,11 @@ object XiaoxiongCsvImporter {
                     volume = volume,
                     unitPrice = unitPrice,
                     actualPaidAmount = row.paidAmount,
-                    totalAmount = row.originalPrice.takeIf { it > 0 },
+
+                    // 👇 替换这里的赋值
+                    totalAmount = validTotalAmount,
+                    discount = finalDiscount,
+
                     fuelGrade = normalizeFuelGrade(row.fuelGrade),
                     isFull = row.isFull,
                     note = finalNote,

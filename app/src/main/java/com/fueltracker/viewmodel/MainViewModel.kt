@@ -322,7 +322,6 @@ class MainViewModel(
     }
 
     private suspend fun getCurrentVehicleFromDatabase(): Vehicle? {
-        // 🚨 确保 VehicleDao.getAllVehicles 有 ORDER BY id DESC
         val allVehicles = vehicleDao.getAllVehicles()
         return allVehicles.firstOrNull { it.isCurrent } ?: allVehicles.firstOrNull()
     }
