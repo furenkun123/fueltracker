@@ -88,7 +88,7 @@ fun InitialRecordScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 👇 大标题 + 跳过按钮（加底包围）
+            // 标题
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -96,7 +96,7 @@ fun InitialRecordScreen(
             ) {
                 Text(
                     text = "车辆初始信息",
-                    fontSize = 26.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
