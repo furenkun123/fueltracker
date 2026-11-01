@@ -616,38 +616,80 @@ class MainViewModel(
     // =========================================================
     private val defaultExpenseCategories = listOf("加油", "停车", "高速", "保养", "保险", "维修", "洗车", "其他")
 
-    fun renameExpenseCategory(oldName: String, newName: String, onComplete: (Result<Unit>) -> Unit) {
+
+    fun renameExpenseCategory(
+        oldName: String,
+        newName: String,
+        onComplete: (Result<Unit>) -> Unit
+    ) {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 try {
                     val trimmed = newName.trim()
                     val currentCustomList = ExpenseCategoryStore.getCustom()
-                    val existing = currentCustomList.find { it.equals(oldName, ignoreCase = true) }
 
-                    requireNotNull(existing) { "原分类不存在" }
-                    require(trimmed.isNotEmpty()) { "名称不能为空" }
-                    require(!existing.equals(trimmed, ignoreCase = true)) { "名称无变化或仅大小写不同" }
-                    require(defaultExpenseCategories.none { it.equals(trimmed, ignoreCase = true) }) { "不能与默认分类重名" }
-                    require(currentCustomList.none { !it.equals(existing, ignoreCase = true) && it.equals(trimmed, ignoreCase = true) }) { "分类已存在" }
+                    val existing = currentCustomList.find {
+                        it.equals(oldName.trim(), ignoreCase = true)
+                    }
 
-                    withContext(NonCancellable) {
-                        if (!ExpenseCategoryStore.update(existing, trimmed)) throw IllegalStateException("本地配置更新失败")
+                    requireNotNull(existing) {
+                        "原分类不存在"
+                    }
 
-                        try {
-                            database.withTransaction { expenseDao.renameCategory(existing, trimmed) }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "DB更新失败，尝试回滚", e)
-                            try {
-                                if (!ExpenseCategoryStore.update(trimmed, existing)) throw IllegalStateException("回滚失败")
-                            } catch (rollbackError: Exception) {
-                                if (rollbackError is CancellationException) throw rollbackError
-                                e.addSuppressed(rollbackError)
-                                Log.e(TAG, "严重错误：数据库更新失败，且本地分类配置恢复失败", e)
-                            }
-                            throw e
+                    require(trimmed.isNotEmpty()) {
+                        "名称不能为空"
+                    }
+
+                    require(!existing.equals(trimmed, ignoreCase = true)) {
+                        "名称无变化或仅大小写不同"
+                    }
+
+                    require(
+                        ExpenseCategoryStore.DEFAULT_EXPENSE_CATEGORIES.none {
+                            it.equals(trimmed, ignoreCase = true)
+                        }
+                    ) {
+                        "不能与默认分类重名"
+                    }
+
+                    require(currentCustomList.none {
+                        !it.equals(existing, ignoreCase = true) &&
+                                it.equals(trimmed, ignoreCase = true)
+                    }) {
+                        "分类已存在"
+                    }
+
+                    database.withTransaction {
+                        val dao = database.customCategoryDao()
+
+                        val deleted = dao.delete(existing)
+
+                        check(deleted == 1) {
+                            "原分类已不存在，请刷新后重试"
+                        }
+
+                        val inserted = dao.insert(
+                            CustomCategoryEntity(trimmed)
+                        )
+
+                        check(inserted != -1L) {
+                            "新分类名称已存在"
+                        }
+
+                        val updated = expenseDao.renameCategory(
+                            existing,
+                            trimmed
+                        )
+
+                        // 不强制 updated > 0：
+                        // 该分类可能尚未被任何费用记录使用。
+                        check(updated >= 0) {
+                            "历史费用更新失败"
                         }
                     }
+
                     Result.success(Unit)
+
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -655,9 +697,11 @@ class MainViewModel(
                     Result.failure(e)
                 }
             }
+
             onComplete(result)
         }
     }
+
 
     // =========================================================
     // 初始记录与备份恢复

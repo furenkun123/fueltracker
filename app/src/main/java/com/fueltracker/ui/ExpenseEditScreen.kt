@@ -28,6 +28,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -78,7 +79,13 @@ fun ExpenseEditScreen(
     val isEditMode = record != null
     val scope = rememberCoroutineScope()
 
-    val customCategories by ExpenseCategoryStore.customCategories.collectAsState()
+    val customCategoriesState by ExpenseCategoryStore.customCategories.collectAsState()
+    if (customCategoriesState == null) {
+        // 显示加载状态
+        CircularProgressIndicator()
+        return
+    }
+    val customCategories = customCategoriesState!!
 
     val allCategories = remember(customCategories) { DEFAULT_EXPENSE_CATEGORIES + customCategories }
 
