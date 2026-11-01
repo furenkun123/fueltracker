@@ -51,6 +51,10 @@ object UpdateLogManager {
         ),
         48 to listOf(
             "UI调整"
+        ),
+        49 to listOf(
+            "微调UI",
+            "修复bug"
         )
         // 后续版本继续追加
     )
@@ -67,7 +71,8 @@ object UpdateLogManager {
         40 to "1.61",
         41 to "1.62",
         45 to "1.66",
-        48 to "1.69"
+        48 to "1.69",
+        49 to "1.70"
     )
 
     /**
