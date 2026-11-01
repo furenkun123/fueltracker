@@ -28,12 +28,37 @@ class MainViewModel(
     private val fuelDao = database.fuelDao()
     private val expenseDao: ExpenseDao = database.expenseDao()
 
+    private data class ParkingSource(
+        val vehicle: Vehicle?,
+        val ready: Boolean
+    )
+
     companion object {
         private const val TAG = "MainViewModel"
         private const val STOP_TIMEOUT = 5_000L
     }
 
     private val _currentVehicleOverride = MutableStateFlow<Vehicle?>(null)
+
+    // ========== 首次真实数据到达标记 ==========
+// false: 数据库首次查询还没 emit，禁止任何通知操作（防重启误取消）
+// true : 至少拿到过一次真实列表，后续 vehicle==null 才代表"真无车"
+    private val dataReady = MutableStateFlow(false)
+
+    init {
+        viewModelScope.launch {
+            try {
+                vehicleDao.observeAllVehicles().first()
+                dataReady.value = true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "observeAllVehicles first failed", e)
+                // 降级：标记就绪，避免永远 NotReady 导致通知永不更新
+                dataReady.value = true
+            }
+        }
+    }
 
     // =========================================================
     // 导航与页面状态
@@ -149,37 +174,47 @@ class MainViewModel(
 //   UI 层不会执行任何 cancel/show
 // - 切换车辆、重启、DB 增删改，都通过此流自动同步
 // =========================================================
+    @OptIn(ExperimentalCoroutinesApi::class)
     val parkingNotificationState: StateFlow<ParkingNotificationState> =
         combine(
             vehicleDao.observeCurrentVehicle(),
             _currentVehicleOverride,
-            vehicleDao.observeAllVehicles()
-        ) { dbVehicle, overrideVehicle, allVehicles ->
-            overrideVehicle ?: dbVehicle
-            ?: allVehicles.firstOrNull { it.isCurrent }
-            ?: allVehicles.firstOrNull()
+            vehicleDao.observeAllVehicles(),
+            dataReady
+        ) { dbVehicle, overrideVehicle, allVehicles, ready ->
+            ParkingSource(
+                vehicle = overrideVehicle ?: dbVehicle
+                ?: allVehicles.firstOrNull { it.isCurrent }
+                ?: allVehicles.firstOrNull(),
+                ready = ready
+            )
         }
-            .distinctUntilChanged { old, new -> old?.id == new?.id }
-            .flatMapLatest { vehicle ->
-                if (vehicle == null) {
-                    flowOf<ParkingNotificationState>(ParkingNotificationState.Hidden)
-                } else {
-                    expenseDao.observeActiveParking(vehicle.id).map { parking ->
-                        // ⚠️ 若 ExpenseRecord 的"通知已忽略"字段名不是
-                        //    notificationIgnored（比如 isNotificationIgnored），
-                        //    请按实际字段名调整此处判断。
-                        if (parking != null && parking.isActive && !parking.notificationIgnored) {
-                            ParkingNotificationState.Visible(
-                                vehicleId = vehicle.id,
-                                locationName = parking.locationName,
-                                floor = parking.floor,
-                                area = parking.area,
-                                spotNumber = parking.spotNumber
-                            )
-                        } else {
-                            ParkingNotificationState.Hidden
+            .distinctUntilChanged()
+            .flatMapLatest { source ->
+                when {
+                    // ① 首次真实数据未到达：绝不操作通知
+                    !source.ready ->
+                        flowOf<ParkingNotificationState>(ParkingNotificationState.NotReady)
+
+                    // ② 已就绪但确实无车（首次安装 / 删除所有车辆）
+                    source.vehicle == null ->
+                        flowOf<ParkingNotificationState>(ParkingNotificationState.Hidden)
+
+                    // ③ 有车：观察其停车记录
+                    else ->
+                        expenseDao.observeActiveParking(source.vehicle.id).map { parking ->
+                            if (parking != null && parking.isActive && !parking.notificationIgnored) {
+                                ParkingNotificationState.Visible(
+                                    vehicleId = source.vehicle.id,
+                                    locationName = parking.locationName,
+                                    floor = parking.floor,
+                                    area = parking.area,
+                                    spotNumber = parking.spotNumber
+                                )
+                            } else {
+                                ParkingNotificationState.Hidden
+                            }
                         }
-                    }
                 }
             }
             .stateIn(
