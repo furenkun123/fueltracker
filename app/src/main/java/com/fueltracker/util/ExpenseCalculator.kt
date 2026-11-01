@@ -65,9 +65,12 @@ fun computeSummary(
     val daysInRange = if (start == null || end == null) null else {
         val s = Calendar.getInstance().apply { timeInMillis = start }
         val e = Calendar.getInstance().apply { timeInMillis = end }
-        var days = 1
-        while (s.before(e)) { s.add(Calendar.DAY_OF_MONTH, 1); days++ }
-        days
+        var days = 0
+        while (s.before(e)) {
+            s.add(Calendar.DAY_OF_MONTH, 1)
+            days++
+        }
+        days.coerceAtLeast(1)
     }
 
     return ExpenseSummary(rangeLabel, total, count, if (daysInRange != null) total / daysInRange else 0.0, daysInRange != null)
