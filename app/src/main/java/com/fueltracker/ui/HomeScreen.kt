@@ -188,6 +188,11 @@ fun HomeScreen(
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
+        val bottomBarPadding = if (isFloating) {
+            112.dp
+        } else {
+            80.dp
+        }
         // 1. 列表铺满整个屏幕
         LazyColumn(
             state = listState,
@@ -196,11 +201,10 @@ fun HomeScreen(
                 .scrollToHideFab(listState, viewModel),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(
-                // 初始状态为标题区域预留空间
-                // 滚动时，这段空间随列表一起滚动
                 top = WindowInsets.statusBars
                     .asPaddingValues()
-                    .calculateTopPadding() + 24.dp
+                    .calculateTopPadding() + 24.dp,
+                bottom = bottomBarPadding
             )
         ) {
             item(key = "home_title") {

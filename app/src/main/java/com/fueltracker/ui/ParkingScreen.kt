@@ -160,7 +160,7 @@ fun ParkingScreen(
 
                 Text(
                     text = if (isEditMode) "编辑停车" else "记停车",
-                    fontSize = 26.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )

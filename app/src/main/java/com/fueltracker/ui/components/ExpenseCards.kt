@@ -29,9 +29,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -50,9 +48,6 @@ import com.fueltracker.util.toPercentText
 import com.fueltracker.util.toPlainMoneyText
 import kotlinx.coroutines.flow.firstOrNull
 import java.util.Locale
-import com.fueltracker.ui.components.MiuiBottomSheetWrapper
-import com.fueltracker.ui.components.WheelList
-import com.fueltracker.ui.components.WheelStyle
 
 @Composable
 fun SummaryCard(

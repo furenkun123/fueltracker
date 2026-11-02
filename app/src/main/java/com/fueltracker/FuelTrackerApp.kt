@@ -2,6 +2,7 @@
 package com.fueltracker
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.fueltracker.notif.ParkingNotification
 import com.fueltracker.ui.ExpenseEditScreen
@@ -157,6 +160,7 @@ fun FuelTrackerApp(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .layerBackdrop(appBackdrop)
         ) {
             if (showBottomBar) {
@@ -164,6 +168,8 @@ fun FuelTrackerApp(
                 // ---------- 主页面 Scaffold ----------
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onBackground,
                     contentWindowInsets = WindowInsets(0, 0, 0, 0)
                 ) { padding ->
 
@@ -499,6 +505,12 @@ fun FuelTrackerApp(
         // ---------- 悬浮底部导航栏 ----------
         if (showBottomBar) {
             MiuiNavigationBar(
+                selectedIndex = when (screen) {
+                    AppScreen.HOME -> 0
+                    AppScreen.RECORDS -> 1
+                    AppScreen.EXPENSES -> 2
+                    else -> 0
+                },
                 modifier = Modifier.align(Alignment.BottomCenter),
                 backdrop = appBackdrop,
                 isGlassEnabled = isGlassEnabled,

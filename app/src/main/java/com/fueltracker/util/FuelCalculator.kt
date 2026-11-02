@@ -408,18 +408,18 @@ object FuelCalculator {
                 var hasInvalid = false
 
                 // 累加这期间所有的加油量
-                for (r in visibleRecords) {
-                    if (r.timestamp <= startTime) continue
-                    if (r.timestamp >= anchorTime) break
+                for ((_, _, timestamp, _, _, volume, _, _, _, _, _, _, _, _, hasMissedRecord) in visibleRecords) {
+                    if (timestamp <= startTime) continue
+                    if (timestamp >= anchorTime) break
 
                     // 如果中途有漏记，说明数据不完整，初始区间无法准确计算
-                    if (r.hasMissedRecord) {
+                    if (hasMissedRecord) {
                         hasInvalid = true
                         break
                     }
 
-                    if (r.volume.isFinite() && r.volume > 0.0) {
-                        intermediateFuel += r.volume
+                    if (volume.isFinite() && volume > 0.0) {
+                        intermediateFuel += volume
                         if (!intermediateFuel.isFinite()) {
                             hasInvalid = true
                             break

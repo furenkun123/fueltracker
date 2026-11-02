@@ -24,12 +24,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -46,6 +48,7 @@ import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CallToAction
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -209,41 +212,41 @@ fun SettingsScreen(
     }
 
     // --- 界面结构 ---
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // 👇 替换掉原本的 TopAppBar，高度严格对齐首页的 48dp
-        // 检查外层 Box/Column 的背景色，必须是 MaterialTheme.colorScheme.background
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background) // 👈 确保这里是动态背景，不要写死 Color.White
-                .statusBarsPadding()
-                .height(48.dp)
-                .padding(horizontal = 4.dp)
-        ) {
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(
+            // 👇 顶部加上状态栏高度，让内容避开状态栏
+            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 16.dp,
+            bottom = 16.dp,
+            start = 16.dp,
+            end = 16.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // 👇 1. 标题与返回键作为第一个 item，跟随列表滚动
+        item(key = "settings_title") {
             Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
             ) {
                 MiuiBackButton(onClick = onBack)
 
+                Spacer(Modifier.width(8.dp))
+
                 Text(
                     text = "设置与数据",
-                    fontSize = 18.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(start = 4.dp)
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
         }
 
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            // 1. 顶部留白稍微留一点（8dp）
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
-            // 2. 把间距从 20.dp 改为 12.dp（或者 14.dp），让整体变得紧凑
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
             // 1. 车辆管理
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -527,6 +530,20 @@ fun SettingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
 
                         SettingsRow(
+                            title = "GitHub 仓库", subtitle = "查看Github",
+                            icon = Icons.Default.Code, trailingIcon = null,
+                            enabled = !viewModel.isBackupOperationRunning,
+                            onClick = {
+                                openExternalPage(
+                                    context,
+                                    "https://github.com/furenkun123/FuelTracker",
+                                    "无法打开浏览器"
+                                )
+                            }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+
+                        SettingsRow(
                             title = "更新历史", subtitle = "查看历次版本更新内容",
                             icon = Icons.Default.History, trailingIcon = null,
                             enabled = !viewModel.isBackupOperationRunning, onClick = { showUpdateHistory = true }
@@ -578,7 +595,7 @@ fun SettingsScreen(
                 }
             }
         }
-    }
+
 
     // --- 自动滚动 ---
     AutoScrollOnExpand(isDataExpanded, KeyDataSection, listState)
@@ -772,7 +789,7 @@ private fun AutoScrollOnExpand(expanded: Boolean, sectionKey: String, listState:
         val item = layoutInfo.visibleItemsInfo.firstOrNull { it.key == sectionKey } ?: return@LaunchedEffect
         val overshoot = item.offset + item.size - layoutInfo.viewportEndOffset
         if (overshoot <= 0) return@LaunchedEffect
-        val keepHeaderPx = with(density) { 48.dp.toPx() }
+        val keepHeaderPx = with(density) { 8.dp.toPx() }
         val maxScroll = (item.offset - layoutInfo.viewportStartOffset + keepHeaderPx).coerceAtLeast(0f)
         val scrollBy = overshoot.toFloat().coerceIn(0f, maxScroll)
         if (scrollBy > 0f) {

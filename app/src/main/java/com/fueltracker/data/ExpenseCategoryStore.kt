@@ -10,17 +10,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import java.util.Locale
 
 object ExpenseCategoryStore {
@@ -64,12 +60,6 @@ object ExpenseCategoryStore {
 
     val customCategories: StateFlow<List<String>?> =
         _customCategories.asStateFlow()
-
-    /**
-     * 是否完成首次初始化。
-     */
-    val isInitialized: Boolean
-        get() = _customCategories.value != null
 
     /**
      * 长期数据库监听任务。
@@ -298,9 +288,7 @@ object ExpenseCategoryStore {
 
         val trimmed = normalizeName(name)
 
-        if (trimmed.isEmpty()) return false
-
-        return writeMutex.withLock {
+        return trimmed.isNotEmpty() && writeMutex.withLock {
             val database = requireDatabase()
             val deleted = database.customCategoryDao()
                 .delete(trimmed)
@@ -363,27 +351,4 @@ object ExpenseCategoryStore {
         }
     }
 
-    /**
-     * 强制重新读取数据库。
-     */
-    suspend fun refresh() {
-        checkInitialized()
-
-        val database = requireDatabase()
-        val categories = database.customCategoryDao()
-            .getAll()
-
-        _customCategories.value = categories
-    }
-
-    /**
-     * 释放 Store 监听任务。
-     *
-     * 正常应用运行期间不要主动调用。
-     * 主要用于测试或特殊生命周期管理。
-     */
-    fun stopObserver() {
-        observerJob?.cancel()
-        observerJob = null
-    }
 }

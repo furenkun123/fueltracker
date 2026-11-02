@@ -369,7 +369,7 @@ fun FuelScreen(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = if (isEditMode) "编辑加油记录" else "记加油",
-                    fontSize = 26.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )

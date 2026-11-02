@@ -133,10 +133,10 @@ fun MiuiTopBar(
             }
 
         } else {
+            // 关闭玻璃效果时不绘制不透明背景，
+            // 保留首页内容在 TopBar 背后的可见性
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(barColor)
+                modifier = Modifier.fillMaxSize()
             )
         }
 
