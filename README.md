@@ -2,17 +2,11 @@
 
 一款纯本地、无广告、极简的 Android 车辆油耗与记账应用。基于 Kotlin 和 Jetpack Compose 开发。
 
-<!-- 如果有 Release 包，取消下面这行的注释并修改链接 -->
-<!-- [![Download APK](https://img.shields.io/badge/Download-APK-success.svg)](https://github.com/furenkun123/FuelTracker/releases) -->
-
-<!-- 📸 强烈建议在这里放上你的应用截图，会让项目好看 10 倍 -->
-<!--
 <p align="center">
-  <img src=https://github.com/user-attachments/assets/c217f8fb-eadf-4393-befc-a1ca97206981" width="200" />
+  <img src="https://github.com/user-attachments/assets/c217f8fb-eadf-4393-befc-a1ca97206981" width="200" />
   <img src="https://github.com/user-attachments/assets/acf1b8e3-fbd8-4919-965f-d5b8e645c92b" width="200" />
   <img src="https://github.com/user-attachments/assets/ce3e5352-d449-4179-bf7f-1123b73fbfc1" width="200" />
 </p>
--->
 
 ## ✨ 核心功能
 
@@ -61,6 +55,7 @@ FuelTracker 使用了以下优秀的开源项目，感谢开发者和社区的�
 - [Kotlinx Serialization](https://github.com/Kotlin/kotlinx.serialization)
 - [Kyant Backdrop](https://github.com/Kyant0/Backdrop)
 - [Kyant Shapes](https://github.com/Kyant0/Shapes)
+
 
 感谢所有开源项目的开发者和维护者。
 
