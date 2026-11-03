@@ -236,6 +236,10 @@ fun FuelTrackerApp(
 
                                     },
 
+                                    onOpenSettings = {
+                                        viewModel.navigateTo(AppScreen.SETTINGS)
+                                    },
+
                                     onCollapseProgressChange = {
                                         homeCollapseProgress = it
                                     }
