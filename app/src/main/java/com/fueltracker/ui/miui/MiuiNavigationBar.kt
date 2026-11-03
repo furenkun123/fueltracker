@@ -31,10 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
@@ -44,10 +41,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fueltracker.ui.miui.glass.GlassDefaults
+import com.fueltracker.ui.miui.glass.drawGlassNavigationBackdrop
+import com.fueltracker.ui.miui.glass.drawGlassNavigationHighlight
+import com.fueltracker.ui.miui.glass.drawGlassNavigationOverlay
+import com.fueltracker.ui.miui.glass.drawGlassSelectionPill
 import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.drawPlainBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
 
 @Composable
 fun MiuiNavigationBar(
@@ -62,10 +61,15 @@ fun MiuiNavigationBar(
         MaterialTheme.colorScheme.background.luminance() > 0.5f
 
     val shape: Shape =
-        if (isFloating) RoundedCornerShape(32.dp)
-        else RoundedCornerShape(0.dp)
+        if (isFloating) {
+            RoundedCornerShape(32.dp)
+        } else {
+            RoundedCornerShape(0.dp)
+        }
 
-    Box(modifier.fillMaxWidth()) {
+    Box(
+        modifier = modifier.fillMaxWidth()
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -73,7 +77,10 @@ fun MiuiNavigationBar(
                     if (isFloating) {
                         Modifier
                             .navigationBarsPadding()
-                            .padding(horizontal = 24.dp, vertical = 16.dp)
+                            .padding(
+                                horizontal = 24.dp,
+                                vertical = 16.dp
+                            )
                     } else {
                         Modifier
                     }
@@ -117,41 +124,49 @@ private fun NavigationBarSurface(
     selectedIndex: Int,
     content: @Composable RowScope.() -> Unit
 ) {
-    val solidColor =
-        if (isLight) Color(0xFFF8F8FA)
-        else Color(0xFF1C1C1E)
+    val solidColor = if (isLight) {
+        Color(0xFFF8F8FA)
+    } else {
+        Color(0xFF1C1C1E)
+    }
 
     val glassEnabled = isGlassEnabled && isFloating
 
     BoxWithConstraints(
-
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(
-                    if (glassEnabled) Color.Transparent else solidColor
-                )
-                .then(
-                    if (isFloating) {
-                        Modifier.border(
-                            width = 0.8.dp,
-                            color = if (isLight) {
-                                Color(0xFFD1D1D6).copy(alpha = 0.65f)
-                            } else {
-                                Color.White.copy(alpha = 0.12f)
-                            },
-                            shape = shape
-                        )
-                    } else {
-                        Modifier
-                    }
-                )
-
-    ){
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+                if (glassEnabled) {
+                    Color.Transparent
+                } else {
+                    solidColor
+                }
+            )
+            .then(
+                if (isFloating) {
+                    Modifier.border(
+                        width = 0.8.dp,
+                        color = if (isLight) {
+                            Color(0xFFD1D1D6).copy(alpha = 0.65f)
+                        } else {
+                            Color.White.copy(alpha = 0.12f)
+                        },
+                        shape = shape
+                    )
+                } else {
+                    Modifier
+                }
+            )
+    ) {
         val tabCount = 3
         val horizontalPadding = 4.dp
-        val tabWidth = (maxWidth - horizontalPadding * 2) / tabCount
-        val pillWidth = tabWidth - horizontalPadding * 2
+
+        val tabWidth =
+            (maxWidth - horizontalPadding * 2) / tabCount
+
+        val pillWidth =
+            tabWidth - horizontalPadding * 2
 
         val animatedIndex = remember {
             Animatable(selectedIndex.toFloat())
@@ -159,7 +174,9 @@ private fun NavigationBarSurface(
 
         LaunchedEffect(selectedIndex) {
             animatedIndex.animateTo(
-                targetValue = selectedIndex.coerceIn(0, tabCount - 1).toFloat(),
+                targetValue = selectedIndex
+                    .coerceIn(0, tabCount - 1)
+                    .toFloat(),
                 animationSpec = spring(
                     dampingRatio = 0.72f,
                     stiffness = 380f
@@ -172,147 +189,53 @@ private fun NavigationBarSurface(
             Box(
                 Modifier
                     .matchParentSize()
-                    .drawPlainBackdrop(
+                    .drawGlassNavigationBackdrop(
                         backdrop = backdrop,
-                        shape = { shape },
-                        effects = {
-                            blur(2.dp.toPx())
-                            lens(
-                                refractionHeight = 6.dp.toPx(),
-                                refractionAmount = 12.dp.toPx(),
-                                depthEffect = false,
-                                chromaticAberration = false
-                            )
-                        },
-                        onDrawSurface = {
-                            drawRect(
-                                if (isLight) {
-                                    Color(0xFFF8F8FA).copy(alpha = 0.30f)
-                                } else {
-                                    Color(0xFF202024).copy(alpha = 0.22f)
-                                }
-                            )
-                        }
+                        shape = shape,
+                        isLight = isLight
                     )
             )
         }
 
         // 第二层：底部淡色叠加
-        if (isFloating && glassEnabled) {
+        if (glassEnabled) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .drawBehind {
-                        val overlayColor = if (isLight) {
-                            Color(0xFFD1D1D6).copy(alpha = 0.20f)
-                        } else {
-                            Color(0xFFB8B8C2).copy(alpha = 0.13f)
-                        }
-
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Transparent,
-                                    overlayColor
-                                ),
-                                startY = size.height * 0.55f,
-                                endY = size.height
-                            )
-                        )
-                    }
+                    .drawGlassNavigationOverlay(isLight)
             )
         }
 
         // 第三层：顶部反光
-        if (isFloating && glassEnabled) {
+        if (glassEnabled) {
             Box(
                 Modifier
                     .matchParentSize()
-                    .drawBehind {
-                        val highlight =
-                            if (isLight) 0.16f else 0.018f
-
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colorStops = arrayOf(
-                                    0f to Color.White.copy(alpha = highlight),
-                                    0.12f to Color.White.copy(alpha = highlight * 0.35f),
-                                    0.30f to Color.Transparent
-                                ),
-                                startY = 0f,
-                                endY = size.height * 0.38f
-                            )
-                        )
-
-                        drawLine(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.White.copy(alpha = 0.06f),
-                                    Color.White.copy(alpha = 0.12f),
-                                    Color.White.copy(alpha = 0.06f),
-                                    Color.Transparent
-                                )
-                            ),
-                            start = Offset(size.width * 0.06f, 1.5.dp.toPx()),
-                            end = Offset(size.width * 0.94f, 1.5.dp.toPx()),
-                            strokeWidth = 2.dp.toPx()
-                        )
-                    }
+                    .drawGlassNavigationHighlight(isLight)
             )
         }
 
         // 第四层：弹性选中胶囊
         val pillOffset = with(LocalDensity.current) {
-            animatedIndex.value * tabWidth.toPx() + horizontalPadding.toPx()
+            animatedIndex.value * tabWidth.toPx() +
+                    horizontalPadding.toPx()
         }
+
         if (glassEnabled) {
             Box(
                 modifier = Modifier
                     .offset {
                         IntOffset(
                             x = pillOffset.toInt(),
-                            y = 4.dp.roundToPx()
+                            y = GlassDefaults.Navigation.pillOffsetY.roundToPx()
                         )
                     }
                     .width(pillWidth)
-                    .height(56.dp)
-                    .drawPlainBackdrop(
+                    .height(GlassDefaults.Navigation.pillHeight)
+                    .drawGlassSelectionPill(
                         backdrop = backdrop,
-                        shape = { RoundedCornerShape(28.dp) },
-                        effects = {
-                            blur(1.dp.toPx())
-                            lens(
-                                refractionHeight = 8.dp.toPx(),
-                                refractionAmount = 12.dp.toPx(),
-                                depthEffect = false,
-                                chromaticAberration = false
-                            )
-                        },
-                        onDrawSurface = {
-                            drawRect(
-                                if (isLight) {
-                                    Color(0xFFFFFFFF).copy(alpha = 0.58f)
-                                } else {
-                                    Color.White.copy(alpha = 0.10f)
-                                }
-                            )
-                        }
+                        isLight = isLight
                     )
-
-                    .drawBehind {
-                        drawRoundRect(
-                            color = if (isLight) {
-                                Color.White.copy(alpha = 0.18f)
-                            } else {
-                                Color.White.copy(alpha = 0.08f)
-                            },
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                                28.dp.toPx()
-                            )
-                        )
-                    }
             )
         } else {
             Box(
@@ -356,8 +279,11 @@ fun RowScope.MiuiNavigationItem(
     label: String
 ) {
     val activeColor =
-        if (selected) MiuiColors.Primary
-        else MiuiColors.SecondaryText
+        if (selected) {
+            MiuiColors.Primary
+        } else {
+            MiuiColors.SecondaryText
+        }
 
     Column(
         modifier = Modifier
