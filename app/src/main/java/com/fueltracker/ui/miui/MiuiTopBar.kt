@@ -52,6 +52,8 @@ fun MiuiStatusBarGlass(
     modifier: Modifier = Modifier
 ) {
     val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // MaterialTheme 只能在 Composable 上下文中读取，不能放在绘制回调内。
+    val statusBarBackground = MaterialTheme.colorScheme.background
     if (isGlassEnabled && statusBarHeight > 0.dp) {
         Box(
             modifier = modifier
@@ -65,8 +67,7 @@ fun MiuiStatusBarGlass(
                         blur(18.dp.toPx())
                     },
                     onDrawSurface = {
-                        val background = MaterialTheme.colorScheme.background
-                        drawRect(background.copy(alpha = 0.16f))
+                        drawRect(statusBarBackground.copy(alpha = 0.16f))
                     }
                 )
         )
