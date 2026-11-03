@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -40,8 +39,6 @@ import com.fueltracker.ui.components.PrivacyDialog
 import com.fueltracker.ui.components.UpdateLogDialog
 import com.fueltracker.ui.miui.MiuiNavigationBar
 import com.fueltracker.ui.miui.MiuiNavigationItem
-import com.fueltracker.ui.miui.MiuiTopBar
-import com.fueltracker.ui.miui.MiuiTopBarIconButton
 import com.fueltracker.ui.miui.glass.ProvideFuelTrackerGlass
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
@@ -480,31 +477,6 @@ fun FuelTrackerApp(
                 }
             }
         }
-        MiuiTopBar(
-            backdrop = appBackdrop,
-            isGlassEnabled = isGlassEnabled,
-
-            // 只有主页面显示设置按钮
-            showActionArea = screen == AppScreen.HOME,
-
-
-            navigationIcon = null,
-
-            action = if (screen == AppScreen.HOME) {
-                {
-                    MiuiTopBarIconButton(
-                        icon = Icons.Default.Settings,
-                        contentDescription = "设置",
-                        onClick = {
-                            viewModel.navigateTo(AppScreen.SETTINGS)
-                        }
-                    )
-                }
-            } else {
-                null
-            }
-        )
-
         // ---------- 悬浮底部导航栏 ----------
         if (showBottomBar) {
             MiuiNavigationBar(
