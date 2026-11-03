@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -39,8 +40,8 @@ import com.fueltracker.ui.components.PrivacyDialog
 import com.fueltracker.ui.components.UpdateLogDialog
 import com.fueltracker.ui.miui.MiuiNavigationBar
 import com.fueltracker.ui.miui.MiuiNavigationItem
-import com.fueltracker.ui.miui.MiuiStatusBarGlass
-import com.fueltracker.ui.miui.glass.ProvideFuelTrackerGlass
+import com.fueltracker.ui.miui.MiuiTopBar
+import com.fueltracker.ui.miui.MiuiTopBarIconButton
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
 import com.fueltracker.viewmodel.ParkingNotificationState
@@ -151,12 +152,8 @@ fun FuelTrackerApp(
     )
 
     // ============================================================
-    // 全 App 内容层：向所有页面组件提供统一 Backdrop 和玻璃开关
+    // 全 App 内容层
     // ============================================================
-    ProvideFuelTrackerGlass(
-        backdrop = appBackdrop,
-        enabled = isGlassEnabled
-    ) {
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -235,10 +232,6 @@ fun FuelTrackerApp(
                                     onIgnoreParking = {
                                         viewModel.ignoreActiveParkingNotification()
 
-                                    },
-
-                                    onOpenSettings = {
-                                        viewModel.navigateTo(AppScreen.SETTINGS)
                                     },
 
                                     onCollapseProgressChange = {
@@ -482,11 +475,29 @@ fun FuelTrackerApp(
                 }
             }
         }
-        // 仅绘制系统状态栏区域的玻璃背景，不添加全局标题栏。
-        MiuiStatusBarGlass(
+        MiuiTopBar(
             backdrop = appBackdrop,
             isGlassEnabled = isGlassEnabled,
-            modifier = Modifier.align(Alignment.TopCenter)
+
+            // 只有主页面显示设置按钮
+            showActionArea = screen == AppScreen.HOME,
+
+
+            navigationIcon = null,
+
+            action = if (screen == AppScreen.HOME) {
+                {
+                    MiuiTopBarIconButton(
+                        icon = Icons.Default.Settings,
+                        contentDescription = "设置",
+                        onClick = {
+                            viewModel.navigateTo(AppScreen.SETTINGS)
+                        }
+                    )
+                }
+            } else {
+                null
+            }
         )
 
         // ---------- 悬浮底部导航栏 ----------
@@ -564,7 +575,6 @@ fun FuelTrackerApp(
                 }
             )
         }
-    }
     }
 }
 
