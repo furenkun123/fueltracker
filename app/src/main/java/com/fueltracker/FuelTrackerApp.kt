@@ -39,6 +39,7 @@ import com.fueltracker.ui.components.PrivacyDialog
 import com.fueltracker.ui.components.UpdateLogDialog
 import com.fueltracker.ui.miui.MiuiNavigationBar
 import com.fueltracker.ui.miui.MiuiNavigationItem
+import com.fueltracker.ui.miui.MiuiStatusBarGlass
 import com.fueltracker.ui.miui.glass.ProvideFuelTrackerGlass
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
@@ -481,6 +482,13 @@ fun FuelTrackerApp(
                 }
             }
         }
+        // 仅绘制系统状态栏区域的玻璃背景，不添加全局标题栏。
+        MiuiStatusBarGlass(
+            backdrop = appBackdrop,
+            isGlassEnabled = isGlassEnabled,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+
         // ---------- 悬浮底部导航栏 ----------
         if (showBottomBar) {
             MiuiNavigationBar(
