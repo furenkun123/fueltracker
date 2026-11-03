@@ -2,6 +2,8 @@ package com.fueltracker.ui.components
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,6 +50,54 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.util.UpdateLogManager
 
+
+// ============================================================
+// 公共玻璃弹窗容器（不使用实时 Backdrop，避免额外 RenderNode 采集）
+// ============================================================
+
+@Composable
+fun GlassDialogSurface(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val shape = RoundedCornerShape(24.dp)
+    val surface = MaterialTheme.colorScheme.surface
+    val outline = MaterialTheme.colorScheme.outline
+    val onSurface = MaterialTheme.colorScheme.onSurface
+
+    Surface(
+        modifier = modifier,
+        shape = shape,
+        color = surface.copy(alpha = 0.86f),
+        border = BorderStroke(
+            1.dp,
+            Brush.linearGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.78f),
+                    outline.copy(alpha = 0.38f),
+                    onSurface.copy(alpha = 0.12f),
+                    Color.White.copy(alpha = 0.52f)
+                )
+            )
+        ),
+        shadowElevation = 18.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            onSurface.copy(alpha = 0.035f),
+                            Color.White.copy(alpha = 0.12f),
+                            surface.copy(alpha = 0.04f)
+                        )
+                    )
+                ),
+            content = content
+        )
+    }
+}
 
 // ============================================================
 // 公共弹窗外壳
@@ -62,9 +113,7 @@ fun ScrollableSettingsDialog(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
+        GlassDialogSurface(
             modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp).padding(horizontal = 16.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
@@ -181,9 +230,7 @@ fun UpdateLogDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
+        GlassDialogSurface(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 48.dp)
