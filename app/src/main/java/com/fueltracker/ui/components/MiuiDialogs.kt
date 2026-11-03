@@ -303,7 +303,8 @@ fun MiuiConfirmDialog(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.liquidGlass(shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), tint = if (MaterialTheme.colorScheme.background.red > 0.5f) Color.White.copy(alpha = 0.72f) else Color(0xFF20232B).copy(alpha = 0.78f)),
+        containerColor = Color.Transparent,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         dragHandle = {
             Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
