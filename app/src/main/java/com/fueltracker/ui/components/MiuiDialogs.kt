@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fueltracker.ui.miui.glass.liquidGlass
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.util.UpdateLogManager
@@ -64,8 +65,9 @@ fun ScrollableSettingsDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
+            color = Color.Transparent,
             modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp).padding(horizontal = 16.dp)
+                .liquidGlass(shape = RoundedCornerShape(20.dp), tint = if (MaterialTheme.colorScheme.background.red > 0.5f) Color.White.copy(alpha = 0.72f) else Color(0xFF20232B).copy(alpha = 0.78f))
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
                 Text(
@@ -183,10 +185,11 @@ fun UpdateLogDialog(
     ) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
+            color = Color.Transparent,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 48.dp)
+                .liquidGlass(shape = RoundedCornerShape(20.dp), tint = if (MaterialTheme.colorScheme.background.red > 0.5f) Color.White.copy(alpha = 0.72f) else Color(0xFF20232B).copy(alpha = 0.78f))
         ) {
             Column(
                 modifier = Modifier
