@@ -221,7 +221,8 @@ fun MiuiDatePickerDialog(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        modifier = Modifier.liquidGlass(shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), tint = if (MaterialTheme.colorScheme.background.red > 0.5f) Color.White.copy(alpha = 0.72f) else Color(0xFF20232B).copy(alpha = 0.78f)),
+        containerColor = Color.Transparent, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         dragHandle = {
             Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp), contentAlignment = Alignment.Center) {
                 Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
