@@ -32,8 +32,8 @@ fun Modifier.drawGlassNavigationBackdrop(
                     GlassDefaults.Navigation.backdropRefractionHeight.toPx(),
                 refractionAmount =
                     GlassDefaults.Navigation.backdropRefractionAmount.toPx(),
-                depthEffect = false,
-                chromaticAberration = false
+                depthEffect = true,
+                chromaticAberration = true
             )
         },
         onDrawSurface = {
@@ -158,8 +158,8 @@ fun Modifier.drawGlassSelectionPill(
                     GlassDefaults.Navigation.pillRefractionHeight.toPx(),
                 refractionAmount =
                     GlassDefaults.Navigation.pillRefractionAmount.toPx(),
-                depthEffect = false,
-                chromaticAberration = false
+                depthEffect = true,
+                chromaticAberration = true
             )
         },
         onDrawSurface = {
