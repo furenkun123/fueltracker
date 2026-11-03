@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -30,8 +29,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,9 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,6 +59,8 @@ import com.fueltracker.ui.components.MiuiDatePickerDialog
 import com.fueltracker.ui.miui.MiuiBackButton
 import com.fueltracker.ui.miui.MiuiButton
 import com.fueltracker.ui.miui.MiuiCard
+import com.fueltracker.ui.miui.MiuiFieldLabel
+import com.fueltracker.ui.miui.MiuiTextField
 import com.fueltracker.util.toDateTimeText
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -165,16 +162,20 @@ fun ExpenseEditScreen(
 
             // 金额
             ExpenseFormCard {
-                ExpenseInputField(
-                    value = amountText, onValueChange = { amountText = it },
-                    label = "金额", isRequired = true, suffix = "元", keyboardType = KeyboardType.Decimal
+                MiuiTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = "金额",
+                    isRequired = true,
+                    suffix = "元",
+                    keyboardType = KeyboardType.Decimal
                 )
             }
 
             // 时间
             ExpenseFormCard {
                 Column {
-                    ExpenseFieldLabel("时间", isRequired = true)
+                    MiuiFieldLabel("时间", isRequired = true)
                     Spacer(Modifier.height(6.dp))
                     Box(
                         modifier = Modifier.fillMaxWidth().height(56.dp)
@@ -189,7 +190,11 @@ fun ExpenseEditScreen(
 
             // 备注
             ExpenseFormCard {
-                ExpenseInputField(value = note, onValueChange = { note = it }, label = "备注（可选）")
+                MiuiTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = "备注（可选）"
+                )
             }
 
             Spacer(Modifier.height(8.dp))
@@ -273,56 +278,12 @@ fun ExpenseEditScreen(
 // ============================================================
 
 @Composable
-private fun ExpenseFieldLabel(text: String, isRequired: Boolean = false) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        if (isRequired) Text(" *", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-    }
-}
-
-@Composable
 private fun ExpenseFormCard(content: @Composable ColumnScope.() -> Unit) {
     MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), content = content)
     }
 }
 
-@Composable
-private fun CommonTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    label: String? = null,
-    placeholder: String? = null,
-    isRequired: Boolean = false,
-    suffix: String? = null,
-    keyboardType: KeyboardType = KeyboardType.Text
-) {
-    Column(modifier = modifier) {
-        label?.let { ExpenseFieldLabel(it, isRequired) }
-        if (label != null) Spacer(Modifier.height(6.dp))
-        OutlinedTextField(
-            value = value, onValueChange = onValueChange, modifier = Modifier.fillMaxWidth(), singleLine = true,
-            shape = RoundedCornerShape(14.dp),
-            textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
-            placeholder = placeholder?.let { { Text(it, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
-            suffix = suffix?.let { { Text(it, fontSize = 14.sp) } },
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Transparent, cursorColor = MaterialTheme.colorScheme.primary
-            )
-        )
-    }
-}
-
-@Composable
-private fun ExpenseInputField(
-    value: String, onValueChange: (String) -> Unit, label: String,
-    isRequired: Boolean = false, suffix: String? = null, keyboardType: KeyboardType = KeyboardType.Text
-) {
-    CommonTextField(value, onValueChange, label = label, isRequired = isRequired, suffix = suffix, keyboardType = keyboardType)
-}
 
 @Composable
 private fun CategoryChip(
@@ -379,7 +340,11 @@ private fun EditCategoryDialog(
                     )
                     Spacer(Modifier.height(16.dp))
 
-                    CommonTextField(value = name, onValueChange = { name = it }, label = "分类名")
+                    MiuiTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = "分类名"
+                    )
 
                     Spacer(Modifier.height(16.dp))
 
@@ -424,7 +389,11 @@ private fun MiuixInputDialog(
             Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                 Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
                 Spacer(Modifier.height(16.dp))
-                CommonTextField(value = value, onValueChange = onValueChange, placeholder = placeholder)
+                MiuiTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    placeholder = placeholder
+                )
                 Spacer(Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(24.dp)) { Text("取消", color = MaterialTheme.colorScheme.onSurface) }

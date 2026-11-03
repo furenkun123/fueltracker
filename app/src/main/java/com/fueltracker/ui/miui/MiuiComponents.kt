@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,6 +40,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.unit.Dp
+
 
 /**
  * 普通主按钮
@@ -265,6 +272,169 @@ fun MiuiInputItem(
     }
 }
 
+
+/**
+ * 通用 MIUI 风格表单输入框
+ *
+ * 支持：
+ * - 标签及必填标记
+ * - 输入错误状态及错误提示
+ * - 普通后缀、可点击后缀
+ * - 标签右侧自定义内容
+ * - 输入框占位提示
+ * - 辅助说明
+ * - 启用/禁用状态
+ * - 键盘类型
+ *
+ * 不负责业务数据校验、数值计算或保存逻辑。
+ */
+@Composable
+fun MiuiTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    placeholder: String? = null,
+    isRequired: Boolean = false,
+    isError: Boolean = false,
+    errorMessage: String? = null,
+    suffix: String? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    keyboardOptions: KeyboardOptions = KeyboardOptions(
+        keyboardType = keyboardType
+    ),
+    keyboardActions: KeyboardActions = KeyboardActions(),
+    onSuffixClick: (() -> Unit)? = null,
+    labelTrailing: (@Composable () -> Unit)? = null,
+    supportingText: String? = null,
+    enabled: Boolean = true,
+    horizontalPadding: Dp = 0.dp
+) {
+    Column(
+        modifier = modifier.padding(horizontal = horizontalPadding)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!label.isNullOrBlank()) {
+                    Text(
+                        text = label,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                if (isRequired) {
+                    Text(
+                        text = " *",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            labelTrailing?.let {
+                Spacer(Modifier.width(4.dp))
+                it()
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = enabled,
+            isError = isError,
+            shape = RoundedCornerShape(14.dp),
+            textStyle = TextStyle(
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            ),
+            placeholder = placeholder?.let {
+                {
+                    Text(
+                        text = it,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            suffix = {
+                if (suffix != null) {
+                    if (onSuffixClick != null) {
+                        Text(
+                            text = "$suffix ▾",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable(onClick = onSuffixClick)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    } else {
+                        Text(
+                            text = suffix,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            },
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = Color.Transparent,
+                disabledBorderColor = Color.Transparent,
+
+                errorBorderColor = MaterialTheme.colorScheme.error,
+                cursorColor = MaterialTheme.colorScheme.primary
+            )
+        )
+
+        when {
+            isError && errorMessage != null -> {
+                Text(
+                    text = errorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(
+                        start = 4.dp,
+                        top = 2.dp
+                    )
+                )
+            }
+
+            supportingText != null -> {
+                Text(
+                    text = supportingText,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(
+                        start = 4.dp,
+                        top = 2.dp
+                    )
+                )
+            }
+        }
+    }
+}
+
+
 @Composable
 fun MiuiClickableItem(
     label: String,
@@ -374,4 +544,28 @@ object MiuiColors {
     val SecondaryText: Color
         @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 
+}
+@Composable
+fun MiuiFieldLabel(
+    text: String,
+    isRequired: Boolean = false
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        if (isRequired) {
+            Text(
+                text = " *",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+    }
 }

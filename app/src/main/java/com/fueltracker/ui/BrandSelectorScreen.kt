@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CarBrand
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.ui.miui.MiuiBackButton
+import com.fueltracker.ui.miui.MiuiTextField
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -274,10 +275,18 @@ private fun BrandSearchBox(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            CommonTextField(
-                value = value, onValueChange = onValueChange, placeholder = "搜索汽车品牌...",
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onSearchAction() }),
+            MiuiTextField(
+                value = value,
+                onValueChange = onValueChange,
+                placeholder = "搜索汽车品牌...",
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Search
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        onSearchAction()
+                    }
+                ),
                 modifier = Modifier.weight(1f)
             )
             if (value.isNotEmpty()) {
