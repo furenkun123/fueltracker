@@ -1,5 +1,6 @@
 package com.fueltracker.ui.miui
 
+import com.fueltracker.ui.miui.glass.liquidGlass
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -41,7 +42,7 @@ fun MiuiChip(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
-            .background(backgroundColor)
+            .liquidGlass(shape = RoundedCornerShape(cornerRadius), tint = backgroundColor.copy(alpha = 0.72f))
             .padding(horizontal = paddingH, vertical = paddingV),
         contentAlignment = Alignment.Center
     ) {
