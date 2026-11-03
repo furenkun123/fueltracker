@@ -42,6 +42,7 @@ import com.fueltracker.ui.miui.MiuiNavigationBar
 import com.fueltracker.ui.miui.MiuiNavigationItem
 import com.fueltracker.ui.miui.MiuiTopBar
 import com.fueltracker.ui.miui.MiuiTopBarIconButton
+import com.fueltracker.ui.miui.glass.ProvideFuelTrackerGlass
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
 import com.fueltracker.viewmodel.ParkingNotificationState
@@ -152,8 +153,12 @@ fun FuelTrackerApp(
     )
 
     // ============================================================
-    // 全 App 内容层
+    // 全 App 内容层：向所有页面组件提供统一 Backdrop 和玻璃开关
     // ============================================================
+    ProvideFuelTrackerGlass(
+        backdrop = appBackdrop,
+        enabled = isGlassEnabled
+    ) {
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -541,6 +546,7 @@ fun FuelTrackerApp(
                 )
             }
         }
+    }
     }
 
     // ---------- 首次安装：隐私声明 ----------
