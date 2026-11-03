@@ -9,7 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -53,14 +52,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CATEGORY_PARKING
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.ui.miui.MiuiBackButton
-import com.fueltracker.ui.miui.MiuiCard
+import com.fueltracker.ui.miui.MiuiChip
+import com.fueltracker.ui.miui.MiuiFormCard
 import com.fueltracker.util.LocationHelper
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -169,7 +167,7 @@ fun ParkingScreen(
 
         // 👇 2. 位置选择卡片
         item {
-            ParkingFormCard {
+            MiuiFormCard {
                 ParkingInputField(
                     value = locationName, onValueChange = { locationName = it },
                     label = "位置", placeholder = "如：万达广场",
@@ -216,15 +214,20 @@ fun ParkingScreen(
                         )
                     }
                     Spacer(Modifier.height(6.dp))
-                    CustomChip(
-                        text = candidate,
-                        selected = false,
-                        onClick = {
+                    Box(
+                        modifier = Modifier.clickable {
                             locationName = candidate
                             locationCandidate = null
-                        },
-                        cornerRadius = 20.dp, paddingH = 14.dp, paddingV = 8.dp, fontSize = 13.sp
-                    )
+                        }
+                    ) {
+                        MiuiChip(
+                            text = candidate,
+                            cornerRadius = 20.dp,
+                            paddingH = 14.dp,
+                            paddingV = 8.dp,
+                            fontSize = 13.sp
+                        )
+                    }
                 }
 
                 val displayRecentLocations = recentLocations.filter {
@@ -245,12 +248,19 @@ fun ParkingScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         displayRecentLocations.forEach { loc ->
-                            CustomChip(
-                                text = loc,
-                                selected = false,
-                                onClick = { locationName = loc },
-                                cornerRadius = 20.dp, paddingH = 14.dp, paddingV = 8.dp, fontSize = 13.sp
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable { locationName = loc }
+                            ) {
+                                MiuiChip(
+                                    text = loc,
+                                    cornerRadius = 20.dp,
+                                    paddingH = 14.dp,
+                                    paddingV = 8.dp,
+                                    fontSize = 13.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -274,19 +284,19 @@ fun ParkingScreen(
 
         // 👇 4. 车位号与金额、备注
         item {
-            ParkingFormCard {
+            MiuiFormCard {
                 ParkingInputField(spotNumber, { spotNumber = it }, "车位号", "如：135")
             }
         }
 
         item {
-            ParkingFormCard {
+            MiuiFormCard {
                 ParkingInputField(amountText, { amountText = it }, "停车费（可选）", "如：5.00", "元", KeyboardType.Decimal)
             }
         }
 
         item {
-            ParkingFormCard {
+            MiuiFormCard {
                 ParkingInputField(note, { note = it }, "备注（可选）", "如：电梯口旁边")
             }
         }
@@ -341,39 +351,24 @@ fun ParkingScreen(
     }
 }
 
-// ============================================================
-// 抽离出的通用组件（无需修改）
-// ============================================================
-
-@Composable
-private fun ParkingFormCard(content: @Composable ColumnScope.() -> Unit) {
-    MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), content = content)
-    }
-}
-
-@Composable
-private fun CustomChip(
-    text: String, selected: Boolean, onClick: () -> Unit,
-    cornerRadius: Dp = 12.dp, paddingH: Dp = 16.dp, paddingV: Dp = 10.dp, fontSize: TextUnit = 15.sp
-) {
-    Box(
-        modifier = Modifier.clip(RoundedCornerShape(cornerRadius))
-            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onClick).padding(horizontal = paddingH, vertical = paddingV)
-    ) {
-        Text(text, fontSize = fontSize, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface, maxLines = 1)
-    }
-}
 
 @Composable
 private fun ParkingOptionSection(title: String, options: List<String>, currentValue: String, onValueChange: (String) -> Unit, placeholder: String) {
-    ParkingFormCard {
+    MiuiFormCard {
         Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(10.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             options.forEach { option ->
-                CustomChip(text = option, selected = currentValue == option, onClick = { onValueChange(if (currentValue == option) "" else option) })
+                Box(
+                    modifier = Modifier.clickable {
+                        onValueChange(if (currentValue == option) "" else option)
+                    }
+                ) {
+                    MiuiChip(
+                        text = option,
+                        selected = currentValue == option
+                    )
+                }
             }
         }
         Spacer(Modifier.height(10.dp))

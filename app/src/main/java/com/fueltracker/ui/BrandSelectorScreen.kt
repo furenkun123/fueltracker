@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -47,11 +46,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -60,13 +57,10 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CarBrand
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.ui.miui.MiuiBackButton
-import com.fueltracker.ui.miui.MiuiTextField
+import com.fueltracker.ui.miui.MiuiSearchTextField
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-private suspend fun ensureDbLoaded(db: CarDatabase) {
-    check(db.ensureCatalogLoaded() != null) { "车型目录加载失败" }
-}
 
 private fun letterSortKey(letter: String): Int {
     return when (letter) {
@@ -275,7 +269,7 @@ private fun BrandSearchBox(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            MiuiTextField(
+            MiuiSearchTextField(
                 value = value,
                 onValueChange = onValueChange,
                 placeholder = "搜索汽车品牌...",
@@ -388,25 +382,4 @@ private fun AlphabetIndexBar(letters: List<String>, onLetterClick: (String) -> U
             )
         }
     }
-}
-
-/** 通用的带 placeholder 的输入框 */
-@Composable
-private fun CommonTextField(
-    value: String, onValueChange: (String) -> Unit, placeholder: String,
-    modifier: Modifier = Modifier, keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    keyboardActions: KeyboardActions = KeyboardActions.Default
-) {
-    BasicTextField(
-        value = value, onValueChange = onValueChange,
-        textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary), singleLine = true,
-        keyboardOptions = keyboardOptions, keyboardActions = keyboardActions, modifier = modifier,
-        decorationBox = { innerTextField ->
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
-                if (value.isEmpty()) Text(placeholder, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                innerTextField()
-            }
-        }
-    )
 }

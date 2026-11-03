@@ -8,7 +8,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -58,8 +57,9 @@ import com.fueltracker.ui.components.MiuiConfirmDialog
 import com.fueltracker.ui.components.MiuiDatePickerDialog
 import com.fueltracker.ui.miui.MiuiBackButton
 import com.fueltracker.ui.miui.MiuiButton
-import com.fueltracker.ui.miui.MiuiCard
+import com.fueltracker.ui.miui.MiuiChip
 import com.fueltracker.ui.miui.MiuiFieldLabel
+import com.fueltracker.ui.miui.MiuiFormCard
 import com.fueltracker.ui.miui.MiuiTextField
 import com.fueltracker.util.toDateTimeText
 import com.fueltracker.viewmodel.MainViewModel
@@ -135,7 +135,7 @@ fun ExpenseEditScreen(
             }
 
             // 分类
-            ExpenseFormCard {
+            MiuiFormCard {
                 Text("分类", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
                 FlowRow(
@@ -161,7 +161,7 @@ fun ExpenseEditScreen(
             }
 
             // 金额
-            ExpenseFormCard {
+            MiuiFormCard {
                 MiuiTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
@@ -173,7 +173,7 @@ fun ExpenseEditScreen(
             }
 
             // 时间
-            ExpenseFormCard {
+            MiuiFormCard {
                 Column {
                     MiuiFieldLabel("时间", isRequired = true)
                     Spacer(Modifier.height(6.dp))
@@ -189,7 +189,7 @@ fun ExpenseEditScreen(
             }
 
             // 备注
-            ExpenseFormCard {
+            MiuiFormCard {
                 MiuiTextField(
                     value = note,
                     onValueChange = { note = it },
@@ -273,32 +273,49 @@ fun ExpenseEditScreen(
     }
 }
 
-// ============================================================
-// 复用组件区
-// ============================================================
-
-@Composable
-private fun ExpenseFormCard(content: @Composable ColumnScope.() -> Unit) {
-    MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), content = content)
-    }
-}
-
-
 @Composable
 private fun CategoryChip(
-    text: String, selected: Boolean, onClick: () -> Unit,
-    isCustom: Boolean = false, isAction: Boolean = false, onLongClick: (() -> Unit)? = null
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    isCustom: Boolean = false,
+    isAction: Boolean = false,
+    onLongClick: (() -> Unit)? = null
 ) {
-    val bgColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val textColor = when { selected -> MaterialTheme.colorScheme.onPrimary; isAction -> MaterialTheme.colorScheme.primary; else -> MaterialTheme.colorScheme.onSurface }
+    val bgColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    val textColor = when {
+        selected -> MaterialTheme.colorScheme.onPrimary
+        isAction -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
     Box(
-        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(bgColor)
-            .combinedClickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = if (isCustom) onLongClick else null)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(bgColor)
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+                onLongClick = if (isCustom) onLongClick else null
+            )
     ) {
-        Text(text, fontSize = 15.sp, fontWeight = if (selected || isAction) FontWeight.SemiBold else FontWeight.Normal, color = textColor, maxLines = 1)
+        MiuiChip(
+            text = text,
+            selected = selected,
+            backgroundColor = bgColor,
+            contentColor = textColor,
+            fontWeight = if (selected || isAction) {
+                FontWeight.SemiBold
+            } else {
+                FontWeight.Normal
+            }
+        )
     }
 }
 

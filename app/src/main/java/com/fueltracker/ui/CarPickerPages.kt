@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -44,11 +43,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -58,15 +55,12 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.data.Trim
 import com.fueltracker.ui.miui.MiuiBackButton
+import com.fueltracker.ui.miui.MiuiSearchTextField
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private const val TAG = "PickerScreen"
-
-private suspend fun ensureDbLoaded(db: CarDatabase) {
-    check(db.ensureCatalogLoaded() != null) { "车型目录加载失败" }
-}
 
 @Composable
 fun SeriesSelectorScreen(brand: String, onBack: () -> Unit, onSelected: (String) -> Unit, onManualInput: (String) -> Unit = onSelected) {
@@ -192,9 +186,16 @@ private fun <T> PickerListScreen(
 
 @Composable
 private fun PickerScaffold(
-    title: String, subtitle: String, onBack: () -> Unit, search: String,
-    onSearchChange: (String) -> Unit, placeholder: String, loading: Boolean,
-    errorMessage: String?, showSearch: Boolean, onSearchAction: () -> Unit,
+    title: String,
+    subtitle: String,
+    onBack: () -> Unit,
+    search: String,
+    onSearchChange: (String) -> Unit,
+    placeholder: String,
+    loading: Boolean,
+    errorMessage: String?,
+    showSearch: Boolean,
+    onSearchAction: () -> Unit,
     content: @Composable () -> Unit
 ) {
     Column(
@@ -254,25 +255,7 @@ private fun PickerScaffold(
     }
 }
 
-@Composable
-private fun PickerTextField(
-    value: String, onValueChange: (String) -> Unit, placeholder: String,
-    modifier: Modifier = Modifier, keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    keyboardActions: KeyboardActions = KeyboardActions.Default
-) {
-    BasicTextField(
-        value = value, onValueChange = onValueChange,
-        textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary), singleLine = true,
-        keyboardOptions = keyboardOptions, keyboardActions = keyboardActions, modifier = modifier,
-        decorationBox = { innerTextField ->
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
-                if (value.isEmpty()) Text(placeholder, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                innerTextField()
-            }
-        }
-    )
-}
+
 
 @Composable
 private fun PickerItemWrapper(onClick: () -> Unit, content: @Composable () -> Unit) {
@@ -299,11 +282,19 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
         Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            PickerTextField(
-                value = value, onValueChange = { value = it }, placeholder = placeholder,
+            MiuiSearchTextField(
+                value = value,
+                onValueChange = { value = it },
+                placeholder = placeholder,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { submit() }),
-                modifier = Modifier.weight(1f).height(38.dp).clip(RoundedCornerShape(8.dp)).background(inputBg).padding(horizontal = 10.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(inputBg)
+                    .padding(horizontal = 10.dp),
+                placeholderEllipsis = true
             )
             Spacer(Modifier.width(8.dp))
             Button(onClick = { submit() }, enabled = trimmedValue.isNotEmpty(), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 12.dp), modifier = Modifier.height(38.dp)) {
@@ -323,14 +314,17 @@ private fun PickerSearchBox(value: String, onValueChange: (String) -> Unit, plac
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            PickerTextField(
-                value = value, onValueChange = onValueChange, placeholder = placeholder,
+            MiuiSearchTextField(
+                value = value,
+                onValueChange = onValueChange,
+                placeholder = placeholder,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {
                     onSearchAction()
                     keyboard?.hide()
                 }),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                placeholderEllipsis = true
             )
             if (value.isNotEmpty()) IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Clear, "清除", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp)) }
         }
