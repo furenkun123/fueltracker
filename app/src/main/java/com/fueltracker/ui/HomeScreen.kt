@@ -1,5 +1,6 @@
 package com.fueltracker.ui
 
+import com.fueltracker.ui.miui.glass.liquidGlass
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -605,8 +606,8 @@ private fun EmptyRecordCard() {
 @Composable
 private fun FabActionItem(icon: String, label: String, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier.clip(RoundedCornerShape(24.dp)).clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceVariant, shadowElevation = 6.dp, shape = RoundedCornerShape(24.dp)
+        modifier = Modifier.clip(RoundedCornerShape(24.dp)).liquidGlass(shape = RoundedCornerShape(24.dp), tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)).clickable(onClick = onClick),
+        color = Color.Transparent, shadowElevation = 6.dp, shape = RoundedCornerShape(24.dp)
     ) {
         Row(modifier = Modifier.padding(start = 12.dp, end = 18.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(icon, fontSize = 18.sp)
