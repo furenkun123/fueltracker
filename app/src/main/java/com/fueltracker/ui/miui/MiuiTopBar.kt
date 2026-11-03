@@ -64,79 +64,30 @@ fun MiuiTopBar(
             .fillMaxWidth()
             .height(totalHeight)
     ) {
-        // 整体连续玻璃背景
         if (isGlassEnabled) {
+            // 第一轮稳定性实验：单一 Backdrop 消费者，只启用实时 Blur。
+            // 暂不使用 Lens、色散、Vibrancy 或额外的采样层。
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(totalHeight)
-            ) {
-                // 第一层：清晰背景
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .drawPlainBackdrop(
-                            backdrop = backdrop,
-                            shape = { RectangleShape },
-                            effects = {},
-                            onDrawSurface = {
-                                drawRect(Color.Transparent)
-                            }
-                        )
-                )
-
-                // 第二层：模糊背景，使用渐变遮罩
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .height(totalHeight)
-                        .graphicsLayer {
-                            compositingStrategy = CompositingStrategy.Offscreen
-                        }
-                        .drawWithContent {
-                            drawContent()
-
+                    .fillMaxSize()
+                    .drawPlainBackdrop(
+                        backdrop = backdrop,
+                        shape = { RectangleShape },
+                        effects = {
+                            blur(16.dp.toPx())
+                        },
+                        onDrawSurface = {
                             drawRect(
-                                brush = Brush.verticalGradient(
-                                    colorStops = arrayOf(
-                                        0.0f to Color.White,
-                                        0.25f to Color.White,
-                                        0.45f to Color.White.copy(alpha = 0.65f),
-                                        0.65f to Color.White.copy(alpha = 0.15f),
-                                        0.75f to Color.Transparent,
-                                        1.0f to Color.Transparent
-                                    )
-                                ),
-                                blendMode = BlendMode.DstIn
+                                barColor.copy(
+                                    alpha = if (barColor.luminance() > 0.5f) {
+                                        0.30f
+                                    } else {
+                                        0.38f
+                                    }
+                                )
                             )
                         }
-                        .drawPlainBackdrop(
-                            backdrop = backdrop,
-                            shape = { RectangleShape },
-                            effects = {
-                                vibrancy()
-                                blur(24.dp.toPx())
-                            },
-                            onDrawSurface = {
-                                drawRect(
-                                    barColor.copy(
-                                        alpha = if (barColor.luminance() > 0.5f) {
-                                            0.28f
-                                        } else {
-                                            0.36f
-                                        }
-                                    )
-                                )
-                            }
-                        )
-                )
-            }
-
-        } else {
-            // 关闭玻璃效果时不绘制不透明背景，
-            // 保留首页内容在 TopBar 背后的可见性
-            Box(
-                modifier = Modifier.fillMaxSize()
+                    )
             )
         }
 
