@@ -41,39 +41,6 @@ import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.vibrancy
 
-/**
- * 仅为系统状态栏区域提供玻璃背景，不包含标题、返回按钮或操作区。
- * 页面标题仍由各个 Screen 自己布局。
- */
-@Composable
-fun MiuiStatusBarGlass(
-    backdrop: Backdrop,
-    isGlassEnabled: Boolean = true,
-    modifier: Modifier = Modifier
-) {
-    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    // MaterialTheme 只能在 Composable 上下文中读取，不能放在绘制回调内。
-    val statusBarBackground = MaterialTheme.colorScheme.background
-    if (isGlassEnabled && statusBarHeight > 0.dp) {
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .height(statusBarHeight)
-                .drawPlainBackdrop(
-                    backdrop = backdrop,
-                    shape = { RectangleShape },
-                    effects = {
-                        vibrancy()
-                        blur(18.dp.toPx())
-                    },
-                    onDrawSurface = {
-                        drawRect(statusBarBackground.copy(alpha = 0.16f))
-                    }
-                )
-        )
-    }
-}
-
 @Composable
 fun MiuiTopBar(
     backdrop: Backdrop,
