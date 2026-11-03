@@ -46,8 +46,11 @@ fun Modifier.liquidGlass(
     val backdrop = LocalFuelTrackerBackdrop.current
     val enabled = LocalFuelTrackerGlassEnabled.current
     if (!enabled || backdrop == null) {
-        val fallbackColor = (tint ?: androidx.compose.material3.MaterialTheme.colorScheme.surface)
-            .copy(alpha = 1f)
+        val fallbackColor = when {
+            tint == null -> androidx.compose.material3.MaterialTheme.colorScheme.surface
+            tint.alpha < 0.45f -> androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+            else -> tint.copy(alpha = 1f)
+        }
         return this.background(fallbackColor, shape)
     }
 
