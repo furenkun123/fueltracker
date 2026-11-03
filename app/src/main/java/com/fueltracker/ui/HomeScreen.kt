@@ -1,6 +1,5 @@
 package com.fueltracker.ui
 
-import com.fueltracker.ui.miui.glass.liquidGlass
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -8,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -36,7 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -106,7 +106,6 @@ fun HomeScreen(
     onEditParking: (ExpenseRecord) -> Unit,
     onClearParking: () -> Unit,
     onIgnoreParking: () -> Unit,
-    onOpenSettings: () -> Unit,
     onCollapseProgressChange: (Float) -> Unit = {},
 ) {
     val deliveryDate = vehicle?.deliveryDate
@@ -211,35 +210,18 @@ fun HomeScreen(
             )
         ) {
             item(key = "home_title") {
-                Row(
+                Text(
+                    text = "随记油耗",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = (-15).dp)
-                        .padding(horizontal = 15.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "随记油耗",
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
-                            .clickable(onClick = onOpenSettings),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "设置",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(22.dp)
+                        .padding(
+                            horizontal = 15.dp,
+                            vertical = 0.dp
                         )
-                    }
-                }
+                )
             }
 
             if (vehicle == null) {
@@ -402,7 +384,16 @@ private fun EmptyVehicleCard(onAddVehicle: () -> Unit) {
 
 @Composable
 private fun ConsumptionCard(recordCount: Int, latestConsumption: Double?, averageConsumption: Double?) {
-    MiuiCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    MiuiCard(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
+        ),
+        border = BorderStroke(
+            width = 0.8.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)
+        )
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("当前油耗", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.Bottom) {
@@ -625,8 +616,8 @@ private fun EmptyRecordCard() {
 @Composable
 private fun FabActionItem(icon: String, label: String, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier.clip(RoundedCornerShape(24.dp)).liquidGlass(shape = RoundedCornerShape(24.dp), tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)).clickable(onClick = onClick),
-        color = Color.Transparent, shadowElevation = 6.dp, shape = RoundedCornerShape(24.dp)
+        modifier = Modifier.clip(RoundedCornerShape(24.dp)).clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant, shadowElevation = 6.dp, shape = RoundedCornerShape(24.dp)
     ) {
         Row(modifier = Modifier.padding(start = 12.dp, end = 18.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(icon, fontSize = 18.sp)
