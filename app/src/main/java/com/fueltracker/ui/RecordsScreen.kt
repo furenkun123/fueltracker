@@ -1,6 +1,5 @@
 package com.fueltracker.ui
 
-import com.fueltracker.ui.miui.glass.liquidGlass
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -343,7 +342,7 @@ private fun FuelRecordCard(
 
 @Composable
 private fun TagChip(text: String, color: Color, bgColor: Color) {
-    Surface(modifier = Modifier.liquidGlass(shape = RoundedCornerShape(4.dp), tint = bgColor.copy(alpha = 0.70f)), color = Color.Transparent, shape = RoundedCornerShape(4.dp)) {
+    Surface(color = bgColor, shape = RoundedCornerShape(4.dp)) {
         Text(text, modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp), fontSize = 10.sp, fontWeight = FontWeight.Medium, color = color)
     }
 }
