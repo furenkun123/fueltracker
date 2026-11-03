@@ -1,6 +1,7 @@
 package com.fueltracker.ui.miui.glass
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,7 +45,11 @@ fun Modifier.liquidGlass(
 ): Modifier {
     val backdrop = LocalFuelTrackerBackdrop.current
     val enabled = LocalFuelTrackerGlassEnabled.current
-    if (!enabled || backdrop == null) return this
+    if (!enabled || backdrop == null) {
+        val fallbackColor = (tint ?: androidx.compose.material3.MaterialTheme.colorScheme.surface)
+            .copy(alpha = 1f)
+        return this.background(fallbackColor, shape)
+    }
 
     val isLight = androidx.compose.material3.MaterialTheme.colorScheme.background
         .let { it.red * 0.2126f + it.green * 0.7152f + it.blue * 0.0722f > 0.5f }
