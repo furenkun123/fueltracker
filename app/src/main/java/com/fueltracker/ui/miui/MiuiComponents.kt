@@ -118,7 +118,7 @@ fun MiuiSwitch(
             .width(44.dp)
             .height(24.dp)
             .clip(RoundedCornerShape(50)) // 胶囊形轨道
-            .background(trackColor) // 应用深灰色轨道
+            .liquidGlass(shape = RoundedCornerShape(50), tint = trackColor.copy(alpha = 0.72f)) // 液态玻璃轨道
             .clickable(enabled = enabled) { onCheckedChange(!checked) },
         contentAlignment = Alignment.CenterStart
     ) {
@@ -499,8 +499,9 @@ fun MiuiFilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (selected) MaterialTheme.colorScheme.primary else unselectedBgColor
+            .liquidGlass(
+                shape = RoundedCornerShape(10.dp),
+                tint = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.72f) else unselectedBgColor.copy(alpha = 0.70f)
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -524,6 +525,7 @@ fun MiuiTextButton(text: String, color: Color, onClick: () -> Unit) {
     Box(
         Modifier
             .clip(RoundedCornerShape(6.dp))
+            .liquidGlass(shape = RoundedCornerShape(6.dp), tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.18f))
             .clickable(onClick = onClick)
             .padding(8.dp),
         contentAlignment = Alignment.Center
