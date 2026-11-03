@@ -1,6 +1,5 @@
 package com.fueltracker.ui
 
-import com.fueltracker.ui.miui.glass.liquidGlass
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -684,10 +683,9 @@ private fun HyperFuelGradePickerDialog(
     var selectedGrade by remember { mutableStateOf(currentValue) }
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            modifier = Modifier.fillMaxWidth().liquidGlass(shape = RoundedCornerShape(24.dp), tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)),
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-            elevation = CardDefaults.cardElevation(0.dp)
+            elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                 Row(
