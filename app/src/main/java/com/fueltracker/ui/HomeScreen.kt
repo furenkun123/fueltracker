@@ -36,6 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -105,6 +106,7 @@ fun HomeScreen(
     onEditParking: (ExpenseRecord) -> Unit,
     onClearParking: () -> Unit,
     onIgnoreParking: () -> Unit,
+    onOpenSettings: () -> Unit,
     onCollapseProgressChange: (Float) -> Unit = {},
 ) {
     val deliveryDate = vehicle?.deliveryDate
@@ -209,18 +211,35 @@ fun HomeScreen(
             )
         ) {
             item(key = "home_title") {
-                Text(
-                    text = "随记油耗",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = (-15).dp)
-                        .padding(
-                            horizontal = 15.dp,
-                            vertical = 0.dp
+                        .padding(horizontal = 15.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "随记油耗",
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
+                            .clickable(onClick = onOpenSettings),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "设置",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
                         )
-                )
+                    }
+                }
             }
 
             if (vehicle == null) {
