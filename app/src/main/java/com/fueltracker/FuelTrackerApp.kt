@@ -547,7 +547,6 @@ fun FuelTrackerApp(
             }
         }
     }
-    }
 
     // ---------- 首次安装：隐私声明 ----------
     if (showPrivacyOnStart) {
@@ -581,6 +580,7 @@ fun FuelTrackerApp(
                 }
             )
         }
+    }
     }
 }
 
