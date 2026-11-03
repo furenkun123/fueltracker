@@ -1,6 +1,5 @@
 package com.fueltracker.ui
 
-import com.fueltracker.ui.miui.glass.liquidGlass
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -760,7 +759,7 @@ private fun VehicleItemCard(vehicle: Vehicle, onSelect: () -> Unit, onEdit: () -
             Spacer(modifier = Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (vehicle.isCurrent) {
-                    Surface(modifier = Modifier.liquidGlass(shape = RoundedCornerShape(4.dp), tint = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)), shape = RoundedCornerShape(4.dp), color = Color.Transparent) {
+                    Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primaryContainer) {
                         Text("当前使用", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                     }
                 }
