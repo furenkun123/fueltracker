@@ -1,6 +1,5 @@
 package com.fueltracker.ui.miui
 
-import com.fueltracker.ui.miui.glass.liquidGlass
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -111,7 +110,7 @@ private fun CurrentVehicleBadge() {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
-            .liquidGlass(shape = RoundedCornerShape(8.dp), tint = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f))
+            .background(MaterialTheme.colorScheme.primaryContainer)
             .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
