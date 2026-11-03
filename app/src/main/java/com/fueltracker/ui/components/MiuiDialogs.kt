@@ -1,10 +1,7 @@
 package com.fueltracker.ui.components
 
 import android.annotation.SuppressLint
-import android.os.Build
-import android.view.WindowManager
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,7 +30,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,82 +37,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fueltracker.ui.miui.glass.LocalFuelTrackerGlassEnabled
-import com.fueltracker.ui.miui.glass.liquidGlass
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
 import com.fueltracker.util.UpdateLogManager
 
-
-
-/**
- * Dialog 使用独立 Window，不能直接采样主窗口的 Backdrop。
- * Android 12+ 使用系统 blur-behind；低版本保留半透明材质作为降级效果。
- */
-@Composable
-private fun DialogBlurBehind() {
-    val view = LocalView.current
-    val density = LocalDensity.current
-    val glassEnabled = LocalFuelTrackerGlassEnabled.current
-
-    SideEffect {
-        val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect
-        window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-        window.setDimAmount(if (glassEnabled) 0.16f else 0.32f)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (glassEnabled) {
-                window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-                window.attributes = window.attributes.apply {
-                    blurBehindRadius = with(density) { 28.dp.roundToPx() }
-                }
-            } else {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-                window.attributes = window.attributes.apply { blurBehindRadius = 0 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun dialogGlassModifier(shape: RoundedCornerShape): Modifier {
-    val glassEnabled = LocalFuelTrackerGlassEnabled.current
-    val isLight = MaterialTheme.colorScheme.background.red > 0.5f
-    val surfaceColor = if (isLight) Color.White else Color(0xFF20232B)
-    val fill = if (glassEnabled) {
-        surfaceColor.copy(alpha = if (isLight) 0.34f else 0.40f)
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-
-    return Modifier
-        .clip(shape)
-        .background(fill, shape)
-        .then(
-            if (glassEnabled) {
-                Modifier.border(
-                    width = 0.8.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = if (isLight) 0.78f else 0.30f),
-                            Color.White.copy(alpha = 0.06f)
-                        )
-                    ),
-                    shape = shape
-                )
-            } else Modifier
-        )
-}
 
 // ============================================================
 // 公共弹窗外壳
@@ -132,12 +62,10 @@ fun ScrollableSettingsDialog(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        DialogBlurBehind()
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = Color.Transparent,
+            color = MaterialTheme.colorScheme.surface,
             modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp).padding(horizontal = 16.dp)
-                .then(dialogGlassModifier(RoundedCornerShape(20.dp)))
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
                 Text(
@@ -253,14 +181,12 @@ fun UpdateLogDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        DialogBlurBehind()
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = Color.Transparent,
+            color = MaterialTheme.colorScheme.surface,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 48.dp)
-                .then(dialogGlassModifier(RoundedCornerShape(20.dp)))
         ) {
             Column(
                 modifier = Modifier
@@ -374,8 +300,7 @@ fun MiuiConfirmDialog(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = Modifier.liquidGlass(shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), tint = if (MaterialTheme.colorScheme.background.red > 0.5f) Color.White.copy(alpha = 0.72f) else Color(0xFF20232B).copy(alpha = 0.78f)),
-        containerColor = Color.Transparent,
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         dragHandle = {
             Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
