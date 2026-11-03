@@ -285,7 +285,6 @@ fun FuelTrackerApp(
                                 )
                             }
 
-                            else -> Unit
                         }
                     }
                 }
@@ -473,7 +472,6 @@ fun FuelTrackerApp(
                         }
                     }
 
-                    else -> Unit
                 }
             }
         }
@@ -509,7 +507,6 @@ fun FuelTrackerApp(
                     AppScreen.HOME -> 0
                     AppScreen.RECORDS -> 1
                     AppScreen.EXPENSES -> 2
-                    else -> 0
                 },
                 modifier = Modifier.align(Alignment.BottomCenter),
                 backdrop = appBackdrop,

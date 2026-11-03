@@ -37,7 +37,6 @@ fun computeExpenseRange(range: ExpenseRange, customYear: Int, customMonth: Int):
             if (customMonth == 0) { cal.set(Calendar.MONTH, Calendar.JANUARY); cal.set(Calendar.DAY_OF_MONTH, 1) }
             else { cal.set(Calendar.MONTH, customMonth - 1); cal.set(Calendar.DAY_OF_MONTH, 1) }
         }
-        else -> {}
     }
     val start = cal.timeInMillis
     val endCal = cal.clone() as Calendar
@@ -45,7 +44,6 @@ fun computeExpenseRange(range: ExpenseRange, customYear: Int, customMonth: Int):
         ExpenseRange.MONTH -> endCal.add(Calendar.MONTH, 1)
         ExpenseRange.YEAR -> endCal.add(Calendar.YEAR, 1)
         ExpenseRange.CUSTOM_MONTH -> if (customMonth == 0) endCal.add(Calendar.YEAR, 1) else endCal.add(Calendar.MONTH, 1)
-        else -> {}
     }
     return start to (endCal.timeInMillis - 1)
 }

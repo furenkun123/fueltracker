@@ -47,12 +47,12 @@ import com.fueltracker.data.Vehicle
 import com.fueltracker.ui.components.LazyColumnScrollbar
 import com.fueltracker.ui.components.MiuiBottomSheetWrapper
 import com.fueltracker.ui.components.MiuiConfirmDialog
-import com.fueltracker.ui.components.MiuiFilterChip
-import com.fueltracker.ui.components.MiuiTextButton
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miui.MiuiCard
+import com.fueltracker.ui.miui.MiuiFilterChip
+import com.fueltracker.ui.miui.MiuiTextButton
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.IntervalConfidence

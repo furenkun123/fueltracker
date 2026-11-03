@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
@@ -67,7 +66,7 @@ object ParkingNotification {
         }
 
         val title = locationName?.takeIf { it.isNotBlank() } ?: "当前停车"
-        val contentText = if (detail.isBlank()) "点击查看停车详情" else detail
+        val contentText = detail.ifBlank { "点击查看停车详情" }
 
         // 点通知主体 → 打开 App
         val launchIntent = context.packageManager
