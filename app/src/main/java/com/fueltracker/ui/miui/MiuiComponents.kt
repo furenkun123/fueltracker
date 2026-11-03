@@ -45,6 +45,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.unit.Dp
+import com.fueltracker.ui.miui.glass.liquidGlass
 
 
 /**
@@ -75,7 +76,7 @@ fun MiuiButton(
             .fillMaxWidth()
             .height(50.dp) // 高度也是 50dp
             .clip(shape)
-            .background(bgColor)
+            .liquidGlass(shape = shape, tint = bgColor)
             .clickable(enabled = enabled) { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -145,10 +146,10 @@ fun MiuiCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.liquidGlass(shape = shape),
         shape = shape,
         colors = colors ?: CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = Color.Transparent
         ),
         elevation = elevation ?: CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = border,
@@ -173,11 +174,11 @@ fun MiuiCard(
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.liquidGlass(shape = shape),
         enabled = enabled,
         shape = shape,
         colors = colors ?: CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = Color.Transparent
         ),
         elevation = elevation ?: CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = border,
@@ -208,9 +209,12 @@ fun MiuiGroupCard(content: @Composable ColumnScope.() -> Unit) {
     val cardBg = if (isLight) MaterialTheme.colorScheme.surface else Color(0xFF1C1C1E)
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().liquidGlass(
+            shape = RoundedCornerShape(16.dp),
+            tint = if (isLight) Color.White.copy(alpha = 0.22f) else Color(0xFF252A35).copy(alpha = 0.22f)
+        ),
         shape = RoundedCornerShape(16.dp),
-        color = cardBg
+        color = Color.Transparent
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             content()
@@ -351,7 +355,10 @@ fun MiuiTextField(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().liquidGlass(
+                shape = RoundedCornerShape(14.dp),
+                tint = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) Color.White.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.07f)
+            ),
             singleLine = true,
             enabled = enabled,
             isError = isError,
@@ -393,9 +400,9 @@ fun MiuiTextField(
             keyboardOptions = keyboardOptions,
             keyboardActions = keyboardActions,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
 
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = Color.Transparent,
