@@ -54,6 +54,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fueltracker.ui.miui.glass.liquidGlass
 import com.fueltracker.data.CarBrand
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.ui.miui.MiuiBackButton
@@ -262,7 +263,7 @@ private fun BrandSearchBox(
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .height(42.dp)
             .clip(RoundedCornerShape(21.dp))
-            .background(searchBoxBg)
+            .liquidGlass(shape = RoundedCornerShape(21.dp), tint = searchBoxBg.copy(alpha = 0.72f))
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -304,7 +305,7 @@ private fun EmptyBrandState(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp) // 控制外边距，紧贴搜索框
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface) // 用卡片色托底
+            .liquidGlass(shape = RoundedCornerShape(16.dp)) // 液态玻璃卡片
             .padding(vertical = 32.dp, horizontal = 16.dp), // 内部上下留白
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
