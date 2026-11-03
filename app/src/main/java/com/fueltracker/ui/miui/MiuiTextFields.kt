@@ -14,6 +14,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.fueltracker.ui.miui.glass.liquidGlass
 
 /**
  * MIUI 风格基础单行输入框
@@ -42,7 +45,7 @@ fun MiuiSearchTextField(
         singleLine = true,
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
-        modifier = modifier,
+        modifier = modifier.liquidGlass(shape = RoundedCornerShape(12.dp)),
         decorationBox = { innerTextField ->
             Box(
                 modifier = Modifier.fillMaxSize(),
