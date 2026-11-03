@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fueltracker.ui.miui.glass.liquidGlass
 import androidx.compose.ui.window.Dialog
 import java.util.Calendar
 
@@ -165,7 +166,7 @@ private fun MiuiYearMonthPickerDialog(
     val years = remember(minYear, maxYear) { (minYear..maxYear).toList() }
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(Modifier.fillMaxWidth().padding(horizontal = 24.dp), shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(8.dp)) {
+        Card(Modifier.fillMaxWidth().padding(horizontal = 24.dp).liquidGlass(shape = RoundedCornerShape(20.dp)), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent), elevation = CardDefaults.cardElevation(0.dp)) {
             Column(Modifier.fillMaxWidth().padding(20.dp)) {
                 Text("选择年月", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
                 Spacer(Modifier.height(12.dp))
