@@ -52,7 +52,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fueltracker.ui.miui.glass.liquidGlass
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.data.Trim
 import com.fueltracker.ui.miui.MiuiBackButton
@@ -260,7 +259,7 @@ private fun PickerScaffold(
 
 @Composable
 private fun PickerItemWrapper(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().liquidGlass(shape = RoundedCornerShape(0.dp), tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.20f))) {
+    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
         Box(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp)) { content() }
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.8.dp, modifier = Modifier.padding(start = 20.dp))
     }
@@ -279,7 +278,7 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
         onConfirm(trimmedValue); value = ""; keyboard?.hide()
     }
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(12.dp)).liquidGlass(shape = RoundedCornerShape(12.dp)).padding(12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).padding(12.dp)) {
         Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -293,7 +292,7 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
                     .weight(1f)
                     .height(38.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .liquidGlass(shape = RoundedCornerShape(8.dp), tint = inputBg.copy(alpha = 0.72f))
+                    .background(inputBg)
                     .padding(horizontal = 10.dp),
                 placeholderEllipsis = true
             )
@@ -311,7 +310,7 @@ private fun PickerSearchBox(value: String, onValueChange: (String) -> Unit, plac
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val bg = if (isLight) Color.Black.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.12f)
 
-    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(42.dp).clip(RoundedCornerShape(21.dp)).liquidGlass(shape = RoundedCornerShape(21.dp), tint = bg.copy(alpha = 0.72f)).padding(horizontal = 12.dp)) {
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(42.dp).clip(RoundedCornerShape(21.dp)).background(bg).padding(horizontal = 12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -343,7 +342,7 @@ private fun NoMatchText(text: String) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .clip(RoundedCornerShape(16.dp))
-            .liquidGlass(shape = RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
             .padding(vertical = 32.dp, horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
