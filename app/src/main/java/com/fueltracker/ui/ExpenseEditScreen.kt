@@ -1,5 +1,6 @@
 package com.fueltracker.ui
 
+import com.fueltracker.ui.miui.glass.liquidGlass
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -344,9 +345,9 @@ private fun EditCategoryDialog(
     } else {
         Dialog(onDismissRequest = onDismiss) {
             Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).liquidGlass(shape = RoundedCornerShape(20.dp), tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                     Text(
@@ -402,7 +403,7 @@ private fun MiuixInputDialog(
     confirmText: String, confirmEnabled: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(24.dp)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).liquidGlass(shape = RoundedCornerShape(24.dp)), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
             Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                 Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
                 Spacer(Modifier.height(16.dp))
