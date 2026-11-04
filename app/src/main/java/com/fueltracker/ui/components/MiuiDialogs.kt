@@ -1,14 +1,5 @@
 package com.fueltracker.ui.components
 
-import android.annotation.SuppressLint
-import android.graphics.Color as AndroidColor
-import android.graphics.drawable.ColorDrawable
-import android.os.Build
-import android.util.Log
-import android.view.View
-import android.view.ViewParent
-import android.view.Window
-import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -40,7 +31,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,95 +46,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.ui.miui.glass.GlassPreferences
 import com.fueltracker.util.UpdateLogManager
 
-
-/**
- * 为独立 Dialog Window 启用系统级背景模糊。
- * Android 12+ 由系统决定是否允许跨窗口模糊；不支持时保留适度暗化。
- */
-private const val DIALOG_BLUR_TAG = "DialogBlur"
-
-private fun findDialogWindow(view: View): Window? {
-    // DialogWindowProvider 实现于 Dialog 根布局本身，因此从 LocalView 自身开始检查，
-    // 再逐级向上查找；不能只从 view.parent 开始。
-    var current: View? = view
-    while (current != null) {
-        if (current is DialogWindowProvider) {
-            return current.window
-        }
-        current = current.parent as? View
-    }
-    return null
-}
-
-private fun describeViewHierarchy(view: View): String {
-    val names = mutableListOf<String>()
-    var current: View? = view
-    while (current != null && names.size < 12) {
-        names += current.javaClass.name
-        current = current.parent as? View
-    }
-    return names.joinToString(" -> ")
-}
-
-@Composable
-fun ApplyDialogBlurBehind() {
-    val view = LocalView.current
-    val dialogWindow = findDialogWindow(view)
-
-    SideEffect {
-        if (dialogWindow == null) {
-            Log.w(
-                DIALOG_BLUR_TAG,
-                "Dialog Window NOT FOUND; viewHierarchy=${describeViewHierarchy(view)}"
-            )
-            return@SideEffect
-        }
-
-        dialogWindow.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
-        dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val windowManager = dialogWindow.context.getSystemService(WindowManager::class.java)
-            val blurAvailable = windowManager?.isCrossWindowBlurEnabled == true
-            val attributes = dialogWindow.attributes
-
-            if (blurAvailable) {
-                dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-                attributes.blurBehindRadius = 48
-                dialogWindow.setDimAmount(0.20f)
-            } else {
-                dialogWindow.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-                attributes.blurBehindRadius = 0
-                dialogWindow.setDimAmount(0.32f)
-            }
-            dialogWindow.attributes = attributes
-
-            val applied = dialogWindow.attributes
-            Log.i(
-                DIALOG_BLUR_TAG,
-                "windowFound=true sdk=${Build.VERSION.SDK_INT} " +
-                    "crossWindowBlurEnabled=$blurAvailable " +
-                    "blurFlag=${(applied.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND) != 0} " +
-                    "dimFlag=${(applied.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0} " +
-                    "blurRadius=${applied.blurBehindRadius} dimAmount=${dialogWindow.attributes.dimAmount} " +
-                    "windowType=${applied.type} view=${view.javaClass.name}"
-            )
-        } else {
-            dialogWindow.setDimAmount(0.32f)
-            Log.i(
-                DIALOG_BLUR_TAG,
-                "windowFound=true sdk=${Build.VERSION.SDK_INT}; cross-window blur requires Android 12+"
-            )
-        }
-    }
-}
 
 // ============================================================
 // 公共玻璃弹窗容器
@@ -197,11 +103,16 @@ fun GlassDialogSurface(
     // 65% 保持当前弹窗材质；浓度只控制表面渐变与描边强度。
     val concentrationScale =
         (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
+    val surfaceColor = if (isLight) {
+        Color(0xFFF7FAFF).copy(alpha = 0.88f)
+    } else {
+        Color(0xFF182334).copy(alpha = 0.92f)
+    }
 
     Surface(
         modifier = modifier,
         shape = shape,
-        color = MaterialTheme.colorScheme.surface,
+        color = surfaceColor,
         border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight, concentrationScale)),
         shadowElevation = 20.dp
     ) {
@@ -224,17 +135,21 @@ fun GlassBottomSheetSurface(
     content: @Composable ColumnScope.() -> Unit
 ) {
     // Material3 ModalBottomSheet 使用独立 Dialog Window。
-    ApplyDialogBlurBehind()
 
     val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val concentrationScale =
         (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
+    val surfaceColor = if (isLight) {
+        Color(0xFFF7FAFF).copy(alpha = 0.88f)
+    } else {
+        Color(0xFF182334).copy(alpha = 0.92f)
+    }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = shape,
-        color = MaterialTheme.colorScheme.surface,
+        color = surfaceColor,
         border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight, concentrationScale)),
         shadowElevation = 20.dp
     ) {
@@ -261,7 +176,6 @@ fun ScrollableSettingsDialog(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        ApplyDialogBlurBehind()
         GlassDialogSurface(
             modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp).padding(horizontal = 16.dp)
         ) {
@@ -379,7 +293,6 @@ fun UpdateLogDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        ApplyDialogBlurBehind()
         GlassDialogSurface(
             modifier = Modifier
                 .fillMaxWidth()
