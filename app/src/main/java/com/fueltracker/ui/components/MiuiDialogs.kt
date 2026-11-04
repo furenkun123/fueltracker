@@ -411,7 +411,7 @@ fun MiuiConfirmDialog(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = Color.Transparent,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
         dragHandle = null
     ) {
         GlassBottomSheetSurface {
@@ -457,7 +457,7 @@ fun MiuiConfirmDialog(
 fun MiuiYearMonthSheet(initialYear: Int, initialMonth: Int, availableYears: List<Int>, onDismiss: () -> Unit, onConfirm: (Int, Int) -> Unit) {
     var year by remember { mutableIntStateOf(initialYear) }
     var month by remember { mutableIntStateOf(initialMonth) }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Color.Transparent, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), dragHandle = null) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Color.Transparent, shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp), dragHandle = null) {
         GlassBottomSheetSurface {
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp)) {
             Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
@@ -490,7 +490,7 @@ fun MiuiBottomSheetWrapper(
     ModalBottomSheet(
         onDismissRequest = onDismiss, sheetState = sheetState,
         containerColor = Color.Transparent,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
         dragHandle = null
     ) {
         GlassBottomSheetSurface {
