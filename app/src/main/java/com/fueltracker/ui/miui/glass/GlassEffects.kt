@@ -17,6 +17,7 @@ import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
+import com.fueltracker.ui.miui.glass.GlassPreferences
 
 /**
  * 所有内容卡片共用的独立背景采样源。
@@ -187,39 +188,43 @@ fun Modifier.drawLiquidGlassCard(
 ): Modifier {
     if (backdrop == null) return this
 
+    val glassParams = GlassPreferences.params
+    // 默认浓度 65% 对应当前材质强度；用户可在 0–100% 之间微调。
+    val concentrationScale = 0.35f + glassParams.concentration / 100f
+
     val surfaceBrush = if (isLight) {
         Brush.verticalGradient(
             colorStops = arrayOf(
-                0.00f to Color.White.copy(alpha = 0.15f),
-                0.38f to Color(0xFFE7EFFB).copy(alpha = 0.09f),
-                0.78f to Color(0xFFDCE8F8).copy(alpha = 0.12f),
-                1.00f to Color(0xFFB9CBE3).copy(alpha = 0.17f)
+                0.00f to Color.White.copy(alpha = 0.15f * concentrationScale),
+                0.38f to Color(0xFFE7EFFB).copy(alpha = 0.09f * concentrationScale),
+                0.78f to Color(0xFFDCE8F8).copy(alpha = 0.12f * concentrationScale),
+                1.00f to Color(0xFFB9CBE3).copy(alpha = 0.17f * concentrationScale)
             )
         )
     } else {
         // 暗色模式提高卡片上半部的亮度，底部逐渐压暗，形成柔和的悬浮层次。
         Brush.verticalGradient(
             colorStops = arrayOf(
-                0.00f to Color(0xFF52627A).copy(alpha = 0.34f),
-                0.30f to Color(0xFF34445B).copy(alpha = 0.30f),
-                0.72f to Color(0xFF202D40).copy(alpha = 0.34f),
-                1.00f to Color(0xFF101A2A).copy(alpha = 0.48f)
+                0.00f to Color(0xFF52627A).copy(alpha = 0.34f * concentrationScale),
+                0.30f to Color(0xFF34445B).copy(alpha = 0.30f * concentrationScale),
+                0.72f to Color(0xFF202D40).copy(alpha = 0.34f * concentrationScale),
+                1.00f to Color(0xFF101A2A).copy(alpha = 0.48f * concentrationScale)
             )
         )
     }
 
-    val topHighlightAlpha = if (isLight) 0.10f else 0.075f
-    val bottomShadeAlpha = if (isLight) 0.035f else 0.12f
+    val topHighlightAlpha = (if (isLight) 0.10f else 0.075f) * concentrationScale
+    val bottomShadeAlpha = (if (isLight) 0.035f else 0.12f) * concentrationScale
 
     return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
             vibrancy()
-            blur(12.dp.toPx())
+            blur(glassParams.blur.dp.toPx())
             lens(
-                refractionHeight = 14.dp.toPx(),
-                refractionAmount = 24.dp.toPx()
+                refractionHeight = glassParams.refractionHeight.dp.toPx(),
+                refractionAmount = glassParams.refractionAmount.dp.toPx()
             )
         },
         highlight = { Highlight.Plain },
