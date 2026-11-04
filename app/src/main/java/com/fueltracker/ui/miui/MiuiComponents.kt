@@ -177,9 +177,9 @@ fun MiuiCard(
         elevation = elevation ?: CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = border ?: if (useGlass) {
             BorderStroke(
-                width = 0.2.dp,
-                color = if (isLight) Color(0xFF475569).copy(alpha = 0.16f)
-                else Color(0xFF070D16).copy(alpha = 0.38f)
+                width = 0.8.dp,
+                color = if (isLight) Color(0xFFD1D1D6).copy(alpha = 0.65f)
+                else Color.White.copy(alpha = 0.12f)
             )
         } else null,
         content = content
@@ -229,9 +229,9 @@ fun MiuiCard(
         elevation = elevation ?: CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = border ?: if (useGlass) {
             BorderStroke(
-                width = 0.2.dp,
-                color = if (isLight) Color(0xFF475569).copy(alpha = 0.16f)
-                else Color(0xFF070D16).copy(alpha = 0.38f)
+                width = 0.8.dp,
+                color = if (isLight) Color(0xFFD1D1D6).copy(alpha = 0.65f)
+                else Color.White.copy(alpha = 0.12f)
             )
         } else null,
         content = content
