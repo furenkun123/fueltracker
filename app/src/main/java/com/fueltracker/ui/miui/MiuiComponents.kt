@@ -6,12 +6,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -367,16 +370,12 @@ fun MiuiTextField(
     enabled: Boolean = true,
     horizontalPadding: Dp = 0.dp
 ) {
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val inputFill = if (isLight) {
-        Color.White.copy(alpha = 0.34f)
-    } else {
-        Color(0xFF0B1422).copy(alpha = 0.42f)
-    }
-    val inputOutline = if (isLight) {
-        Color(0xFF475569).copy(alpha = 0.20f)
-    } else {
-        Color(0xFF070D16).copy(alpha = 0.44f)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val inputBorder = when {
+        isError -> BorderStroke(0.8.dp, MaterialTheme.colorScheme.error)
+        isFocused -> BorderStroke(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.9f))
+        else -> null
     }
 
     Column(
@@ -417,10 +416,17 @@ fun MiuiTextField(
 
         Spacer(Modifier.height(6.dp))
 
-        OutlinedTextField(
+        MiuiCard(
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(14.dp),
+            interactionSource = interactionSource,
+            border = inputBorder
+        ) {
+            Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxSize(),
             singleLine = true,
             enabled = enabled,
             isError = isError,
@@ -462,23 +468,24 @@ fun MiuiTextField(
             keyboardOptions = keyboardOptions,
             keyboardActions = keyboardActions,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = inputFill.copy(alpha = if (isLight) 0.52f else 0.58f),
-                unfocusedContainerColor = inputFill,
-                disabledContainerColor = inputFill.copy(alpha = 0.18f),
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
 
-                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
-                unfocusedBorderColor = inputOutline,
-                disabledBorderColor = inputOutline.copy(alpha = 0.45f),
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                disabledBorderColor = Color.Transparent,
 
-                errorBorderColor = MaterialTheme.colorScheme.error,
+                errorBorderColor = Color.Transparent,
                 cursorColor = MaterialTheme.colorScheme.primary,
                 focusedTextColor = MaterialTheme.colorScheme.onSurface,
                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                 disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
                 focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                 unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-            )
-        )
+                )
+            }
+        }
 
         when {
             isError && errorMessage != null -> {
