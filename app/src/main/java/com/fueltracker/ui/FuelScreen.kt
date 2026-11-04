@@ -364,14 +364,22 @@ fun FuelScreen(
                         Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
                             Text("加油时间 *", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(6.dp))
-                            Box(
-                                modifier = Modifier.fillMaxWidth().height(56.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
-                                    .clickable { showDatePicker = true }
-                                    .padding(horizontal = 14.dp),
-                                contentAlignment = Alignment.CenterStart
+                            MiuiCard(
+                                onClick = { showDatePicker = true },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = RoundedCornerShape(14.dp)
                             ) {
-                                Text(dateFormatter.format(Date(timestamp)), fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                Box(
+                                    modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Text(
+                                        dateFormatter.format(Date(timestamp)),
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                         MiuiTextField(
