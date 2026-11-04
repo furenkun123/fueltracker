@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.graphics.Color as AndroidColor
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
+import android.util.Log
 import android.view.View
 import android.view.ViewParent
 import android.view.Window
@@ -67,25 +68,44 @@ import com.fueltracker.util.UpdateLogManager
  * 为独立 Dialog Window 启用系统级背景模糊。
  * Android 12+ 由系统决定是否允许跨窗口模糊；不支持时保留适度暗化。
  */
+private const val DIALOG_BLUR_TAG = "DialogBlur"
+
 private fun findDialogWindow(view: View): Window? {
-    // Compose Dialog 的 WindowProvider 不一定是 LocalView 的直接 parent，
-    // 因此沿 ViewParent 链向上查找，避免因中间包装层而漏掉 Dialog Window。
-    var parent: ViewParent? = view.parent
-    while (parent != null) {
-        if (parent is DialogWindowProvider) {
-            return parent.window
+    // DialogWindowProvider 实现于 Dialog 根布局本身，因此从 LocalView 自身开始检查，
+    // 再逐级向上查找；不能只从 view.parent 开始。
+    var current: View? = view
+    while (current != null) {
+        if (current is DialogWindowProvider) {
+            return current.window
         }
-        parent = parent.parent
+        current = current.parent as? View
     }
     return null
+}
+
+private fun describeViewHierarchy(view: View): String {
+    val names = mutableListOf<String>()
+    var current: View? = view
+    while (current != null && names.size < 12) {
+        names += current.javaClass.name
+        current = current.parent as? View
+    }
+    return names.joinToString(" -> ")
 }
 
 @Composable
 fun ApplyDialogBlurBehind() {
     val view = LocalView.current
-    val dialogWindow = findDialogWindow(view) ?: return
+    val dialogWindow = findDialogWindow(view)
 
     SideEffect {
+        if (dialogWindow == null) {
+            Log.w(
+                DIALOG_BLUR_TAG,
+                "Dialog Window NOT FOUND; viewHierarchy=${describeViewHierarchy(view)}"
+            )
+            return@SideEffect
+        }
 
         dialogWindow.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
         dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
@@ -105,8 +125,23 @@ fun ApplyDialogBlurBehind() {
                 dialogWindow.setDimAmount(0.32f)
             }
             dialogWindow.attributes = attributes
+
+            val applied = dialogWindow.attributes
+            Log.i(
+                DIALOG_BLUR_TAG,
+                "windowFound=true sdk=${Build.VERSION.SDK_INT} " +
+                    "crossWindowBlurEnabled=$blurAvailable " +
+                    "blurFlag=${(applied.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND) != 0} " +
+                    "dimFlag=${(applied.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0} " +
+                    "blurRadius=${applied.blurBehindRadius} dimAmount=${dialogWindow.attributes.dimAmount} " +
+                    "windowType=${applied.type} view=${view.javaClass.name}"
+            )
         } else {
             dialogWindow.setDimAmount(0.32f)
+            Log.i(
+                DIALOG_BLUR_TAG,
+                "windowFound=true sdk=${Build.VERSION.SDK_INT}; cross-window blur requires Android 12+"
+            )
         }
     }
 }
