@@ -716,7 +716,10 @@ private fun ActiveParkingConfirmOverlay(onDismiss: () -> Unit, onConfirm: () -> 
     else Color.White.copy(alpha = 0.20f)
 
     Surface(
-        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(bottom = if (isFloating) 96.dp else 64.dp),
         shape = shape,
         color = baseColor,
         border = BorderStroke(0.8.dp, edgeColor),
