@@ -98,7 +98,7 @@ fun GlassDialogSurface(
     Surface(
         modifier = modifier,
         shape = shape,
-        color = Color.Transparent,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight)),
         shadowElevation = 20.dp
     ) {
@@ -126,7 +126,7 @@ fun GlassBottomSheetSurface(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = shape,
-        color = Color.Transparent,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight)),
         shadowElevation = 20.dp
     ) {
