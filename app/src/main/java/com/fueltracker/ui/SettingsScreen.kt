@@ -215,6 +215,22 @@ fun SettingsScreen(
         )
     }
 
+    val backgroundImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                ThemePreferences.setBackgroundImage(context, uri)
+            }.onFailure {
+                Toast.makeText(
+                    context,
+                    "设置背景图片失败：${it.localizedMessage ?: "无法读取图片"}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
     // --- 界面结构 ---
     LazyColumn(
         state = listState,
@@ -503,6 +519,36 @@ fun SettingsScreen(
                         if (mode != ThemeMode.entries.last()) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp, modifier = Modifier.padding(start = 16.dp))
                         }
+                    }
+
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        thickness = 0.6.dp
+                    )
+                    SettingsRow(
+                        icon = Icons.Default.Folder,
+                        title = "自定义背景图片",
+                        subtitle = if (ThemePreferences.backgroundImageUri != null) {
+                            "已设置，点击可更换图片"
+                        } else {
+                            "从相册选择图片作为应用背景"
+                        },
+                        enabled = !viewModel.isBackupOperationRunning,
+                        onClick = { backgroundImageLauncher.launch(arrayOf("image/*")) }
+                    )
+                    if (ThemePreferences.backgroundImageUri != null) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            thickness = 0.6.dp,
+                            modifier = Modifier.padding(start = 16.dp)
+                        )
+                        SettingsRow(
+                            icon = Icons.Default.DeleteOutline,
+                            title = "恢复默认背景",
+                            subtitle = "移除自定义图片，使用默认渐变背景",
+                            enabled = !viewModel.isBackupOperationRunning,
+                            onClick = { ThemePreferences.setBackgroundImage(context, null) }
+                        )
                     }
                 }
             }
