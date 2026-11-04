@@ -702,9 +702,9 @@ fun ActiveParkingConfirmOverlay(
     else Color.White.copy(alpha = 0.20f)
 
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding(),
+        // Surface 本身延伸到屏幕底部；系统导航栏 inset 只留给内容，
+        // 避免渐变背景在导航栏区域额外形成一块浅色矩形。
+        modifier = Modifier.fillMaxWidth(),
         shape = shape,
         color = baseColor,
         border = BorderStroke(0.8.dp, edgeColor),
@@ -732,6 +732,8 @@ fun ActiveParkingConfirmOverlay(
                 )
                 .padding(horizontal = 24.dp)
                 .padding(top = 16.dp, bottom = 28.dp)
+                // 将导航栏安全区放在渐变背景之外，避免底部 inset 出现独立色块。
+                .navigationBarsPadding()
         ) {
             Box(
                 modifier = Modifier
