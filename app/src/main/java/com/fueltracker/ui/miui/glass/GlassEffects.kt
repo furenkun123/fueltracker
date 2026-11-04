@@ -9,12 +9,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.shadow.InnerShadow
-import androidx.compose.ui.unit.DpOffset
-import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 
@@ -204,93 +200,23 @@ fun Modifier.drawGlassSelectionPill(
 }
 
 /**
- * 首页车辆卡片液态玻璃。
+ * 内容卡片玻璃背景。
  *
- * backdrop 必须来自独立的背景采样层，不能传入包含当前卡片的 appBackdrop。
- * 通过卡片内部的纵向明暗变化建立体积感，不依赖高亮描边。
+ * 与导航栏共用完全相同的基础材质：同一套模糊、折射和单色透明染色。
+ * 卡片不叠加独立渐变、高光或阴影，避免不同尺寸的卡片产生不同色阶。
  */
 fun Modifier.drawLiquidGlassCard(
     backdrop: Backdrop?,
     shape: Shape,
     isLight: Boolean
 ): Modifier {
-    if (backdrop == null) return this
-
-    return drawBackdrop(
-        backdrop = backdrop,
-        shape = { shape },
-        // 关闭默认白色高光和外投影，只保留玻璃内部柔和的边缘压暗。
-        highlight = { null },
-        shadow = { null },
-        innerShadow = {
-            InnerShadow(
-                radius = 6.dp,
-                offset = DpOffset(0.dp, 1.dp),
-                color = if (isLight) {
-                    Color(0xFF526B8C).copy(alpha = 0.16f)
-                } else {
-                    Color.Black.copy(alpha = 0.26f)
-                }
-            )
-        },
-        effects = {
-            // Backdrop 会观察 effects 回调中的 Snapshot 读取。
-            // 必须在这里读取参数，才能在设置变化时触发效果缓存刷新。
-            val params = GlassPreferences.params
-            vibrancy()
-            blur(params.blur.dp.toPx())
-            lens(
-                refractionHeight = params.refractionHeight.dp.toPx(),
-                refractionAmount = params.refractionAmount.dp.toPx()
-            )
-        },
-        onDrawSurface = {
-            // 在绘制回调中读取浓度，确保材质覆盖层同步刷新。
-            // 65% 为当前视觉基准；0% 不叠加材质色，100% 明显增强玻璃层次。
-            val concentrationScale =
-                (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
-
-            val surfaceBrush = if (isLight) {
-                Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.00f to Color.White.copy(alpha = 0.15f * concentrationScale),
-                        0.38f to Color(0xFFE7EFFB).copy(alpha = 0.09f * concentrationScale),
-                        0.78f to Color(0xFFDCE8F8).copy(alpha = 0.12f * concentrationScale),
-                        1.00f to Color(0xFFB9CBE3).copy(alpha = 0.17f * concentrationScale)
-                    )
-                )
-            } else {
-                Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.00f to Color(0xFF52627A).copy(alpha = 0.34f * concentrationScale),
-                        0.30f to Color(0xFF34445B).copy(alpha = 0.30f * concentrationScale),
-                        0.72f to Color(0xFF202D40).copy(alpha = 0.34f * concentrationScale),
-                        1.00f to Color(0xFF101A2A).copy(alpha = 0.48f * concentrationScale)
-                    )
-                )
-            }
-
-            val topHighlightAlpha =
-                (if (isLight) 0.10f else 0.075f) * concentrationScale
-            val bottomShadeAlpha =
-                (if (isLight) 0.035f else 0.12f) * concentrationScale
-
-            drawRect(brush = surfaceBrush)
-
-            drawRect(
-                brush = Brush.verticalGradient(
-                    0f to Color.White.copy(alpha = topHighlightAlpha),
-                    0.22f to Color.White.copy(alpha = topHighlightAlpha * 0.28f),
-                    0.52f to Color.Transparent
-                )
-            )
-
-            drawRect(
-                brush = Brush.verticalGradient(
-                    0.48f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = bottomShadeAlpha)
-                )
-            )
-        }
-    )
+    return if (backdrop == null) {
+        this
+    } else {
+        drawGlassBackdrop(
+            backdrop = backdrop,
+            shape = shape,
+            isLight = isLight
+        )
+    }
 }
