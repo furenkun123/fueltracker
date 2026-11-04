@@ -19,8 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import java.util.Calendar
 
 // ============================================================
@@ -203,6 +201,7 @@ private fun MiuiYearMonthPickerDialog(
 // 主入口
 // ============================================================
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiuiDatePickerDialog(
     initialTimestamp: Long,
@@ -226,62 +225,51 @@ fun MiuiDatePickerDialog(
     var minute by remember { mutableIntStateOf(initialCalendar.get(Calendar.MINUTE)) }
     var showYearMonthDialog by remember { mutableStateOf(false) }
 
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.16f),
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+        dragHandle = null
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize().navigationBarsPadding(),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            GlassBottomSheetSurface(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-            ) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 16.dp)) {
-                Box(Modifier.fillMaxWidth().padding(bottom = 2.dp), contentAlignment = Alignment.Center) {
-                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+        GlassBottomSheetSurface {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 24.dp)) {
+                Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)))
                 }
-            // 顶栏
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onDismiss) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                TextButton(onClick = {
-                    val cal = Calendar.getInstance().apply { clear(); set(selectedYear, selectedMonth - 1, selectedDay, hour, minute, 0) }
-                    onSelected(cal.timeInMillis)
-                }) { Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
-            }
-
-            Spacer(Modifier.height(2.dp))
-
-            // 日历
-            MiuiCalendar(
-                displayYear = displayYear, displayMonth = displayMonth,
-                selectedYear = selectedYear, selectedMonth = selectedMonth, selectedDay = selectedDay,
-                onPrevMonth = {
-                    if (displayMonth == 1) { if (displayYear - 1 >= minYear) { displayYear--; displayMonth = 12 } }
-                    else displayMonth--
-                },
-                onNextMonth = {
-                    if (displayMonth == 12) { if (displayYear + 1 <= maxYear) { displayYear++; displayMonth = 1 } }
-                    else displayMonth++
-                },
-                onSelectDay = { y, m, d -> selectedYear = y; selectedMonth = m; selectedDay = d; displayYear = y; displayMonth = m },
-                onTitleClick = { showYearMonthDialog = true }
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            // 时间滚轮
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Spacer(Modifier.weight(0.6f))
-                WheelList(selectedValue = hour, items = (0..23).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.Plain, itemLabel = { "%02d 时".format(it) }, onChange = { hour = it })
-                WheelList(selectedValue = minute, items = (0..59).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.Plain, itemLabel = { "%02d 分".format(it) }, onChange = { minute = it })
-                Spacer(Modifier.weight(0.6f))
-            }
-            }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onDismiss) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = {
+                        val cal = Calendar.getInstance().apply { clear(); set(selectedYear, selectedMonth - 1, selectedDay, hour, minute, 0) }
+                        onSelected(cal.timeInMillis)
+                    }) { Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
+                }
+                Spacer(Modifier.height(4.dp))
+                MiuiCalendar(
+                    displayYear = displayYear, displayMonth = displayMonth,
+                    selectedYear = selectedYear, selectedMonth = selectedMonth, selectedDay = selectedDay,
+                    onPrevMonth = {
+                        if (displayMonth == 1) { if (displayYear - 1 >= minYear) { displayYear--; displayMonth = 12 } }
+                        else displayMonth--
+                    },
+                    onNextMonth = {
+                        if (displayMonth == 12) { if (displayYear + 1 <= maxYear) { displayYear++; displayMonth = 1 } }
+                        else displayMonth++
+                    },
+                    onSelectDay = { y, m, d -> selectedYear = y; selectedMonth = m; selectedDay = d; displayYear = y; displayMonth = m },
+                    onTitleClick = { showYearMonthDialog = true }
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Spacer(Modifier.weight(0.6f))
+                    WheelList(selectedValue = hour, items = (0..23).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.Plain, itemLabel = { "%02d 时".format(it) }, onChange = { hour = it })
+                    WheelList(selectedValue = minute, items = (0..59).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.Plain, itemLabel = { "%02d 分".format(it) }, onChange = { minute = it })
+                    Spacer(Modifier.weight(0.6f))
+                }
             }
         }
-
         if (showYearMonthDialog) {
             MiuiYearMonthPickerDialog(
                 initialYear = displayYear, initialMonth = displayMonth, minYear = minYear, maxYear = maxYear,
