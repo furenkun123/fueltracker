@@ -707,6 +707,7 @@ private fun ActiveParkingCard(
 
 @Composable
 private fun ActiveParkingConfirmOverlay(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    var actionTriggered by remember { mutableStateOf(false) }
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
     val baseColor = if (isLight) Color(0xFFEAF2FF).copy(alpha = 0.70f)
@@ -785,7 +786,12 @@ private fun ActiveParkingConfirmOverlay(onDismiss: () -> Unit, onConfirm: () -> 
                     Text("取消", fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 }
                 TextButton(
-                    onClick = onConfirm,
+                    onClick = {
+                        if (actionTriggered) return@TextButton
+                        actionTriggered = true
+                        onConfirm()
+                    },
+                    enabled = !actionTriggered,
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(24.dp),
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
