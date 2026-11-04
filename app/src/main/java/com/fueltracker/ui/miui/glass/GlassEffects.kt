@@ -1,5 +1,6 @@
 package com.fueltracker.ui.miui.glass
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -10,6 +11,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.kyant.backdrop.Backdrop
+
+/**
+ * 所有内容卡片共用的独立背景采样源。
+ * 采样层只绘制 AppGlassBackground，不包含任何卡片，避免循环采样。
+ */
+val LocalCardGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+val LocalCardGlassEnabled = staticCompositionLocalOf { false }
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.vibrancy
