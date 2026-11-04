@@ -289,7 +289,20 @@ fun MiuiInputItem(
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(
+                    if (isLight) Color.White.copy(alpha = 0.34f)
+                    else Color(0xFF0B1422).copy(alpha = 0.42f)
+                )
+                .border(
+                    width = 0.6.dp,
+                    color = if (isLight) Color(0xFF475569).copy(alpha = 0.18f)
+                    else Color(0xFF070D16).copy(alpha = 0.42f),
+                    shape = RoundedCornerShape(10.dp)
+                )
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             textStyle = TextStyle(
                 fontSize = 15.sp,
                 // 👈 强制反色
@@ -353,6 +366,18 @@ fun MiuiTextField(
     enabled: Boolean = true,
     horizontalPadding: Dp = 0.dp
 ) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val inputFill = if (isLight) {
+        Color.White.copy(alpha = 0.34f)
+    } else {
+        Color(0xFF0B1422).copy(alpha = 0.42f)
+    }
+    val inputOutline = if (isLight) {
+        Color(0xFF475569).copy(alpha = 0.20f)
+    } else {
+        Color(0xFF070D16).copy(alpha = 0.44f)
+    }
+
     Column(
         modifier = modifier.padding(horizontal = horizontalPadding)
     ) {
@@ -436,16 +461,21 @@ fun MiuiTextField(
             keyboardOptions = keyboardOptions,
             keyboardActions = keyboardActions,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedContainerColor = inputFill.copy(alpha = if (isLight) 0.52f else 0.58f),
+                unfocusedContainerColor = inputFill,
+                disabledContainerColor = inputFill.copy(alpha = 0.18f),
 
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = Color.Transparent,
-                disabledBorderColor = Color.Transparent,
+                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
+                unfocusedBorderColor = inputOutline,
+                disabledBorderColor = inputOutline.copy(alpha = 0.45f),
 
                 errorBorderColor = MaterialTheme.colorScheme.error,
-                cursorColor = MaterialTheme.colorScheme.primary
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
             )
         )
 
