@@ -235,8 +235,7 @@ fun SettingsScreen(
     LazyColumn(
         state = listState,
         modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .fillMaxSize(),
         contentPadding = PaddingValues(
             // 👇 顶部加上状态栏高度，让内容避开状态栏
             top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 16.dp,
