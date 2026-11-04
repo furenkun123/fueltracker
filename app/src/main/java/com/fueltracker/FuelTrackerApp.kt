@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,6 +49,8 @@ import com.fueltracker.ui.components.UpdateLogDialog
 import com.fueltracker.ui.miui.MiuiNavigationBar
 import com.fueltracker.ui.miui.MiuiNavigationItem
 import com.fueltracker.ui.miui.MiuiTopBarMoreButton
+import com.fueltracker.ui.miui.glass.LocalCardGlassBackdrop
+import com.fueltracker.ui.miui.glass.LocalCardGlassEnabled
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
 import com.fueltracker.viewmodel.ParkingNotificationState
@@ -66,7 +69,7 @@ fun FuelTrackerApp(
 
     // 页面导航栏与车辆卡片使用独立采样源，避免卡片循环采样。
     val appBackdrop = rememberLayerBackdrop()
-    val vehicleCardBackdrop = rememberLayerBackdrop()
+    val cardBackdrop = rememberLayerBackdrop()
 
     // ---------- 启动弹窗 ----------
     val startState = remember {
@@ -181,6 +184,12 @@ fun FuelTrackerApp(
                 .layerBackdrop(appBackdrop)
         ) {
             AppGlassBackground()
+
+            // 所有内容卡片共享只包含背景的独立采样层，不采集页面自身。
+            CompositionLocalProvider(
+                LocalCardGlassBackdrop provides cardBackdrop,
+                LocalCardGlassEnabled provides isGlassEnabled
+            ) {
             if (showBottomBar) {
 
                 // ---------- 主页面 Scaffold ----------
@@ -493,6 +502,7 @@ fun FuelTrackerApp(
                     }
 
                 }
+            }
             }
         }
         if (screen == AppScreen.HOME) {
