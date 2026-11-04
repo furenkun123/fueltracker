@@ -69,6 +69,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -102,6 +103,7 @@ import com.fueltracker.ui.components.UpdateHistoryDialog
 import com.fueltracker.ui.miui.MiuiBackButton
 import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.ui.miui.MiuiSwitch
+import com.fueltracker.ui.miui.glass.GlassPreferences
 import com.fueltracker.ui.theme.ThemeMode
 import com.fueltracker.ui.theme.ThemePreferences
 import com.fueltracker.util.BackupManager
@@ -127,6 +129,7 @@ private val FadeOutSpec = fadeOut(tween(durationMillis = 180))
 
 private const val KeyDataSection = "section_data"
 private const val KeyThemeSection = "section_theme"
+private const val KeyGlassSection = "section_glass"
 private const val KeyAboutSection = "section_about"
 
 // ============================================================
@@ -150,6 +153,7 @@ fun SettingsScreen(
 
     var isDataExpanded by rememberSaveable { mutableStateOf(false) }
     var isThemeExpanded by rememberSaveable { mutableStateOf(false) }
+    var isGlassExpanded by rememberSaveable { mutableStateOf(false) }
     var isAboutExpanded by rememberSaveable { mutableStateOf(false) }
     var isXiaoxiongExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -503,7 +507,62 @@ fun SettingsScreen(
                 }
             }
 
-            // 4. 关于应用
+
+
+            // 4. 液态玻璃参数
+            item(key = KeyGlassSection) {
+                val glassParams = GlassPreferences.params
+                ExpandableSettingsGroup(
+                    icon = Icons.Default.BlurOn,
+                    title = "液态玻璃",
+                    subtitle = "调整卡片模糊、折射与材质浓度",
+                    expanded = isGlassExpanded,
+                    enabled = !viewModel.isBackupOperationRunning,
+                    onExpandedChange = { isGlassExpanded = !isGlassExpanded }
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        GlassParameterSlider(
+                            title = "背景模糊",
+                            value = glassParams.blur,
+                            valueLabel = "${glassParams.blur.toInt()} dp",
+                            valueRange = 0f..30f,
+                            onValueChange = { GlassPreferences.update(context, glassParams.copy(blur = it)) }
+                        )
+                        GlassParameterSlider(
+                            title = "折射高度",
+                            value = glassParams.refractionHeight,
+                            valueLabel = "${glassParams.refractionHeight.toInt()} dp",
+                            valueRange = 0f..64f,
+                            onValueChange = { GlassPreferences.update(context, glassParams.copy(refractionHeight = it)) }
+                        )
+                        GlassParameterSlider(
+                            title = "折射强度",
+                            value = glassParams.refractionAmount,
+                            valueLabel = "${glassParams.refractionAmount.toInt()} dp",
+                            valueRange = 0f..128f,
+                            onValueChange = { GlassPreferences.update(context, glassParams.copy(refractionAmount = it)) }
+                        )
+                        GlassParameterSlider(
+                            title = "玻璃浓度",
+                            value = glassParams.concentration,
+                            valueLabel = "${glassParams.concentration.toInt()}%",
+                            valueRange = 0f..100f,
+                            onValueChange = { GlassPreferences.update(context, glassParams.copy(concentration = it)) }
+                        )
+                        TextButton(
+                            onClick = { GlassPreferences.reset(context) },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("恢复默认参数")
+                        }
+                    }
+                }
+            }
+
+            // 5. 关于应用
             item(key = KeyAboutSection) {
                 ExpandableSettingsGroup(
                     icon = Icons.Default.Info, title = "关于应用", subtitle = "版本信息、使用说明、更新",
@@ -638,6 +697,32 @@ fun SettingsScreen(
     if (showPrivacyDialog) PrivacyDialog { showPrivacyDialog = false }
     if (showUpdateHistory) UpdateHistoryDialog { showUpdateHistory = false }
     if (showInstructions) InstructionsDialog { showInstructions = false }
+}
+
+
+@Composable
+private fun GlassParameterSlider(
+    title: String,
+    value: Float,
+    valueLabel: String,
+    valueRange: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(valueLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange
+        )
+    }
 }
 
 // ============================================================
