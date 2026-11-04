@@ -101,8 +101,6 @@ fun GlassDialogSurface(
     val shape = RoundedCornerShape(18.dp)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     // 65% 保持当前弹窗材质；浓度只控制表面渐变与描边强度。
-    val concentrationScale =
-        (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
     val surfaceColor = if (isLight) {
         Color(0xFFF7FAFF).copy(alpha = 0.88f)
     } else {
@@ -158,15 +156,15 @@ fun GlassBottomSheetSurface(
                     Brush.verticalGradient(
                         colors = if (isLight) {
                             listOf(
-                                Color.White.copy(alpha = 0.46f),
-                                Color(0xFFDCE9FA).copy(alpha = 0.22f),
-                                Color(0xFFB9CBE3).copy(alpha = 0.34f)
+                                Color.White.copy(alpha = 0.78f),
+                                Color(0xFFDCE9FA).copy(alpha = 0.68f),
+                                Color(0xFFB9CBE3).copy(alpha = 0.76f)
                             )
                         } else {
                             listOf(
-                                Color(0xFF7186A5).copy(alpha = 0.24f),
-                                Color(0xFF263A55).copy(alpha = 0.20f),
-                                Color(0xFF0D192B).copy(alpha = 0.42f)
+                                Color(0xFF7186A5).copy(alpha = 0.72f),
+                                Color(0xFF263A55).copy(alpha = 0.76f),
+                                Color(0xFF0D192B).copy(alpha = 0.88f)
                             )
                         }
                     )
