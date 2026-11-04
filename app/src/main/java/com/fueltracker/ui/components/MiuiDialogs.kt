@@ -1,6 +1,10 @@
 package com.fueltracker.ui.components
 
 import android.annotation.SuppressLint
+import android.graphics.Color as AndroidColor
+import android.graphics.drawable.ColorDrawable
+import android.os.Build
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -32,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,11 +52,49 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.ui.miui.glass.GlassPreferences
 import com.fueltracker.util.UpdateLogManager
 
+
+/**
+ * 为独立 Dialog Window 启用系统级背景模糊。
+ * Android 12+ 由系统决定是否允许跨窗口模糊；不支持时保留适度暗化。
+ */
+@Composable
+fun ApplyDialogBlurBehind() {
+    val view = LocalView.current
+
+    SideEffect {
+        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+            ?: return@SideEffect
+
+        dialogWindow.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
+        dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val windowManager = dialogWindow.context.getSystemService(WindowManager::class.java)
+            val blurAvailable = windowManager?.isCrossWindowBlurEnabled == true
+            val attributes = dialogWindow.attributes
+
+            if (blurAvailable) {
+                dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                attributes.blurBehindRadius = 48
+                dialogWindow.setDimAmount(0.20f)
+            } else {
+                dialogWindow.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                attributes.blurBehindRadius = 0
+                dialogWindow.setDimAmount(0.32f)
+            }
+            dialogWindow.attributes = attributes
+        } else {
+            dialogWindow.setDimAmount(0.32f)
+        }
+    }
+}
 
 // ============================================================
 // 公共玻璃弹窗容器
@@ -165,6 +208,7 @@ fun ScrollableSettingsDialog(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        ApplyDialogBlurBehind()
         GlassDialogSurface(
             modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp).padding(horizontal = 16.dp)
         ) {
@@ -282,6 +326,7 @@ fun UpdateLogDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        ApplyDialogBlurBehind()
         GlassDialogSurface(
             modifier = Modifier
                 .fillMaxWidth()
