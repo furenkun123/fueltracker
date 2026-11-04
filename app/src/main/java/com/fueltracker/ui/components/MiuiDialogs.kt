@@ -4,6 +4,9 @@ import android.annotation.SuppressLint
 import android.graphics.Color as AndroidColor
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
+import android.view.View
+import android.view.ViewParent
+import android.view.Window
 import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -52,7 +55,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalWindow
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.ui.miui.glass.GlassPreferences
@@ -63,12 +67,23 @@ import com.fueltracker.util.UpdateLogManager
  * 为独立 Dialog Window 启用系统级背景模糊。
  * Android 12+ 由系统决定是否允许跨窗口模糊；不支持时保留适度暗化。
  */
+private fun findDialogWindow(view: View): Window? {
+    // Compose Dialog 的 WindowProvider 不一定是 LocalView 的直接 parent，
+    // 因此沿 ViewParent 链向上查找，避免因中间包装层而漏掉 Dialog Window。
+    var parent: ViewParent? = view.parent
+    while (parent != null) {
+        if (parent is DialogWindowProvider) {
+            return parent.window
+        }
+        parent = parent.parent
+    }
+    return null
+}
+
 @Composable
 fun ApplyDialogBlurBehind() {
-    // LocalWindow 返回当前 Compose 内容实际所在的 Window。
-    // Dialog / ModalBottomSheet 都运行在独立 Window 中，不能只检查 LocalView.parent，
-    // 因为中间可能存在 PopupLayout 等 View 层级。
-    val dialogWindow = LocalWindow.current ?: return
+    val view = LocalView.current
+    val dialogWindow = findDialogWindow(view) ?: return
 
     SideEffect {
 
