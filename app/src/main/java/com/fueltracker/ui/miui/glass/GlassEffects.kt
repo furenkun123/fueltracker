@@ -5,11 +5,16 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.drawPlainBackdrop
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 
@@ -161,4 +166,52 @@ fun Modifier.drawGlassSelectionPill(
             cornerRadius = CornerRadius(cornerRadius)
         )
     }
+}
+
+/**
+ * 首页车辆卡片液态玻璃。
+ *
+ * backdrop 必须来自独立的背景采样层，不能传入包含当前卡片的 appBackdrop。
+ */
+fun Modifier.drawLiquidGlassCard(
+    backdrop: Backdrop?,
+    shape: Shape,
+    isLight: Boolean
+): Modifier {
+    if (backdrop == null) return this
+
+    val surfaceBrush = if (isLight) {
+        Brush.verticalGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.16f),
+                Color(0xFFE7EFFB).copy(alpha = 0.10f),
+                Color(0xFFDCE8F8).copy(alpha = 0.12f)
+            )
+        )
+    } else {
+        Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFF293548).copy(alpha = 0.24f),
+                Color(0xFF1B2432).copy(alpha = 0.20f),
+                Color(0xFF182334).copy(alpha = 0.24f)
+            )
+        )
+    }
+
+    return drawBackdrop(
+        backdrop = backdrop,
+        shape = { shape },
+        effects = {
+            vibrancy()
+            blur(12.dp.toPx())
+            lens(
+                refractionHeight = 14.dp.toPx(),
+                refractionAmount = 24.dp.toPx()
+            )
+        },
+        highlight = { Highlight.Plain },
+        onDrawSurface = {
+            drawRect(brush = surfaceBrush)
+        }
+    )
 }
