@@ -231,8 +231,7 @@ fun FuelTrackerApp(
 
                             // ---------- 首页 ----------
                             AppScreen.HOME -> {
-                                val vehicle by
-                                viewModel.currentVehicle.collectAsState()
+                                val vehicle = currentVehicle
 
                                 val records by
                                 viewModel.records.collectAsState()
