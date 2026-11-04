@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.fueltracker.ui.miui.glass.GlassPreferences
 import com.fueltracker.util.UpdateLogManager
 
 
@@ -59,32 +60,38 @@ import com.fueltracker.util.UpdateLogManager
 // 因此使用与卡片表面一致的静态材质，避免额外 RenderNode 采集。
 // ============================================================
 
-private fun glassCardSurfaceBrush(isLight: Boolean): Brush =
+private fun glassCardSurfaceBrush(
+    isLight: Boolean,
+    concentrationScale: Float
+): Brush =
     if (isLight) {
         Brush.verticalGradient(
             colorStops = arrayOf(
-                0.00f to Color.White.copy(alpha = 0.15f),
-                0.38f to Color(0xFFE7EFFB).copy(alpha = 0.09f),
-                0.78f to Color(0xFFDCE8F8).copy(alpha = 0.12f),
-                1.00f to Color(0xFFB9CBE3).copy(alpha = 0.17f)
+                0.00f to Color.White.copy(alpha = 0.15f * concentrationScale),
+                0.38f to Color(0xFFE7EFFB).copy(alpha = 0.09f * concentrationScale),
+                0.78f to Color(0xFFDCE8F8).copy(alpha = 0.12f * concentrationScale),
+                1.00f to Color(0xFFB9CBE3).copy(alpha = 0.17f * concentrationScale)
             )
         )
     } else {
         Brush.verticalGradient(
             colorStops = arrayOf(
-                0.00f to Color(0xFF52627A).copy(alpha = 0.34f),
-                0.30f to Color(0xFF34445B).copy(alpha = 0.30f),
-                0.72f to Color(0xFF202D40).copy(alpha = 0.34f),
-                1.00f to Color(0xFF101A2A).copy(alpha = 0.48f)
+                0.00f to Color(0xFF52627A).copy(alpha = 0.34f * concentrationScale),
+                0.30f to Color(0xFF34445B).copy(alpha = 0.30f * concentrationScale),
+                0.72f to Color(0xFF202D40).copy(alpha = 0.34f * concentrationScale),
+                1.00f to Color(0xFF101A2A).copy(alpha = 0.48f * concentrationScale)
             )
         )
     }
 
-private fun glassCardOutlineColor(isLight: Boolean): Color =
+private fun glassCardOutlineColor(
+    isLight: Boolean,
+    concentrationScale: Float
+): Color =
     if (isLight) {
-        Color(0xFF475569).copy(alpha = 0.16f)
+        Color(0xFF475569).copy(alpha = 0.16f * concentrationScale)
     } else {
-        Color(0xFF070D16).copy(alpha = 0.38f)
+        Color(0xFF070D16).copy(alpha = 0.38f * concentrationScale)
     }
 
 @Composable
@@ -94,18 +101,21 @@ fun GlassDialogSurface(
 ) {
     val shape = RoundedCornerShape(24.dp)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    // 65% 保持当前弹窗材质；浓度只控制表面渐变与描边强度。
+    val concentrationScale =
+        (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
 
     Surface(
         modifier = modifier,
         shape = shape,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight)),
+        border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight, concentrationScale)),
         shadowElevation = 20.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(glassCardSurfaceBrush(isLight)),
+                .background(glassCardSurfaceBrush(isLight, concentrationScale)),
             content = content
         )
     }
@@ -122,18 +132,20 @@ fun GlassBottomSheetSurface(
 ) {
     val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val concentrationScale =
+        (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
 
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = shape,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight)),
+        border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight, concentrationScale)),
         shadowElevation = 20.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(glassCardSurfaceBrush(isLight)),
+                .background(glassCardSurfaceBrush(isLight, concentrationScale)),
             content = content
         )
     }
