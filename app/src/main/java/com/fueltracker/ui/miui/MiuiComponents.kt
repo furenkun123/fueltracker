@@ -35,6 +35,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import com.fueltracker.ui.miui.glass.LocalCardGlassBackdrop
+import com.fueltracker.ui.miui.glass.LocalCardGlassEnabled
+import com.fueltracker.ui.miui.glass.drawLiquidGlassCard
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -142,16 +145,39 @@ fun MiuiCard(
     colors: CardColors? = null,
     elevation: CardElevation? = null,
     border: BorderStroke? = null,
+    glassEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val backdrop = LocalCardGlassBackdrop.current
+    val useGlass = glassEnabled && LocalCardGlassEnabled.current && backdrop != null
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+
+    val cardModifier = if (useGlass) {
+        modifier.drawLiquidGlassCard(
+            backdrop = backdrop,
+            shape = shape,
+            isLight = isLight
+        )
+    } else {
+        modifier
+    }
+
     Card(
-        modifier = modifier,
+        modifier = cardModifier,
         shape = shape,
-        colors = colors ?: CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        colors = if (useGlass) {
+            CardDefaults.cardColors(containerColor = Color.Transparent)
+        } else {
+            colors ?: CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        },
         elevation = elevation ?: CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = border,
+        border = border ?: if (useGlass) {
+            BorderStroke(
+                width = 0.2.dp,
+                color = if (isLight) Color(0xFF475569).copy(alpha = 0.16f)
+                else Color(0xFF070D16).copy(alpha = 0.38f)
+            )
+        } else null,
         content = content
     )
 }
@@ -169,18 +195,41 @@ fun MiuiCard(
     colors: CardColors? = null,
     elevation: CardElevation? = null,
     border: BorderStroke? = null,
+    glassEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val backdrop = LocalCardGlassBackdrop.current
+    val useGlass = glassEnabled && LocalCardGlassEnabled.current && backdrop != null
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+
+    val cardModifier = if (useGlass) {
+        modifier.drawLiquidGlassCard(
+            backdrop = backdrop,
+            shape = shape,
+            isLight = isLight
+        )
+    } else {
+        modifier
+    }
+
     Card(
         onClick = onClick,
-        modifier = modifier,
+        modifier = cardModifier,
         enabled = enabled,
         shape = shape,
-        colors = colors ?: CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        colors = if (useGlass) {
+            CardDefaults.cardColors(containerColor = Color.Transparent)
+        } else {
+            colors ?: CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        },
         elevation = elevation ?: CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = border,
+        border = border ?: if (useGlass) {
+            BorderStroke(
+                width = 0.2.dp,
+                color = if (isLight) Color(0xFF475569).copy(alpha = 0.16f)
+                else Color(0xFF070D16).copy(alpha = 0.38f)
+            )
+        } else null,
         content = content
     )
 }
@@ -203,14 +252,9 @@ fun MiuiSectionHeader(title: String) {
 
 @Composable
 fun MiuiGroupCard(content: @Composable ColumnScope.() -> Unit) {
-    // 确保卡片背景色在不同模式下都有层次感
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val cardBg = if (isLight) MaterialTheme.colorScheme.surface else Color(0xFF1C1C1E)
-
-    Surface(
+    MiuiCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = cardBg
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             content()
