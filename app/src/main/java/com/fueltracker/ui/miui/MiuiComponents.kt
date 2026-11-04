@@ -291,45 +291,40 @@ fun MiuiInputItem(
             color = textColor,
             modifier = Modifier.width(110.dp)
         )
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(10.dp))
-                .background(
-                    if (isLight) Color.White.copy(alpha = 0.34f)
-                    else Color(0xFF0B1422).copy(alpha = 0.42f)
-                )
-                .border(
-                    width = 0.6.dp,
-                    color = if (isLight) Color(0xFF475569).copy(alpha = 0.18f)
-                    else Color(0xFF070D16).copy(alpha = 0.42f),
-                    shape = RoundedCornerShape(10.dp)
-                )
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            textStyle = TextStyle(
-                fontSize = 15.sp,
-                // 👈 强制反色
-                color = textColor,
-                fontWeight = FontWeight.Medium
-            ),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            decorationBox = { innerTextField ->
-                Box(contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty() && placeholder.isNotEmpty()) {
-                        Text(
-                            text = placeholder,
-                            fontSize = 15.sp,
-                            // 👈 占位符颜色
-                            color = placeholderColor
-                        )
+        MiuiCard(
+            modifier = Modifier.weight(1f).height(42.dp),
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = TextStyle(
+                        fontSize = 15.sp,
+                        color = textColor,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                    decorationBox = { innerTextField ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (value.isEmpty() && placeholder.isNotEmpty()) {
+                                Text(
+                                    text = placeholder,
+                                    fontSize = 15.sp,
+                                    color = placeholderColor
+                                )
+                            }
+                            innerTextField()
+                        }
                     }
-                    innerTextField()
-                }
+                )
             }
-        )
+        }
     }
 }
 
