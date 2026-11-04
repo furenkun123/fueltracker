@@ -238,14 +238,13 @@ fun MiuiDatePickerDialog(
                 Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
                     Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)))
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDismiss) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    TextButton(onClick = {
-                        val cal = Calendar.getInstance().apply { clear(); set(selectedYear, selectedMonth - 1, selectedDay, hour, minute, 0) }
-                        onSelected(cal.timeInMillis)
-                    }) { Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
-                }
+                Text(
+                    title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
                 Spacer(Modifier.height(4.dp))
                 MiuiCalendar(
                     displayYear = displayYear, displayMonth = displayMonth,
@@ -267,6 +266,24 @@ fun MiuiDatePickerDialog(
                     WheelList(selectedValue = hour, items = (0..23).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.Plain, itemLabel = { "%02d 时".format(it) }, onChange = { hour = it })
                     WheelList(selectedValue = minute, items = (0..59).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.Plain, itemLabel = { "%02d 分".format(it) }, onChange = { minute = it })
                     Spacer(Modifier.weight(0.6f))
+                }
+                Spacer(Modifier.height(20.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface) }
+                    TextButton(
+                        onClick = {
+                            val cal = Calendar.getInstance().apply { clear(); set(selectedYear, selectedMonth - 1, selectedDay, hour, minute, 0) }
+                            onSelected(cal.timeInMillis)
+                        },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                    ) { Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary) }
                 }
             }
         }
