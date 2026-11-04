@@ -12,7 +12,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.drawPlainBackdrop
+import com.kyant.backdrop.shadow.InnerShadow
+import androidx.compose.ui.unit.DpOffset
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
@@ -34,7 +35,7 @@ fun Modifier.drawGlassBackdrop(
     shape: Shape,
     isLight: Boolean
 ): Modifier {
-    return drawPlainBackdrop(
+    return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
@@ -218,6 +219,20 @@ fun Modifier.drawLiquidGlassCard(
     return drawPlainBackdrop(
         backdrop = backdrop,
         shape = { shape },
+        // 关闭默认白色高光和外投影，只保留玻璃内部柔和的边缘压暗。
+        highlight = { null },
+        shadow = { null },
+        innerShadow = {
+            InnerShadow(
+                radius = 6.dp,
+                offset = DpOffset(0.dp, 1.dp),
+                color = if (isLight) {
+                    Color(0xFF526B8C).copy(alpha = 0.16f)
+                } else {
+                    Color.Black.copy(alpha = 0.26f)
+                }
+            )
+        },
         effects = {
             // Backdrop 会观察 effects 回调中的 Snapshot 读取。
             // 必须在这里读取参数，才能在设置变化时触发效果缓存刷新。
