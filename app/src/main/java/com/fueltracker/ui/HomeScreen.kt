@@ -60,11 +60,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -114,8 +109,6 @@ fun HomeScreen(
     latestConsumption: Double? = null,
     averageConsumption: Double? = null,
     activeParking: ExpenseRecord? = null,
-    cardBackdrop: Backdrop? = null,
-    isGlassEnabled: Boolean = false,
     onAddVehicle: () -> Unit,
     onAddFuel: () -> Unit,
     onAddParking: () -> Unit,
@@ -125,7 +118,6 @@ fun HomeScreen(
     isClearParkingConfirmVisible: Boolean = false,
     onRequestClearParkingConfirm: () -> Unit,
     onCollapseProgressChange: (Float) -> Unit = {},
-    onVehicleCardBoundsChanged: (Rect?, Rect?) -> Unit = { _, _ -> },
 ) {
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
@@ -173,34 +165,6 @@ fun HomeScreen(
     }
 
     val listState = rememberLazyListState()
-    var homeListBounds by remember { mutableStateOf<Rect?>(null) }
-
-    // 使用 LazyListLayoutInfo 获取真实可见项位置，滚动时每帧随列表布局更新。
-    LaunchedEffect(listState, vehicle, homeListBounds) {
-        if (vehicle == null || homeListBounds == null) {
-            onVehicleCardBoundsChanged(null, homeListBounds)
-            return@LaunchedEffect
-        }
-
-        snapshotFlow {
-            val listBounds = homeListBounds
-            val item = listState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.key == "vehicle_card" }
-            if (listBounds == null || item == null) {
-                null
-            } else {
-                val top = listBounds.top + item.offset
-                Rect(
-                    left = listBounds.left,
-                    top = top,
-                    right = listBounds.right,
-                    bottom = top + item.size
-                )
-            }
-        }.collect { cardBounds ->
-            onVehicleCardBoundsChanged(cardBounds, homeListBounds)
-        }
-    }
 
     val density = LocalDensity.current
 
@@ -247,10 +211,7 @@ fun HomeScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .scrollToHideFab(listState, viewModel)
-                .onPlaced { coordinates ->
-                    homeListBounds = coordinates.boundsInRoot()
-                },
+                .scrollToHideFab(listState, viewModel),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(
                 top = WindowInsets.statusBars
@@ -280,12 +241,7 @@ fun HomeScreen(
                 }
             } else {
                 item(key = "vehicle_card") {
-                    VehicleCard(
-                        vehicle = vehicle,
-                        modifier = Modifier
-                            .alpha(0f)
-                            .clearAndSetSemantics { }
-                    )
+                    VehicleCard(vehicle = vehicle)
                 }
 
                 if (activeParking != null) {
