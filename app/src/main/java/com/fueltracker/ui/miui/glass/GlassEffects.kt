@@ -11,13 +11,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.kyant.backdrop.Backdrop
-
-/**
- * 所有内容卡片共用的独立背景采样源。
- * 采样层只绘制 AppGlassBackground，不包含任何卡片，避免循环采样。
- */
-val LocalCardGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
-val LocalCardGlassEnabled = staticCompositionLocalOf { false }
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.vibrancy
@@ -25,6 +18,12 @@ import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 
+/**
+ * 所有内容卡片共用的独立背景采样源。
+ * 采样层只绘制 AppGlassBackground，不包含任何卡片，避免循环采样。
+ */
+val LocalCardGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+val LocalCardGlassEnabled = staticCompositionLocalOf { false }
 /**
  * 导航栏玻璃背景
  */
