@@ -26,15 +26,6 @@ fun Modifier.drawGlassNavigationBackdrop(
         shape = { shape },
         effects = {
             blur(GlassDefaults.Navigation.backdropBlur.toPx())
-
-            lens(
-                refractionHeight =
-                    GlassDefaults.Navigation.backdropRefractionHeight.toPx(),
-                refractionAmount =
-                    GlassDefaults.Navigation.backdropRefractionAmount.toPx(),
-                depthEffect = false,
-                chromaticAberration = false
-            )
         },
         onDrawSurface = {
             drawRect(
@@ -137,51 +128,37 @@ fun Modifier.drawGlassNavigationHighlight(
 }
 
 /**
- * 选中导航项的液态玻璃胶囊
+ * 选中导航项的轻量玻璃胶囊
+ *
+ * 不再单独采样 Backdrop，避免增加采样消费者。
  */
 fun Modifier.drawGlassSelectionPill(
-    backdrop: Backdrop,
     isLight: Boolean
 ): Modifier {
-    return drawPlainBackdrop(
-        backdrop = backdrop,
-        shape = {
-            RoundedCornerShape(
-                GlassDefaults.Navigation.pillCornerRadius
-            )
-        },
-        effects = {
-            blur(GlassDefaults.Navigation.pillBlur.toPx())
+    return drawBehind {
+        val cornerRadius =
+            GlassDefaults.Navigation.pillCornerRadius.toPx()
 
-            lens(
-                refractionHeight =
-                    GlassDefaults.Navigation.pillRefractionHeight.toPx(),
-                refractionAmount =
-                    GlassDefaults.Navigation.pillRefractionAmount.toPx(),
-                depthEffect = false,
-                chromaticAberration = false
-            )
-        },
-        onDrawSurface = {
-            drawRect(
-                color = if (isLight) {
-                    GlassDefaults.Navigation.lightPillTint
-                } else {
-                    GlassDefaults.Navigation.darkPillTint
-                }
-            )
+        val tint = if (isLight) {
+            GlassDefaults.Navigation.lightPillTint
+        } else {
+            GlassDefaults.Navigation.darkPillTint
         }
-    ).drawBehind {
+
+        val highlight = if (isLight) {
+            GlassDefaults.Navigation.lightPillHighlight
+        } else {
+            GlassDefaults.Navigation.darkPillHighlight
+        }
 
         drawRoundRect(
-            color = if (isLight) {
-                GlassDefaults.Navigation.lightPillHighlight
-            } else {
-                GlassDefaults.Navigation.darkPillHighlight
-            },
-            cornerRadius = CornerRadius(
-                GlassDefaults.Navigation.pillCornerRadius.toPx()
-            )
+            color = tint,
+            cornerRadius = CornerRadius(cornerRadius)
+        )
+
+        drawRoundRect(
+            color = highlight,
+            cornerRadius = CornerRadius(cornerRadius)
         )
     }
 }

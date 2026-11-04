@@ -168,15 +168,15 @@ private fun NavigationBarSurface(
         val pillWidth =
             tabWidth - horizontalPadding * 2
 
+        val safeSelectedIndex = selectedIndex.coerceIn(0, tabCount - 1)
+
         val animatedIndex = remember {
-            Animatable(selectedIndex.toFloat())
+            Animatable(safeSelectedIndex.toFloat())
         }
 
-        LaunchedEffect(selectedIndex) {
+        LaunchedEffect(safeSelectedIndex) {
             animatedIndex.animateTo(
-                targetValue = selectedIndex
-                    .coerceIn(0, tabCount - 1)
-                    .toFloat(),
+                targetValue = safeSelectedIndex.toFloat(),
                 animationSpec = spring(
                     dampingRatio = 0.72f,
                     stiffness = 380f
@@ -233,7 +233,6 @@ private fun NavigationBarSurface(
                     .width(pillWidth)
                     .height(GlassDefaults.Navigation.pillHeight)
                     .drawGlassSelectionPill(
-                        backdrop = backdrop,
                         isLight = isLight
                     )
             )

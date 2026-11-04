@@ -5,13 +5,15 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -26,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import com.fueltracker.notif.ParkingNotification
 import com.fueltracker.ui.ExpenseEditScreen
 import com.fueltracker.ui.ExpenseScreen
@@ -40,8 +43,7 @@ import com.fueltracker.ui.components.PrivacyDialog
 import com.fueltracker.ui.components.UpdateLogDialog
 import com.fueltracker.ui.miui.MiuiNavigationBar
 import com.fueltracker.ui.miui.MiuiNavigationItem
-import com.fueltracker.ui.miui.MiuiTopBar
-import com.fueltracker.ui.miui.MiuiTopBarIconButton
+import com.fueltracker.ui.miui.MiuiTopBarMoreButton
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
 import com.fueltracker.viewmodel.ParkingNotificationState
@@ -475,30 +477,26 @@ fun FuelTrackerApp(
                 }
             }
         }
-        MiuiTopBar(
-            backdrop = appBackdrop,
-            isGlassEnabled = isGlassEnabled,
-
-            // 只有主页面显示设置按钮
-            showActionArea = screen == AppScreen.HOME,
-
-
-            navigationIcon = null,
-
-            action = if (screen == AppScreen.HOME) {
-                {
-                    MiuiTopBarIconButton(
-                        icon = Icons.Default.Settings,
-                        contentDescription = "设置",
-                        onClick = {
-                            viewModel.navigateTo(AppScreen.SETTINGS)
-                        }
-                    )
-                }
-            } else {
-                null
+        if (screen == AppScreen.HOME) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        top = WindowInsets.statusBars
+                            .asPaddingValues()
+                            .calculateTopPadding() + 4.dp,
+                        end = 28.dp
+                    ),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                MiuiTopBarMoreButton(
+                    onClick = {
+                        viewModel.navigateTo(AppScreen.SETTINGS)
+                    }
+                )
             }
-        )
+        }
+
 
         // ---------- 悬浮底部导航栏 ----------
         if (showBottomBar) {
