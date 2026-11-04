@@ -760,8 +760,6 @@ private fun AppGlassBackground(backgroundImage: ImageBitmap?) {
     }
 }
 
-enum class AppScreen
-
 enum class AppScreen {
     HOME,
     ADD_VEHICLE,
