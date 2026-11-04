@@ -63,6 +63,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -265,6 +266,7 @@ fun HomeScreen(
                         vehicle = vehicle,
                         modifier = Modifier
                             .alpha(0f)
+                            .clearAndSetSemantics { }
                             .onGloballyPositioned { coordinates ->
                                 val bounds = coordinates.boundsInRoot()
                                 vehicleCardBounds = bounds
