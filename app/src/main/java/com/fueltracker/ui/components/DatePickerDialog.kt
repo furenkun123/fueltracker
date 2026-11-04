@@ -166,12 +166,8 @@ private fun MiuiYearMonthPickerDialog(
     val years = remember(minYear, maxYear) { (minYear..maxYear).toList() }
 
     Dialog(onDismissRequest = onDismiss) {
-        ApplyDialogBlurBehind()
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 20.dp
+        GlassDialogSurface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
         ) {
             Column(Modifier.fillMaxWidth().padding(20.dp)) {
                 Text("选择年月", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -228,16 +224,12 @@ fun MiuiDatePickerDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        ApplyDialogBlurBehind()
         Box(
             modifier = Modifier.fillMaxSize().navigationBarsPadding(),
             contentAlignment = Alignment.BottomCenter
         ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 24.dp
+            GlassBottomSheetSurface(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
             ) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 16.dp)) {
                 Box(Modifier.fillMaxWidth().padding(bottom = 2.dp), contentAlignment = Alignment.Center) {
