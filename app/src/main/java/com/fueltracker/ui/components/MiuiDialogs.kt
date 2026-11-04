@@ -517,7 +517,7 @@ fun MiuiConfirmDialog(
 fun MiuiYearMonthSheet(initialYear: Int, initialMonth: Int, availableYears: List<Int>, onDismiss: () -> Unit, onConfirm: (Int, Int) -> Unit) {
     var year by remember { mutableIntStateOf(initialYear) }
     var month by remember { mutableIntStateOf(initialMonth) }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Color.Transparent, scrimColor = Color.Black.copy(alpha = 0.16f), shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp), dragHandle = null) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Color.Transparent, scrimColor = Color.Black.copy(alpha = 0.16f), shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp), dragHandle = null) {
         GlassBottomSheetSurface {
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp)) {
             Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
