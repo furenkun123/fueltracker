@@ -29,6 +29,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,9 +54,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.fueltracker.data.FuelRecord
-import com.fueltracker.ui.components.GlassDialogSurface
+import com.fueltracker.ui.components.GlassBottomSheetSurface
 import com.fueltracker.ui.components.MiuiDatePickerDialog
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
@@ -680,6 +683,7 @@ private fun MiuixCheckRow(checked: Boolean, text: String, onChecked: (Boolean) -
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HyperFuelGradePickerDialog(
     currentValue: String,
@@ -688,20 +692,21 @@ private fun HyperFuelGradePickerDialog(
     onDismiss: () -> Unit
 ) {
     var selectedGrade by remember { mutableStateOf(currentValue) }
-    Dialog(onDismissRequest = onDismiss) {
-        GlassDialogSurface(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.clickable { onDismiss() }.padding(8.dp))
-                    Text("选择油品标号", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onSelected(selectedGrade) }.padding(8.dp))
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.16f),
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+        dragHandle = null
+    ) {
+        GlassBottomSheetSurface {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 28.dp)) {
+                Box(Modifier.fillMaxWidth().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)))
                 }
+                Text("选择油品标号", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
                 WheelList(
                     selectedValue = selectedGrade,
                     items = options,
@@ -711,6 +716,21 @@ private fun HyperFuelGradePickerDialog(
                     itemLabel = { it },
                     onChange = { selectedGrade = it }
                 )
+                Spacer(Modifier.height(20.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface) }
+                    TextButton(
+                        onClick = { onSelected(selectedGrade) },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                    ) { Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary) }
+                }
             }
         }
     }
