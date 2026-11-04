@@ -116,12 +116,12 @@ fun HomeScreen(
     onEditParking: (ExpenseRecord) -> Unit,
     onClearParking: () -> Unit,
     onIgnoreParking: () -> Unit,
+    isClearParkingConfirmVisible: Boolean = false,
+    onRequestClearParkingConfirm: () -> Unit,
     onCollapseProgressChange: (Float) -> Unit = {},
 ) {
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
-    var showClearParkingConfirm by remember { mutableStateOf(false) }
-    BackHandler(enabled = showClearParkingConfirm) { showClearParkingConfirm = false }
 
     val (displayRecords, recentRecords) = remember(records, deliveryDate) {
         val list = records
@@ -212,7 +212,7 @@ fun HomeScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (showClearParkingConfirm) Modifier.blur(16.dp) else Modifier)
+                .then(if (isClearParkingConfirmVisible) Modifier.blur(16.dp) else Modifier)
                 .scrollToHideFab(listState, viewModel),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(
@@ -255,7 +255,7 @@ fun HomeScreen(
                         ActiveParkingCard(
                             parking = activeParking,
                             onClick = { onEditParking(activeParking) },
-                            onRequestClear = { showClearParkingConfirm = true },
+                            onRequestClear = onRequestClearParkingConfirm,
                             onIgnore = onIgnoreParking
                         )
                     }
@@ -322,7 +322,7 @@ fun HomeScreen(
                         end = 28.dp,
                         bottom = if (isFloating) 104.dp else 84.dp
                     )
-                    .then(if (showClearParkingConfirm) Modifier.blur(16.dp) else Modifier)
+                    .then(if (isClearParkingConfirmVisible) Modifier.blur(16.dp) else Modifier)
             ) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -370,24 +370,6 @@ fun HomeScreen(
             }
         }
 
-        if (showClearParkingConfirm) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.24f))
-                    .clickable { showClearParkingConfirm = false },
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                ActiveParkingConfirmOverlay(
-                    isFloating = isFloating,
-                    onDismiss = { showClearParkingConfirm = false },
-                    onConfirm = {
-                        showClearParkingConfirm = false
-                        onClearParking()
-                    }
-                )
-            }
-        }
     }
 
     if (showYearMonthPicker) {
@@ -707,8 +689,7 @@ private fun ActiveParkingCard(
 }
 
 @Composable
-private fun ActiveParkingConfirmOverlay(
-    isFloating: Boolean,
+fun ActiveParkingConfirmOverlay(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -723,8 +704,7 @@ private fun ActiveParkingConfirmOverlay(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(bottom = if (isFloating) 96.dp else 64.dp),
+            .navigationBarsPadding(),
         shape = shape,
         color = baseColor,
         border = BorderStroke(0.8.dp, edgeColor),
