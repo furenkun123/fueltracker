@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.fueltracker.ui.theme.FuelTrackerTheme
 import com.fueltracker.ui.theme.ThemePreferences
+import com.fueltracker.ui.miui.glass.GlassPreferences
 import com.fueltracker.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         ThemePreferences.init(applicationContext)
+        GlassPreferences.init(applicationContext)
 
         // 启用 Edge-to-Edge
         WindowCompat.setDecorFitsSystemWindows(window, false)
