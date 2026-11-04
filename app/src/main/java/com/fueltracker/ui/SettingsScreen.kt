@@ -867,7 +867,7 @@ private fun SettingsRow(
 
 @Composable
 private fun MiuiCardLocal(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    MiuiCard(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) { content() }
+    MiuiCard(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) { content() }
 }
 
 @Composable
