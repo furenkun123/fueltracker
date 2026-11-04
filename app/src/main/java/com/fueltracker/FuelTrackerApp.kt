@@ -687,7 +687,7 @@ fun FuelTrackerApp(
 
 /**
  * 低对比度环境背景，为玻璃材质提供可见的明暗变化。
- * 同一背景绘制到独立车辆卡片采样层和页面层，保证采样与实际画面一致。
+ * 同一背景绘制到卡片采样层和页面层，保证玻璃采样与实际画面一致。
  */
 @Composable
 private fun AppGlassBackground(backgroundImage: ImageBitmap?) {
