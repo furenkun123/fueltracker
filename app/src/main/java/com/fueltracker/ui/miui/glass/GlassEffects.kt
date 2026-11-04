@@ -36,16 +36,22 @@ fun Modifier.drawGlassNavigationBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
-            blur(GlassDefaults.Navigation.backdropBlur.toPx())
+            // 与卡片共用全局参数，并在 Backdrop 的 effects 观察范围内读取。
+            val params = GlassPreferences.params
+            blur(params.blur.dp.toPx())
+            lens(
+                refractionHeight = params.refractionHeight.dp.toPx(),
+                refractionAmount = params.refractionAmount.dp.toPx()
+            )
         },
         onDrawSurface = {
-            drawRect(
-                color = if (isLight) {
-                    GlassDefaults.Navigation.lightBackdropTint
-                } else {
-                    GlassDefaults.Navigation.darkBackdropTint
-                }
-            )
+            val concentrationScale = GlassPreferences.params.concentration / 65f
+            val tint = if (isLight) {
+                GlassDefaults.Navigation.lightBackdropTint
+            } else {
+                GlassDefaults.Navigation.darkBackdropTint
+            }
+            drawRect(color = tint.copy(alpha = (tint.alpha * concentrationScale).coerceIn(0f, 1f)))
         }
     )
 }
@@ -58,11 +64,15 @@ fun Modifier.drawGlassNavigationOverlay(
 ): Modifier {
     return drawBehind {
 
-        val overlayColor = if (isLight) {
+        val concentrationScale = GlassPreferences.params.concentration / 65f
+        val baseOverlayColor = if (isLight) {
             GlassDefaults.Navigation.lightBottomOverlay
         } else {
             GlassDefaults.Navigation.darkBottomOverlay
         }
+        val overlayColor = baseOverlayColor.copy(
+            alpha = (baseOverlayColor.alpha * concentrationScale).coerceIn(0f, 1f)
+        )
 
         drawRect(
             brush = Brush.verticalGradient(
@@ -86,11 +96,12 @@ fun Modifier.drawGlassNavigationHighlight(
 ): Modifier {
     return drawBehind {
 
-        val highlightAlpha = if (isLight) {
+        val concentrationScale = GlassPreferences.params.concentration / 65f
+        val highlightAlpha = (if (isLight) {
             GlassDefaults.Navigation.LIGHTHIGHLIGHTALPHA
         } else {
             GlassDefaults.Navigation.DARKHIGHLIGHTALPHA
-        }
+        }) * concentrationScale
 
         drawRect(
             brush = Brush.verticalGradient(
@@ -114,13 +125,13 @@ fun Modifier.drawGlassNavigationHighlight(
                 colors = listOf(
                     Color.Transparent,
                     Color.White.copy(
-                        alpha = GlassDefaults.Navigation.HIGHLIGHTLINEMIDDLEALPHA
+                        alpha = GlassDefaults.Navigation.HIGHLIGHTLINEMIDDLEALPHA * concentrationScale
                     ),
                     Color.White.copy(
-                        alpha = GlassDefaults.Navigation.HIGHLIGHTLINEALPHA
+                        alpha = GlassDefaults.Navigation.HIGHLIGHTLINEALPHA * concentrationScale
                     ),
                     Color.White.copy(
-                        alpha = GlassDefaults.Navigation.HIGHLIGHTLINEMIDDLEALPHA
+                        alpha = GlassDefaults.Navigation.HIGHLIGHTLINEMIDDLEALPHA * concentrationScale
                     ),
                     Color.Transparent
                 )
@@ -149,18 +160,25 @@ fun Modifier.drawGlassSelectionPill(
     return drawBehind {
         val cornerRadius =
             GlassDefaults.Navigation.pillCornerRadius.toPx()
+        val concentrationScale = GlassPreferences.params.concentration / 65f
 
-        val tint = if (isLight) {
+        val baseTint = if (isLight) {
             GlassDefaults.Navigation.lightPillTint
         } else {
             GlassDefaults.Navigation.darkPillTint
         }
 
-        val highlight = if (isLight) {
+        val tint = baseTint.copy(
+            alpha = (baseTint.alpha * concentrationScale).coerceIn(0f, 1f)
+        )
+        val baseHighlight = if (isLight) {
             GlassDefaults.Navigation.lightPillHighlight
         } else {
             GlassDefaults.Navigation.darkPillHighlight
         }
+        val highlight = baseHighlight.copy(
+            alpha = (baseHighlight.alpha * concentrationScale).coerceIn(0f, 1f)
+        )
 
         drawRoundRect(
             color = tint,
@@ -204,8 +222,9 @@ fun Modifier.drawLiquidGlassCard(
         highlight = { Highlight.Plain },
         onDrawSurface = {
             // 在绘制回调中读取浓度，确保材质覆盖层同步刷新。
+            // 65% 为当前视觉基准；0% 不叠加材质色，100% 明显增强玻璃层次。
             val concentrationScale =
-                0.35f + GlassPreferences.params.concentration / 100f
+                (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
 
             val surfaceBrush = if (isLight) {
                 Brush.verticalGradient(
