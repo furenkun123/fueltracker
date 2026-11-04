@@ -242,11 +242,7 @@ fun HomeScreen(
                 }
             } else {
                 item {
-                    VehicleCard(
-                        vehicle = vehicle,
-                        backdrop = cardBackdrop,
-                        isGlassEnabled = isGlassEnabled
-                    )
+                    VehicleCard(vehicle = vehicle)
                 }
 
                 if (activeParking != null) {
@@ -403,14 +399,7 @@ private fun EmptyVehicleCard(onAddVehicle: () -> Unit) {
 @Composable
 private fun ConsumptionCard(recordCount: Int, latestConsumption: Double?, averageConsumption: Double?) {
     MiuiCard(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
-        ),
-        border = BorderStroke(
-            width = 0.8.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)
-        )
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("当前油耗", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
