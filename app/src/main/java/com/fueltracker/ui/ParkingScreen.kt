@@ -133,7 +133,6 @@ fun ParkingScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .imePadding()
             .navigationBarsPadding(),
         contentPadding = PaddingValues(
