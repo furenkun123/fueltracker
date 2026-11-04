@@ -65,12 +65,12 @@ import com.fueltracker.util.UpdateLogManager
  */
 @Composable
 fun ApplyDialogBlurBehind() {
+    // LocalWindow 返回当前 Compose 内容实际所在的 Window。
+    // Dialog / ModalBottomSheet 都运行在独立 Window 中，不能只检查 LocalView.parent，
+    // 因为中间可能存在 PopupLayout 等 View 层级。
+    val dialogWindow = LocalWindow.current ?: return
+
     SideEffect {
-        // LocalWindow 返回当前 Compose 内容实际所在的 Window。
-        // Dialog / ModalBottomSheet 都运行在独立 Window 中，不能只检查 LocalView.parent，
-        // 因为中间可能存在 PopupLayout 等 View 层级。
-        val dialogWindow = LocalWindow.current
-            ?: return@SideEffect
 
         dialogWindow.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
         dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
