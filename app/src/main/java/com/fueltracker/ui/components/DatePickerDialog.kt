@@ -11,10 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
-import android.graphics.Color as AndroidColor
-import android.graphics.drawable.ColorDrawable
-import android.os.Build
-import android.view.WindowManager
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,44 +19,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
 import java.util.Calendar
-
-// ============================================================
-// 弹窗背景模糊
-// ============================================================
-
-@Composable
-private fun ApplyDialogBlurBehind() {
-    val view = LocalView.current
-
-    SideEffect {
-        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
-            ?: return@SideEffect
-
-        dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val windowManager = dialogWindow.context
-                .getSystemService(WindowManager::class.java)
-            val blurAvailable = windowManager?.isCrossWindowBlurEnabled == true
-
-            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-            dialogWindow.setDimAmount(if (blurAvailable) 0.18f else 0.32f)
-
-            val attributes = dialogWindow.attributes
-            attributes.blurBehindRadius = if (blurAvailable) 32 else 0
-            dialogWindow.attributes = attributes
-        } else {
-            dialogWindow.setDimAmount(0.32f)
-        }
-
-        dialogWindow.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
-    }
-}
 
 // ============================================================
 // 内部数据与工具
