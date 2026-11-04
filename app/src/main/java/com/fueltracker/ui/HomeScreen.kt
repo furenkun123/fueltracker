@@ -62,7 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.CornerRadius
@@ -228,7 +228,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .scrollToHideFab(listState, viewModel)
-                .onGloballyPositioned { coordinates ->
+                .onPlaced { coordinates ->
                     val bounds = coordinates.boundsInRoot()
                     homeListBounds = bounds
                     onVehicleCardBoundsChanged(vehicleCardBounds, bounds)
@@ -267,7 +267,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .alpha(0f)
                             .clearAndSetSemantics { }
-                            .onGloballyPositioned { coordinates ->
+                            .onPlaced { coordinates ->
                                 val bounds = coordinates.boundsInRoot()
                                 vehicleCardBounds = bounds
                                 onVehicleCardBoundsChanged(bounds, homeListBounds)
