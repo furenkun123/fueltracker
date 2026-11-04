@@ -11,6 +11,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
+import android.graphics.Color as AndroidColor
+import android.graphics.drawable.ColorDrawable
+import android.os.Build
+import android.view.WindowManager
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,8 +23,44 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import java.util.Calendar
+
+// ============================================================
+// 弹窗背景模糊
+// ============================================================
+
+@Composable
+private fun ApplyDialogBlurBehind() {
+    val view = LocalView.current
+
+    SideEffect {
+        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+            ?: return@SideEffect
+
+        dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val windowManager = dialogWindow.context
+                .getSystemService(WindowManager::class.java)
+            val blurAvailable = windowManager?.isCrossWindowBlurEnabled == true
+
+            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            dialogWindow.setDimAmount(if (blurAvailable) 0.18f else 0.32f)
+
+            val attributes = dialogWindow.attributes
+            attributes.blurBehindRadius = if (blurAvailable) 32 else 0
+            dialogWindow.attributes = attributes
+        } else {
+            dialogWindow.setDimAmount(0.32f)
+        }
+
+        dialogWindow.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
+    }
+}
 
 // ============================================================
 // 内部数据与工具
@@ -165,8 +205,12 @@ private fun MiuiYearMonthPickerDialog(
     val years = remember(minYear, maxYear) { (minYear..maxYear).toList() }
 
     Dialog(onDismissRequest = onDismiss) {
-        GlassDialogSurface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+        ApplyDialogBlurBehind()
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 20.dp
         ) {
             Column(Modifier.fillMaxWidth().padding(20.dp)) {
                 Text("选择年月", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -196,7 +240,6 @@ private fun MiuiYearMonthPickerDialog(
 // 主入口
 // ============================================================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiuiDatePickerDialog(
     initialTimestamp: Long,
@@ -220,14 +263,21 @@ fun MiuiDatePickerDialog(
     var minute by remember { mutableIntStateOf(initialCalendar.get(Calendar.MINUTE)) }
     var showYearMonthDialog by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
+    Dialog(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color.Transparent,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = null
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        GlassBottomSheetSurface {
+        ApplyDialogBlurBehind()
+        Box(
+            modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 24.dp
+            ) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 16.dp)) {
                 Box(Modifier.fillMaxWidth().padding(bottom = 2.dp), contentAlignment = Alignment.Center) {
                     Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
@@ -268,6 +318,7 @@ fun MiuiDatePickerDialog(
                 WheelList(selectedValue = hour, items = (0..23).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.Plain, itemLabel = { "%02d 时".format(it) }, onChange = { hour = it })
                 WheelList(selectedValue = minute, items = (0..59).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.Plain, itemLabel = { "%02d 分".format(it) }, onChange = { minute = it })
                 Spacer(Modifier.weight(0.6f))
+            }
             }
             }
         }
