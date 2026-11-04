@@ -100,6 +100,8 @@ fun GlassDialogSurface(
 ) {
     val shape = RoundedCornerShape(18.dp)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val concentrationScale =
+        (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
     // 65% 保持当前弹窗材质；浓度只控制表面渐变与描边强度。
     val surfaceColor = if (isLight) {
         Color(0xFFF7FAFF).copy(alpha = 0.88f)
