@@ -1,6 +1,7 @@
 package com.fueltracker.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -8,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -43,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -56,8 +60,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -69,7 +77,6 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
-import com.fueltracker.ui.components.MiuiConfirmDialog
 import com.fueltracker.ui.components.MiuiYearMonthSheet
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miui.MiuiButton
@@ -113,6 +120,8 @@ fun HomeScreen(
 ) {
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
+    var showClearParkingConfirm by remember { mutableStateOf(false) }
+    BackHandler(enabled = showClearParkingConfirm) { showClearParkingConfirm = false }
 
     val (displayRecords, recentRecords) = remember(records, deliveryDate) {
         val list = records
@@ -203,6 +212,7 @@ fun HomeScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
+                .then(if (showClearParkingConfirm) Modifier.blur(16.dp) else Modifier)
                 .scrollToHideFab(listState, viewModel),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(
@@ -245,7 +255,7 @@ fun HomeScreen(
                         ActiveParkingCard(
                             parking = activeParking,
                             onClick = { onEditParking(activeParking) },
-                            onClear = onClearParking,
+                            onRequestClear = { showClearParkingConfirm = true },
                             onIgnore = onIgnoreParking
                         )
                     }
@@ -312,6 +322,7 @@ fun HomeScreen(
                         end = 28.dp,
                         bottom = if (isFloating) 104.dp else 84.dp
                     )
+                    .then(if (showClearParkingConfirm) Modifier.blur(16.dp) else Modifier)
             ) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -356,6 +367,24 @@ fun HomeScreen(
                         )
                     }
                 }
+            }
+        }
+
+        if (showClearParkingConfirm) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.24f))
+                    .clickable { showClearParkingConfirm = false },
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                ActiveParkingConfirmOverlay(
+                    onDismiss = { showClearParkingConfirm = false },
+                    onConfirm = {
+                        showClearParkingConfirm = false
+                        onClearParking()
+                    }
+                )
             }
         }
     }
@@ -635,8 +664,12 @@ private fun FabActionItem(icon: String, label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ActiveParkingCard(parking: ExpenseRecord, onClick: () -> Unit, onClear: () -> Unit, onIgnore: () -> Unit) {
-    var showClearConfirm by remember(parking.id) { mutableStateOf(false) }
+private fun ActiveParkingCard(
+    parking: ExpenseRecord,
+    onClick: () -> Unit,
+    onRequestClear: () -> Unit,
+    onIgnore: () -> Unit
+) {
     var nowTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(parking.timestamp) {
@@ -660,7 +693,7 @@ private fun ActiveParkingCard(parking: ExpenseRecord, onClick: () -> Unit, onCle
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     // 👈 统一替换为 MiuiTextButton
                     if (!parking.notificationIgnored) MiuiTextButton("忽略", MaterialTheme.colorScheme.onSurfaceVariant, onIgnore)
-                    MiuiTextButton("取车", MaterialTheme.colorScheme.primary) { showClearConfirm = true }
+                    MiuiTextButton("取车", MaterialTheme.colorScheme.primary, onRequestClear)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -670,17 +703,104 @@ private fun ActiveParkingCard(parking: ExpenseRecord, onClick: () -> Unit, onCle
         }
     }
 
-    if (showClearConfirm) {
-        MiuiConfirmDialog(
-            title = "已取车",
-            message = "确定已取车？卡片会从首页移除。",
-            confirmText = "确定",
-            onConfirm = {
-                showClearConfirm = false
-                onClear()
-            },
-            onDismiss = { showClearConfirm = false }
-        )
+}
+
+@Composable
+private fun ActiveParkingConfirmOverlay(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
+    val baseColor = if (isLight) Color(0xFFEAF2FF).copy(alpha = 0.70f)
+    else Color(0xFF142236).copy(alpha = 0.76f)
+    val edgeColor = if (isLight) Color.White.copy(alpha = 0.82f)
+    else Color.White.copy(alpha = 0.20f)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+        shape = shape,
+        color = baseColor,
+        border = BorderStroke(0.8.dp, edgeColor),
+        shadowElevation = 24.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = if (isLight) {
+                            listOf(
+                                Color.White.copy(alpha = 0.46f),
+                                Color(0xFFDCE9FA).copy(alpha = 0.22f),
+                                Color(0xFFB9CBE3).copy(alpha = 0.34f)
+                            )
+                        } else {
+                            listOf(
+                                Color(0xFF7186A5).copy(alpha = 0.24f),
+                                Color(0xFF263A55).copy(alpha = 0.20f),
+                                Color(0xFF0D192B).copy(alpha = 0.42f)
+                            )
+                        }
+                    )
+                )
+                .padding(horizontal = 24.dp)
+                .padding(top = 16.dp, bottom = 28.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(bottom = 12.dp)
+                    .width(40.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f))
+            )
+            Text(
+                text = "已取车",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "确定已取车？卡片会从首页移除。",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 22.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(28.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Text("取消", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                }
+                TextButton(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                    )
+                ) {
+                    Text(
+                        "确定",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
     }
 }
 
