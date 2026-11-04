@@ -76,7 +76,8 @@ fun VehicleCard(
                 color = if (isLight) Color(0xFF475569).copy(alpha = 0.16f)
                 else Color(0xFF070D16).copy(alpha = 0.38f)
             )
-        } else null
+        } else null,
+        glassEnabled = false
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
