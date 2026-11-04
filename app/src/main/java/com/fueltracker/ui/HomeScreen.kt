@@ -713,23 +713,6 @@ fun ActiveParkingConfirmOverlay(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = if (isLight) {
-                            listOf(
-                                Color.White.copy(alpha = 0.46f),
-                                Color(0xFFDCE9FA).copy(alpha = 0.22f),
-                                Color(0xFFB9CBE3).copy(alpha = 0.34f)
-                            )
-                        } else {
-                            listOf(
-                                Color(0xFF7186A5).copy(alpha = 0.24f),
-                                Color(0xFF263A55).copy(alpha = 0.20f),
-                                Color(0xFF0D192B).copy(alpha = 0.42f)
-                            )
-                        }
-                    )
-                )
                 .padding(horizontal = 24.dp)
                 .padding(top = 16.dp, bottom = 28.dp)
                 // 将导航栏安全区放在渐变背景之外，避免底部 inset 出现独立色块。
