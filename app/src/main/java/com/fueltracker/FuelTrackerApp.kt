@@ -3,7 +3,9 @@ package com.fueltracker
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -583,7 +585,10 @@ fun FuelTrackerApp(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.24f))
-                    .clickable { showClearParkingConfirm = false },
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { showClearParkingConfirm = false },
                 contentAlignment = Alignment.BottomCenter
             ) {
                 ActiveParkingConfirmOverlay(
