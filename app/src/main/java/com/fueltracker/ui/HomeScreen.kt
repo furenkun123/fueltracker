@@ -99,6 +99,7 @@ import com.fueltracker.viewmodel.MainViewModel
 import com.kyant.backdrop.Backdrop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.collect
 import java.util.Calendar
 import kotlin.time.Duration.Companion.seconds
 
@@ -172,13 +173,32 @@ fun HomeScreen(
     }
 
     val listState = rememberLazyListState()
-    var vehicleCardBounds by remember { mutableStateOf<Rect?>(null) }
     var homeListBounds by remember { mutableStateOf<Rect?>(null) }
 
-    LaunchedEffect(vehicle) {
-        if (vehicle == null) {
-            vehicleCardBounds = null
+    // 使用 LazyListLayoutInfo 获取真实可见项位置，滚动时每帧随列表布局更新。
+    LaunchedEffect(listState, vehicle, homeListBounds) {
+        if (vehicle == null || homeListBounds == null) {
             onVehicleCardBoundsChanged(null, homeListBounds)
+            return@LaunchedEffect
+        }
+
+        snapshotFlow {
+            val listBounds = homeListBounds
+            val item = listState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.key == "vehicle_card" }
+            if (listBounds == null || item == null) {
+                null
+            } else {
+                val top = listBounds.top + item.offset
+                Rect(
+                    left = listBounds.left,
+                    top = top,
+                    right = listBounds.right,
+                    bottom = top + item.size
+                )
+            }
+        }.collect { cardBounds ->
+            onVehicleCardBoundsChanged(cardBounds, homeListBounds)
         }
     }
 
@@ -229,9 +249,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .scrollToHideFab(listState, viewModel)
                 .onPlaced { coordinates ->
-                    val bounds = coordinates.boundsInRoot()
-                    homeListBounds = bounds
-                    onVehicleCardBoundsChanged(vehicleCardBounds, bounds)
+                    homeListBounds = coordinates.boundsInRoot()
                 },
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(
@@ -267,11 +285,6 @@ fun HomeScreen(
                         modifier = Modifier
                             .alpha(0f)
                             .clearAndSetSemantics { }
-                            .onPlaced { coordinates ->
-                                val bounds = coordinates.boundsInRoot()
-                                vehicleCardBounds = bounds
-                                onVehicleCardBoundsChanged(bounds, homeListBounds)
-                            }
                     )
                 }
 
