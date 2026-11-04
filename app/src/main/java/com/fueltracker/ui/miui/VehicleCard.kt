@@ -1,5 +1,6 @@
 package com.fueltracker.ui.miui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,26 +24,58 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.Vehicle
+import com.fueltracker.ui.miui.glass.drawLiquidGlassCard
+import com.kyant.backdrop.Backdrop
 
 @Composable
 fun VehicleCard(
     vehicle: Vehicle,
     modifier: Modifier = Modifier,
+    backdrop: Backdrop? = null,
+    isGlassEnabled: Boolean = false,
     onSwitchClick: (() -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
+    val shape = RoundedCornerShape(18.dp)
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val useGlass = isGlassEnabled && backdrop != null
+
     MiuiCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .then(
+                if (useGlass) {
+                    Modifier.drawLiquidGlassCard(
+                        backdrop = backdrop,
+                        shape = shape,
+                        isLight = isLight
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .then(
                 if (onClick != null) Modifier.clickable { onClick() }
                 else Modifier
             )
+        shape = shape,
+        colors = CardDefaults.cardColors(
+            containerColor = if (useGlass) Color.Transparent else MaterialTheme.colorScheme.surface
+        ),
+        border = if (useGlass) {
+            BorderStroke(
+                width = 0.8.dp,
+                color = if (isLight) Color.White.copy(alpha = 0.62f)
+                else Color.White.copy(alpha = 0.14f)
+            )
+        } else null
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
