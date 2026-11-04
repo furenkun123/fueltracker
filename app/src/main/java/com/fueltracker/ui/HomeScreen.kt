@@ -60,6 +60,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -119,6 +123,7 @@ fun HomeScreen(
     isClearParkingConfirmVisible: Boolean = false,
     onRequestClearParkingConfirm: () -> Unit,
     onCollapseProgressChange: (Float) -> Unit = {},
+    onVehicleCardBoundsChanged: (Rect?, Rect?) -> Unit = { _, _ -> },
 ) {
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
@@ -166,6 +171,15 @@ fun HomeScreen(
     }
 
     val listState = rememberLazyListState()
+    var vehicleCardBounds by remember { mutableStateOf<Rect?>(null) }
+    var homeListBounds by remember { mutableStateOf<Rect?>(null) }
+
+    LaunchedEffect(vehicle) {
+        if (vehicle == null) {
+            vehicleCardBounds = null
+            onVehicleCardBoundsChanged(null, homeListBounds)
+        }
+    }
 
     val density = LocalDensity.current
 
@@ -212,7 +226,12 @@ fun HomeScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .scrollToHideFab(listState, viewModel),
+                .scrollToHideFab(listState, viewModel)
+                .onGloballyPositioned { coordinates ->
+                    val bounds = coordinates.boundsInRoot()
+                    homeListBounds = bounds
+                    onVehicleCardBoundsChanged(vehicleCardBounds, bounds)
+                },
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(
                 top = WindowInsets.statusBars
@@ -241,8 +260,17 @@ fun HomeScreen(
                     EmptyVehicleCard(onAddVehicle)
                 }
             } else {
-                item {
-                    VehicleCard(vehicle = vehicle)
+                item(key = "vehicle_card") {
+                    VehicleCard(
+                        vehicle = vehicle,
+                        modifier = Modifier
+                            .alpha(0f)
+                            .onGloballyPositioned { coordinates ->
+                                val bounds = coordinates.boundsInRoot()
+                                vehicleCardBounds = bounds
+                                onVehicleCardBoundsChanged(bounds, homeListBounds)
+                            }
+                    )
                 }
 
                 if (activeParking != null) {
