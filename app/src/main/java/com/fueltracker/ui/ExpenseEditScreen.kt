@@ -53,6 +53,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.data.DEFAULT_EXPENSE_CATEGORIES
 import com.fueltracker.data.ExpenseCategoryStore
 import com.fueltracker.data.ExpenseRecord
+import com.fueltracker.ui.components.GlassDialogSurface
 import com.fueltracker.ui.components.MiuiConfirmDialog
 import com.fueltracker.ui.components.MiuiDatePickerDialog
 import com.fueltracker.ui.miui.MiuiBackButton
@@ -343,10 +344,8 @@ private fun EditCategoryDialog(
         )
     } else {
         Dialog(onDismissRequest = onDismiss) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            GlassDialogSurface(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                     Text(
@@ -402,7 +401,7 @@ private fun MiuixInputDialog(
     confirmText: String, confirmEnabled: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(24.dp)) {
+        GlassDialogSurface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
             Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                 Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
                 Spacer(Modifier.height(16.dp))
