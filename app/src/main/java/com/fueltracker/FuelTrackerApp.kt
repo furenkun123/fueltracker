@@ -172,7 +172,7 @@ fun FuelTrackerApp(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .layerBackdrop(vehicleCardBackdrop)
+                .layerBackdrop(cardBackdrop)
         ) {
             AppGlassBackground()
         }
@@ -228,7 +228,7 @@ fun FuelTrackerApp(
                                     latestConsumption = latest,
                                     averageConsumption = average,
                                     activeParking = activeParking,
-                                    cardBackdrop = vehicleCardBackdrop,
+                                    cardBackdrop = cardBackdrop,
                                     isGlassEnabled = isGlassEnabled,
 
                                     onAddVehicle = {
