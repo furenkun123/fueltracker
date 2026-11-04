@@ -64,7 +64,7 @@ fun VehicleCard(
             .then(
                 if (onClick != null) Modifier.clickable { onClick() }
                 else Modifier
-            )
+            ),
         shape = shape,
         colors = CardDefaults.cardColors(
             containerColor = if (useGlass) Color.Transparent else MaterialTheme.colorScheme.surface
