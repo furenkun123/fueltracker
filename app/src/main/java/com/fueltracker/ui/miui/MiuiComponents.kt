@@ -175,13 +175,8 @@ fun MiuiCard(
             colors ?: CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         },
         elevation = elevation ?: CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = border ?: if (useGlass) {
-            BorderStroke(
-                width = 0.8.dp,
-                color = if (isLight) Color(0xFFD1D1D6).copy(alpha = 0.65f)
-                else Color.White.copy(alpha = 0.12f)
-            )
-        } else null,
+        // 卡片统一采用无描边玻璃材质；显式传入的边框仍可用于特殊状态。 
+        border = border,
         content = content
     )
 }
@@ -227,13 +222,8 @@ fun MiuiCard(
             colors ?: CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         },
         elevation = elevation ?: CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = border ?: if (useGlass) {
-            BorderStroke(
-                width = 0.8.dp,
-                color = if (isLight) Color(0xFFD1D1D6).copy(alpha = 0.65f)
-                else Color.White.copy(alpha = 0.12f)
-            )
-        } else null,
+        // 卡片统一采用无描边玻璃材质；显式传入的边框仍可用于特殊状态。 
+        border = border,
         content = content
     )
 }
