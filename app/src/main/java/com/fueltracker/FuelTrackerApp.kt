@@ -579,26 +579,28 @@ fun FuelTrackerApp(
             }
         }
 
-        // 取车确认层放在导航栏之后绘制，确保遮罩和面板都覆盖导航栏。
-        if (screen == AppScreen.HOME && showClearParkingConfirm) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.24f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { showClearParkingConfirm = false },
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                ActiveParkingConfirmOverlay(
-                    onDismiss = { showClearParkingConfirm = false },
-                    onConfirm = {
-                        showClearParkingConfirm = false
-                        viewModel.clearActiveParking()
-                    }
-                )
-            }
+    }
+
+    // 独立的 Backdrop 消费者：弹窗本身不进入 appBackdrop 的采样内容。
+    if (screen == AppScreen.HOME && showClearParkingConfirm) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.16f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { showClearParkingConfirm = false },
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            ActiveParkingConfirmOverlay(
+                backdrop = appBackdrop,
+                onDismiss = { showClearParkingConfirm = false },
+                onConfirm = {
+                    showClearParkingConfirm = false
+                    viewModel.clearActiveParking()
+                }
+            )
         }
     }
 
