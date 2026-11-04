@@ -67,7 +67,7 @@ fun FuelTrackerApp(
         mutableFloatStateOf(0f)
     }
 
-    // 页面导航栏与车辆卡片使用独立采样源，避免卡片循环采样。
+    // 底部导航使用 appBackdrop；所有内容卡片共用独立背景采样源。
     val appBackdrop = rememberLayerBackdrop()
     val cardBackdrop = rememberLayerBackdrop()
 
