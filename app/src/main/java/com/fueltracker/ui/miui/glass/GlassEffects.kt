@@ -17,7 +17,6 @@ import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
-import com.fueltracker.ui.miui.glass.GlassPreferences
 
 /**
  * 所有内容卡片共用的独立背景采样源。
