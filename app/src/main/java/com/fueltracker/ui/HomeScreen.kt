@@ -60,7 +60,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -92,6 +91,8 @@ import com.fueltracker.util.toDateTimeText
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
 import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
 import java.util.Calendar
@@ -212,7 +213,6 @@ fun HomeScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isClearParkingConfirmVisible) Modifier.blur(16.dp) else Modifier)
                 .scrollToHideFab(listState, viewModel),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(
@@ -322,8 +322,8 @@ fun HomeScreen(
                         end = 28.dp,
                         bottom = if (isFloating) 104.dp else 84.dp
                     )
-                    .then(if (isClearParkingConfirmVisible) Modifier.blur(16.dp) else Modifier)
-            ) {
+                    )
+             {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalAlignment = Alignment.End
@@ -690,6 +690,7 @@ private fun ActiveParkingCard(
 
 @Composable
 fun ActiveParkingConfirmOverlay(
+    backdrop: Backdrop,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -704,9 +705,22 @@ fun ActiveParkingConfirmOverlay(
     Surface(
         // Surface 本身延伸到屏幕底部；系统导航栏 inset 只留给内容，
         // 避免渐变背景在导航栏区域额外形成一块浅色矩形。
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .drawBackdrop(
+                backdrop = backdrop,
+                shape = { shape },
+                effects = {
+                    // 只模糊面板覆盖区域后方的页面内容。
+                    blur(36.dp.toPx())
+                },
+                onDrawSurface = {
+                    // 高不透明度避免底下文字透过面板显现。
+                    drawRect(color = baseColor.copy(alpha = 0.94f))
+                }
+            ),
         shape = shape,
-        color = baseColor,
+        color = Color.Transparent,
         border = BorderStroke(0.8.dp, edgeColor),
         shadowElevation = 0.dp
     ) {
