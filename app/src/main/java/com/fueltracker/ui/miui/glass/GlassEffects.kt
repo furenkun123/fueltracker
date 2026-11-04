@@ -215,7 +215,7 @@ fun Modifier.drawLiquidGlassCard(
 ): Modifier {
     if (backdrop == null) return this
 
-    return drawBackdrop(
+    return drawPlainBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
