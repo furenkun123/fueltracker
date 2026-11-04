@@ -33,7 +33,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.fueltracker.notif.ParkingNotification
@@ -47,6 +54,7 @@ import com.fueltracker.ui.ParkingScreen
 import com.fueltracker.ui.RecordsScreen
 import com.fueltracker.ui.SettingsScreen
 import com.fueltracker.ui.VehicleScreen
+import com.fueltracker.ui.miui.VehicleCard
 import com.fueltracker.ui.components.PrivacyDialog
 import com.fueltracker.ui.components.UpdateLogDialog
 import com.fueltracker.ui.miui.MiuiNavigationBar
@@ -59,12 +67,17 @@ import com.fueltracker.viewmodel.MainViewModel
 import com.fueltracker.viewmodel.ParkingNotificationState
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import kotlin.math.roundToInt
 
 @Composable
 fun FuelTrackerApp(
     viewModel: MainViewModel
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+    val currentVehicle by viewModel.currentVehicle.collectAsState()
+    var vehicleCardBounds by remember { mutableStateOf<Rect?>(null) }
+    var homeListBounds by remember { mutableStateOf<Rect?>(null) }
 
     var homeCollapseProgress by remember {
         mutableFloatStateOf(0f)
@@ -276,6 +289,10 @@ fun FuelTrackerApp(
 
                                     onCollapseProgressChange = {
                                         homeCollapseProgress = it
+                                    },
+                                    onVehicleCardBoundsChanged = { cardBounds, listBounds ->
+                                        vehicleCardBounds = cardBounds
+                                        homeListBounds = listBounds
                                     }
                                 )
                             }
@@ -516,6 +533,49 @@ fun FuelTrackerApp(
             }
             }
         }
+        // 车辆卡片作为页面采样层之外的独立玻璃消费者，采样真实页面内容。
+        if (screen == AppScreen.HOME && currentVehicle != null) {
+            val cardBounds = vehicleCardBounds
+            val listBounds = homeListBounds
+            if (cardBounds != null && listBounds != null &&
+                cardBounds.width > 0f && cardBounds.height > 0f &&
+                listBounds.width > 0f && listBounds.height > 0f
+            ) {
+                val cardWidth = with(density) { cardBounds.width.toDp() }
+                Box(
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                listBounds.left.roundToInt(),
+                                listBounds.top.roundToInt()
+                            )
+                        }
+                        .size(
+                            width = with(density) { listBounds.width.toDp() },
+                            height = with(density) { listBounds.height.toDp() }
+                        )
+                        .clipToBounds()
+                ) {
+                    CompositionLocalProvider(
+                        LocalCardGlassBackdrop provides appBackdrop,
+                        LocalCardGlassEnabled provides isGlassEnabled
+                    ) {
+                        VehicleCard(
+                            vehicle = currentVehicle!!,
+                            modifier = Modifier
+                                .offset {
+                                    IntOffset(
+                                        (cardBounds.left - listBounds.left).roundToInt(),
+                                        (cardBounds.top - listBounds.top).roundToInt()
+                                    )
+                                }
+                                .width(cardWidth)
+                        )
+                    }
+                }
+            }
+        }
+
         if (screen == AppScreen.HOME) {
             Box(
                 modifier = Modifier
