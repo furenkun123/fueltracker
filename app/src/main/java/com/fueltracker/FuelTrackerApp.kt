@@ -2,6 +2,7 @@
 package com.fueltracker
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -26,7 +27,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Offset
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.fueltracker.notif.ParkingNotification
@@ -60,7 +64,9 @@ fun FuelTrackerApp(
         mutableFloatStateOf(0f)
     }
 
+    // 页面导航栏与车辆卡片使用独立采样源，避免卡片循环采样。
     val appBackdrop = rememberLayerBackdrop()
+    val vehicleCardBackdrop = rememberLayerBackdrop()
 
     // ---------- 启动弹窗 ----------
     val startState = remember {
@@ -159,12 +165,22 @@ fun FuelTrackerApp(
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
+        // 车辆卡片专用采样层：只捕获背景，不包含 Scaffold、卡片或导航栏。
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .layerBackdrop(vehicleCardBackdrop)
+        ) {
+            AppGlassBackground()
+        }
+
+        // 页面采样层继续供底部导航栏使用。
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
                 .layerBackdrop(appBackdrop)
         ) {
+            AppGlassBackground()
             if (showBottomBar) {
 
                 // ---------- 主页面 Scaffold ----------
@@ -203,6 +219,8 @@ fun FuelTrackerApp(
                                     latestConsumption = latest,
                                     averageConsumption = average,
                                     activeParking = activeParking,
+                                    cardBackdrop = vehicleCardBackdrop,
+                                    isGlassEnabled = isGlassEnabled,
 
                                     onAddVehicle = {
                                         viewModel.navigateToAddVehicle(
@@ -571,6 +589,50 @@ fun FuelTrackerApp(
                         BuildConfig.VERSION_CODE
                     )
                 }
+            )
+        }
+    }
+}
+
+/**
+ * 低对比度环境背景，为玻璃材质提供可见的明暗变化。
+ * 同一背景绘制到独立车辆卡片采样层和页面层，保证采样与实际画面一致。
+ */
+@Composable
+private fun AppGlassBackground() {
+    val background = MaterialTheme.colorScheme.background
+    val isLight = background.luminance() > 0.5f
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(background)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val glow = if (isLight) {
+                Color(0xFF9BB8E2).copy(alpha = 0.22f)
+            } else {
+                Color(0xFF5276A8).copy(alpha = 0.20f)
+            }
+            val secondaryGlow = if (isLight) {
+                Color(0xFFD5E0F0).copy(alpha = 0.16f)
+            } else {
+                Color(0xFF354B68).copy(alpha = 0.16f)
+            }
+
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(glow, Color.Transparent),
+                    center = Offset(size.width * 0.84f, size.height * 0.14f),
+                    radius = maxOf(size.width, size.height) * 0.72f
+                )
+            )
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(secondaryGlow, Color.Transparent),
+                    center = Offset(size.width * 0.08f, size.height * 0.82f),
+                    radius = maxOf(size.width, size.height) * 0.62f
+                )
             )
         }
     }
