@@ -84,6 +84,7 @@ import com.fueltracker.util.computeExpenseRange
 import com.fueltracker.util.toDateTimeText
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
+import com.kyant.backdrop.Backdrop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
 import java.util.Calendar
@@ -100,6 +101,8 @@ fun HomeScreen(
     latestConsumption: Double? = null,
     averageConsumption: Double? = null,
     activeParking: ExpenseRecord? = null,
+    cardBackdrop: Backdrop? = null,
+    isGlassEnabled: Boolean = false,
     onAddVehicle: () -> Unit,
     onAddFuel: () -> Unit,
     onAddParking: () -> Unit,
@@ -230,7 +233,11 @@ fun HomeScreen(
                 }
             } else {
                 item {
-                    VehicleCard(vehicle)
+                    VehicleCard(
+                        vehicle = vehicle,
+                        backdrop = cardBackdrop,
+                        isGlassEnabled = isGlassEnabled
+                    )
                 }
 
                 if (activeParking != null) {
