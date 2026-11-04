@@ -682,7 +682,6 @@ fun FuelTrackerApp(
                     )
                 }
             )
-            }
         }
     }
 }
@@ -756,9 +755,12 @@ private fun AppGlassBackground(backgroundImage: ImageBitmap?) {
                     radius = maxOf(size.width, size.height) * 0.34f
                 )
             )
+            }
         }
     }
 }
+
+enum class AppScreen
 
 enum class AppScreen {
     HOME,
