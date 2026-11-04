@@ -550,7 +550,7 @@ fun MiuiBottomSheetWrapper(
     ModalBottomSheet(
         onDismissRequest = onDismiss, sheetState = sheetState,
         containerColor = Color.Transparent,
-        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {
         GlassBottomSheetSurface {
