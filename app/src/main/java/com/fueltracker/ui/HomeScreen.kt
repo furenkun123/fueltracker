@@ -707,7 +707,7 @@ fun ActiveParkingConfirmOverlay(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
         color = Color.Transparent,
-        border = null,
+        border = BorderStroke(0.8.dp, edgeColor),
         shadowElevation = 0.dp
     ) {
         Column(
