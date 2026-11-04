@@ -39,6 +39,7 @@ import com.fueltracker.ui.ExpenseEditScreen
 import com.fueltracker.ui.ExpenseScreen
 import com.fueltracker.ui.FuelScreen
 import com.fueltracker.ui.HomeScreen
+import com.fueltracker.ui.ActiveParkingConfirmOverlay
 import com.fueltracker.ui.InitialRecordScreen
 import com.fueltracker.ui.ParkingScreen
 import com.fueltracker.ui.RecordsScreen
@@ -93,6 +94,7 @@ fun FuelTrackerApp(
     val addVehicleOrigin = viewModel.addVehicleOrigin
     val expenseSelectedCategory = viewModel.expenseSelectedCategory
 
+    var showClearParkingConfirm by remember { mutableStateOf(false) }
     val activeParking by viewModel.activeParking.collectAsState()
     val parkingNotificationState by viewModel.parkingNotificationState.collectAsState()
 
@@ -160,6 +162,11 @@ fun FuelTrackerApp(
     BackHandler(
         enabled = screen != AppScreen.HOME,
         onBack = handleBack
+    )
+
+    BackHandler(
+        enabled = screen == AppScreen.HOME && showClearParkingConfirm,
+        onBack = { showClearParkingConfirm = false }
     )
 
     // ============================================================
@@ -230,6 +237,8 @@ fun FuelTrackerApp(
                                     activeParking = activeParking,
                                     cardBackdrop = cardBackdrop,
                                     isGlassEnabled = isGlassEnabled,
+                                    isClearParkingConfirmVisible = showClearParkingConfirm,
+                                    onRequestClearParkingConfirm = { showClearParkingConfirm = true },
 
                                     onAddVehicle = {
                                         viewModel.navigateToAddVehicle(
@@ -564,6 +573,25 @@ fun FuelTrackerApp(
                     },
                     icon = Icons.Default.Receipt,
                     label = "费用"
+                )
+            }
+        }
+
+        // 取车确认层放在导航栏之后绘制，确保遮罩和面板都覆盖导航栏。
+        if (screen == AppScreen.HOME && showClearParkingConfirm) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.24f))
+                    .clickable { showClearParkingConfirm = false },
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                ActiveParkingConfirmOverlay(
+                    onDismiss = { showClearParkingConfirm = false },
+                    onConfirm = {
+                        showClearParkingConfirm = false
+                        viewModel.clearActiveParking()
+                    }
                 )
             }
         }
