@@ -328,7 +328,7 @@ fun FuelScreen(
             }
 
             // 车辆信息卡片
-            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -342,7 +342,7 @@ fun FuelScreen(
             }
 
             // 油品标号卡片
-            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { showFuelGradePicker = true }.padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -354,7 +354,7 @@ fun FuelScreen(
             }
 
             // 输入区域卡片
-            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
                 Column(
                     modifier = Modifier.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -513,7 +513,7 @@ fun FuelScreen(
             }
 
             // 勾选项
-            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
                 Column(modifier = Modifier.padding(vertical = 4.dp)) {
                     MiuixCheckRow(isFull, "本次已加满") { checked ->
                         isFull = checked
@@ -555,7 +555,7 @@ fun FuelScreen(
             }
 
             // 备注
-            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
                 MiuiTextField(
                     value = note,
                     onValueChange = { note = it },
