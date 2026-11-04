@@ -189,7 +189,6 @@ fun VehicleScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .imePadding()
             .navigationBarsPadding()
