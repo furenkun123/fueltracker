@@ -52,8 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.ui.platform.LocalWindow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.ui.miui.glass.GlassPreferences
@@ -66,10 +65,11 @@ import com.fueltracker.util.UpdateLogManager
  */
 @Composable
 fun ApplyDialogBlurBehind() {
-    val view = LocalView.current
-
     SideEffect {
-        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+        // LocalWindow 返回当前 Compose 内容实际所在的 Window。
+        // Dialog / ModalBottomSheet 都运行在独立 Window 中，不能只检查 LocalView.parent，
+        // 因为中间可能存在 PopupLayout 等 View 层级。
+        val dialogWindow = LocalWindow.current
             ?: return@SideEffect
 
         dialogWindow.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
@@ -173,6 +173,9 @@ fun GlassBottomSheetSurface(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    // Material3 ModalBottomSheet 使用独立 Dialog Window。
+    ApplyDialogBlurBehind()
+
     val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val concentrationScale =
