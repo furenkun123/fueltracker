@@ -514,29 +514,48 @@ fun MiuiConfirmDialog(
 @SuppressLint("DefaultLocale")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MiuiYearMonthSheet(initialYear: Int, initialMonth: Int, availableYears: List<Int>, onDismiss: () -> Unit, onConfirm: (Int, Int) -> Unit) {
+fun MiuiYearMonthSheet(
+    initialYear: Int,
+    initialMonth: Int,
+    availableYears: List<Int>,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int) -> Unit
+) {
     var year by remember { mutableIntStateOf(initialYear) }
     var month by remember { mutableIntStateOf(initialMonth) }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Color.Transparent, scrimColor = Color.Black.copy(alpha = 0.16f), shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp), dragHandle = null) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.16f),
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+        dragHandle = null
+    ) {
         GlassBottomSheetSurface {
-            Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp)) {
-            Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 28.dp)) {
+                Box(Modifier.fillMaxWidth().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)))
+                }
+                Text("选择年月", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WheelList(selectedValue = year, items = availableYears, visibleCount = 3, modifier = Modifier.weight(1.4f), style = WheelStyle.WithBackground, itemLabel = { "${it}年" }, onChange = { year = it })
+                    WheelList(selectedValue = month, items = (0..12).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.WithBackground, itemLabel = { if (it == 0) "全年" else String.format("%02d 月", it) }, onChange = { month = it })
+                }
+                Spacer(Modifier.height(20.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(24.dp), colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    TextButton(onClick = { onConfirm(year, month) }, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(24.dp), colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))) {
+                        Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("取消", Modifier.clickable(onClick = onDismiss).padding(8.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("选择年月", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text("确定", Modifier.clickable { onConfirm(year, month) }.padding(8.dp), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                WheelList(selectedValue = year, items = availableYears, visibleCount = 3, modifier = Modifier.weight(1.4f), style = WheelStyle.WithBackground, itemLabel = { "${it}年" }, onChange = { year = it })
-                WheelList(selectedValue = month, items = (0..12).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.WithBackground, itemLabel = { if (it == 0) "全年" else String.format("%02d 月", it) }, onChange = { month = it })
-            }
-        }
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiuiBottomSheetWrapper(
@@ -548,24 +567,37 @@ fun MiuiBottomSheetWrapper(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
-        onDismissRequest = onDismiss, sheetState = sheetState,
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.16f),
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {
         GlassBottomSheetSurface {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 24.dp)) {
-                Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
-                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 28.dp)) {
+                Box(Modifier.fillMaxWidth().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)))
                 }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("取消", Modifier.clickable(onClick = onDismiss).padding(8.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text(confirmText, Modifier.clickable { onConfirm() }.padding(8.dp), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
+                content()
+                Spacer(Modifier.height(20.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface) }
+                    TextButton(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                    ) { Text(confirmText, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary) }
+                }
             }
-            Spacer(Modifier.height(12.dp))
-            content()
-        }
         }
     }
 }
