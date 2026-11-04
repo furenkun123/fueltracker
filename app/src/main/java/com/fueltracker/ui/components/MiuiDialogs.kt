@@ -53,8 +53,39 @@ import com.fueltracker.util.UpdateLogManager
 
 
 // ============================================================
-// 公共玻璃弹窗容器（不使用实时 Backdrop，避免额外 RenderNode 采集）
+// 公共玻璃弹窗容器
+// 与 MiuiCard 使用同一套渐变和描边参数。
+// Dialog/BottomSheet 属于独立 Window，不跨窗口采样 Backdrop，
+// 因此使用与卡片表面一致的静态材质，避免额外 RenderNode 采集。
 // ============================================================
+
+private fun glassCardSurfaceBrush(isLight: Boolean): Brush =
+    if (isLight) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.00f to Color.White.copy(alpha = 0.15f),
+                0.38f to Color(0xFFE7EFFB).copy(alpha = 0.09f),
+                0.78f to Color(0xFFDCE8F8).copy(alpha = 0.12f),
+                1.00f to Color(0xFFB9CBE3).copy(alpha = 0.17f)
+            )
+        )
+    } else {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.00f to Color(0xFF52627A).copy(alpha = 0.34f),
+                0.30f to Color(0xFF34445B).copy(alpha = 0.30f),
+                0.72f to Color(0xFF202D40).copy(alpha = 0.34f),
+                1.00f to Color(0xFF101A2A).copy(alpha = 0.48f)
+            )
+        )
+    }
+
+private fun glassCardOutlineColor(isLight: Boolean): Color =
+    if (isLight) {
+        Color(0xFF475569).copy(alpha = 0.16f)
+    } else {
+        Color(0xFF070D16).copy(alpha = 0.38f)
+    }
 
 @Composable
 fun GlassDialogSurface(
@@ -62,102 +93,47 @@ fun GlassDialogSurface(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(24.dp)
-    val surface = MaterialTheme.colorScheme.surface
-    val isLight = surface.luminance() > 0.5f
-    val outline = if (isLight) {
-        Color(0xFF475569).copy(alpha = 0.20f)
-    } else {
-        Color(0xFF070D16).copy(alpha = 0.58f)
-    }
-    val highlight = if (isLight) {
-        Color.White.copy(alpha = 0.62f)
-    } else {
-        Color(0xFF94A3B8).copy(alpha = 0.14f)
-    }
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
     Surface(
         modifier = modifier,
         shape = shape,
-        color = surface.copy(alpha = if (isLight) 0.88f else 0.90f),
-        border = BorderStroke(
-            0.8.dp,
-            Brush.linearGradient(
-                listOf(
-                    highlight,
-                    outline,
-                    outline.copy(alpha = outline.alpha * 0.72f),
-                    highlight.copy(alpha = highlight.alpha * 0.72f)
-                )
-            )
-        ),
+        color = Color.Transparent,
+        border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight)),
         shadowElevation = 20.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            if (isLight) Color.White.copy(alpha = 0.20f)
-                            else Color(0xFF71839C).copy(alpha = 0.10f),
-                            if (isLight) Color(0xFFDCE8F8).copy(alpha = 0.10f)
-                            else Color(0xFF26364D).copy(alpha = 0.12f),
-                            if (isLight) Color(0xFFB9CBE3).copy(alpha = 0.12f)
-                            else Color(0xFF080F1B).copy(alpha = 0.18f)
-                        )
-                    )
-                ),
+                .background(glassCardSurfaceBrush(isLight)),
             content = content
         )
     }
 }
 
 /**
- * 底部弹出层使用独立的半透明材质，不跨 Dialog/Window 采样 Backdrop。
+ * 底部弹出层使用与内容卡片一致的表面渐变和描边。
+ * 不跨 Dialog/Window 采样 Backdrop，避免额外 RenderNode 采集。
  */
 @Composable
 fun GlassBottomSheetSurface(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val surface = MaterialTheme.colorScheme.surface
-    val isLight = surface.luminance() > 0.5f
-    val outline = if (isLight) {
-        Color(0xFF475569).copy(alpha = 0.20f)
-    } else {
-        Color(0xFF070D16).copy(alpha = 0.58f)
-    }
-    val highlight = if (isLight) {
-        Color.White.copy(alpha = 0.58f)
-    } else {
-        Color(0xFF94A3B8).copy(alpha = 0.12f)
-    }
+    val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        color = surface.copy(alpha = if (isLight) 0.88f else 0.90f),
-        border = BorderStroke(
-            0.8.dp,
-            Brush.linearGradient(listOf(highlight, outline, outline, highlight))
-        ),
+        shape = shape,
+        color = Color.Transparent,
+        border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight)),
         shadowElevation = 20.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            if (isLight) Color.White.copy(alpha = 0.18f)
-                            else Color(0xFF71839C).copy(alpha = 0.10f),
-                            if (isLight) Color(0xFFDCE8F8).copy(alpha = 0.10f)
-                            else Color(0xFF26364D).copy(alpha = 0.12f),
-                            if (isLight) Color(0xFFB9CBE3).copy(alpha = 0.12f)
-                            else Color(0xFF080F1B).copy(alpha = 0.18f)
-                        )
-                    )
-                ),
+                .background(glassCardSurfaceBrush(isLight)),
             content = content
         )
     }
