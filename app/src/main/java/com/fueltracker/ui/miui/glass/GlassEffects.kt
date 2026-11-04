@@ -25,9 +25,12 @@ import com.kyant.backdrop.effects.lens
 val LocalCardGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 val LocalCardGlassEnabled = staticCompositionLocalOf { false }
 /**
- * 导航栏玻璃背景
+ * 通用玻璃背景材质。
+ *
+ * 导航栏、弹窗等需要统一外观的组件共用此实现，所有模糊、折射和染色参数
+ * 均由 GlassPreferences / GlassDefaults.Navigation 提供。
  */
-fun Modifier.drawGlassNavigationBackdrop(
+fun Modifier.drawGlassBackdrop(
     backdrop: Backdrop,
     shape: Shape,
     isLight: Boolean
@@ -36,7 +39,6 @@ fun Modifier.drawGlassNavigationBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
-            // 与卡片共用全局参数，并在 Backdrop 的 effects 观察范围内读取。
             val params = GlassPreferences.params
             blur(params.blur.dp.toPx())
             lens(
@@ -55,6 +57,15 @@ fun Modifier.drawGlassNavigationBackdrop(
         }
     )
 }
+
+/**
+ * 导航栏玻璃背景：保留原有 API，内部直接复用通用材质。
+ */
+fun Modifier.drawGlassNavigationBackdrop(
+    backdrop: Backdrop,
+    shape: Shape,
+    isLight: Boolean
+): Modifier = drawGlassBackdrop(backdrop, shape, isLight)
 
 /**
  * 导航栏底部渐变叠加
