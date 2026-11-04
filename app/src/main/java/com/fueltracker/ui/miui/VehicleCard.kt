@@ -69,11 +69,12 @@ fun VehicleCard(
         colors = CardDefaults.cardColors(
             containerColor = if (useGlass) Color.Transparent else MaterialTheme.colorScheme.surface
         ),
+        // 边框只保留极淡的边缘提示，避免形成一圈醒目的白色描边。
         border = if (useGlass) {
             BorderStroke(
-                width = 0.8.dp,
-                color = if (isLight) Color.White.copy(alpha = 0.62f)
-                else Color.White.copy(alpha = 0.14f)
+                width = 0.5.dp,
+                color = if (isLight) Color.White.copy(alpha = 0.20f)
+                else Color.White.copy(alpha = 0.055f)
             )
         } else null
     ) {
@@ -81,7 +82,6 @@ fun VehicleCard(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // 第一行：品牌 + 车系 + 当前车辆标签 + (可选)切换按钮
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -126,7 +126,6 @@ fun VehicleCard(
                 }
             }
 
-            // 第二行：具体车型
             Text(
                 text = "${vehicle.year}款 ${vehicle.model}",
                 style = MaterialTheme.typography.bodyMedium,
