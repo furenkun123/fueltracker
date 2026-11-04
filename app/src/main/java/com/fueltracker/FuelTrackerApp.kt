@@ -713,29 +713,42 @@ private fun AppGlassBackground() {
             .background(background)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
+            // 测试阶段提高背景色彩与明暗差异，便于观察玻璃的模糊和折射。
             val glow = if (isLight) {
-                Color(0xFF9BB8E2).copy(alpha = 0.22f)
+                Color(0xFF78A9F5).copy(alpha = 0.38f)
             } else {
-                Color(0xFF5276A8).copy(alpha = 0.20f)
+                Color(0xFF5276A8).copy(alpha = 0.28f)
             }
             val secondaryGlow = if (isLight) {
-                Color(0xFFD5E0F0).copy(alpha = 0.16f)
+                Color(0xFFB9A4F2).copy(alpha = 0.30f)
             } else {
-                Color(0xFF354B68).copy(alpha = 0.16f)
+                Color(0xFF354B68).copy(alpha = 0.24f)
+            }
+            val tertiaryGlow = if (isLight) {
+                Color(0xFF72D6D0).copy(alpha = 0.22f)
+            } else {
+                Color(0xFF286D78).copy(alpha = 0.18f)
             }
 
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(glow, Color.Transparent),
-                    center = Offset(size.width * 0.84f, size.height * 0.14f),
-                    radius = maxOf(size.width, size.height) * 0.72f
+                    center = Offset(size.width * 0.84f, size.height * 0.16f),
+                    radius = maxOf(size.width, size.height) * 0.58f
                 )
             )
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(secondaryGlow, Color.Transparent),
-                    center = Offset(size.width * 0.08f, size.height * 0.82f),
-                    radius = maxOf(size.width, size.height) * 0.62f
+                    center = Offset(size.width * 0.10f, size.height * 0.78f),
+                    radius = maxOf(size.width, size.height) * 0.52f
+                )
+            )
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(tertiaryGlow, Color.Transparent),
+                    center = Offset(size.width * 0.22f, size.height * 0.34f),
+                    radius = maxOf(size.width, size.height) * 0.34f
                 )
             )
         }
