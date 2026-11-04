@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -382,6 +383,10 @@ private fun ParkingInputField(
     placeholder: String = "", suffix: String? = null,
     keyboardType: KeyboardType = KeyboardType.Text, trailingIcon: (@Composable () -> Unit)? = null
 ) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val inputFill = if (isLight) Color.White.copy(alpha = 0.34f) else Color(0xFF0B1422).copy(alpha = 0.42f)
+    val inputOutline = if (isLight) Color(0xFF475569).copy(alpha = 0.20f) else Color(0xFF070D16).copy(alpha = 0.44f)
+
     Column {
         if (label.isNotEmpty()) {
             Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -396,8 +401,14 @@ private fun ParkingInputField(
             trailingIcon = trailingIcon,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Transparent, cursorColor = MaterialTheme.colorScheme.primary
+                focusedContainerColor = inputFill.copy(alpha = if (isLight) 0.52f else 0.58f),
+                unfocusedContainerColor = inputFill,
+                disabledContainerColor = inputFill.copy(alpha = 0.18f),
+                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
+                unfocusedBorderColor = inputOutline,
+                disabledBorderColor = inputOutline.copy(alpha = 0.45f),
+                errorBorderColor = MaterialTheme.colorScheme.error,
+                cursorColor = MaterialTheme.colorScheme.primary
             )
         )
     }
