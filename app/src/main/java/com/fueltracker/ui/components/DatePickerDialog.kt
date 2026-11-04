@@ -221,15 +221,17 @@ fun MiuiDatePickerDialog(
     var showYearMonthDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f), shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = {
-            Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-            }
-        }
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.Transparent,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = null
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
+        GlassBottomSheetSurface {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 16.dp)) {
+                Box(Modifier.fillMaxWidth().padding(bottom = 2.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+                }
             // 顶栏
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onDismiss) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -266,6 +268,7 @@ fun MiuiDatePickerDialog(
                 WheelList(selectedValue = hour, items = (0..23).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.Plain, itemLabel = { "%02d 时".format(it) }, onChange = { hour = it })
                 WheelList(selectedValue = minute, items = (0..59).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.Plain, itemLabel = { "%02d 分".format(it) }, onChange = { minute = it })
                 Spacer(Modifier.weight(0.6f))
+            }
             }
         }
 
