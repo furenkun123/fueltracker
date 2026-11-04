@@ -24,6 +24,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -46,12 +49,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.data.DEFAULT_EXPENSE_CATEGORIES
 import com.fueltracker.data.ExpenseCategoryStore
 import com.fueltracker.data.ExpenseRecord
-import com.fueltracker.ui.components.GlassDialogSurface
+import com.fueltracker.ui.components.GlassBottomSheetSurface
 import com.fueltracker.ui.components.MiuiConfirmDialog
 import com.fueltracker.ui.components.MiuiDatePickerDialog
 import com.fueltracker.ui.miui.MiuiBackButton
@@ -318,6 +319,7 @@ private fun CategoryChip(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditCategoryDialog(
     currentName: String,
@@ -332,7 +334,6 @@ private fun EditCategoryDialog(
     val isDuplicate = trimmed.isNotEmpty() && trimmed != currentName && trimmed in existingNames
 
     if (showDeleteConfirm) {
-        // 👈 核心优化：直接复用公共的 MiuiConfirmDialog
         MiuiConfirmDialog(
             title = "删除分类",
             message = "确定删除分类「$currentName」吗？\n\n已有记录不会丢失，仍保留原分类标签。",
@@ -341,51 +342,43 @@ private fun EditCategoryDialog(
             onDismiss = { showDeleteConfirm = false }
         )
     } else {
-        Dialog(onDismissRequest = onDismiss) {
-            GlassDialogSurface(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                    Text(
-                        "编辑分类",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = Color.Transparent,
+            scrimColor = Color.Black.copy(alpha = 0.16f),
+            shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+            dragHandle = null
+        ) {
+            GlassBottomSheetSurface {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 28.dp)) {
+                    Box(Modifier.fillMaxWidth().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+                        Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)))
+                    }
+                    Text("编辑分类", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     Spacer(Modifier.height(16.dp))
-
-                    MiuiTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = "分类名"
-                    )
-
-                    Spacer(Modifier.height(16.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MiuiTextField(value = name, onValueChange = { name = it }, label = "分类名")
+                    Spacer(Modifier.height(20.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         TextButton(
                             onClick = { showDeleteConfirm = true },
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(22.dp),
-                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                            contentPadding = PaddingValues(0.dp)
-                        ) { Text("删除", fontSize = 14.sp, color = MaterialTheme.colorScheme.onErrorContainer) }
-
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                        ) { Text("删除", fontSize = 15.sp, color = MaterialTheme.colorScheme.onErrorContainer) }
                         TextButton(
                             onClick = onDismiss,
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(22.dp),
-                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                            contentPadding = PaddingValues(0.dp)
-                        ) { Text("取消", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface) }
-
-                        Button(
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface) }
+                        TextButton(
                             onClick = { onSave(name) },
                             enabled = trimmed.isNotEmpty() && trimmed != currentName && !isDuplicate,
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(22.dp),
-                            contentPadding = PaddingValues(0.dp)
-                        ) { Text("保存", fontSize = 14.sp) }
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                        ) { Text("保存", fontSize = 15.sp, color = MaterialTheme.colorScheme.primary) }
                     }
                 }
             }
@@ -393,25 +386,43 @@ private fun EditCategoryDialog(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MiuixInputDialog(
     title: String, value: String, onValueChange: (String) -> Unit, placeholder: String,
     confirmText: String, confirmEnabled: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        GlassDialogSurface(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-            Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.16f),
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+        dragHandle = null
+    ) {
+        GlassBottomSheetSurface {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 28.dp)) {
+                Box(Modifier.fillMaxWidth().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)))
+                }
+                Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
-                MiuiTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    placeholder = placeholder
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(24.dp)) { Text("取消", color = MaterialTheme.colorScheme.onSurface) }
-                    Button(onClick = onConfirm, enabled = confirmEnabled, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(24.dp)) { Text(confirmText) }
+                MiuiTextField(value = value, onValueChange = onValueChange, placeholder = placeholder)
+                Spacer(Modifier.height(20.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface) }
+                    TextButton(
+                        onClick = onConfirm,
+                        enabled = confirmEnabled,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                    ) { Text(confirmText, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary) }
                 }
             }
         }
