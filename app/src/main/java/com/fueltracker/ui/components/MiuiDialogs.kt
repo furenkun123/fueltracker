@@ -98,7 +98,7 @@ fun GlassDialogSurface(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(18.dp)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     // 65% 保持当前弹窗材质；浓度只控制表面渐变与描边强度。
     val concentrationScale =
@@ -114,7 +114,7 @@ fun GlassDialogSurface(
         shape = shape,
         color = surfaceColor,
         border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight, concentrationScale)),
-        shadowElevation = 20.dp
+        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
@@ -136,7 +136,7 @@ fun GlassBottomSheetSurface(
 ) {
     // Material3 ModalBottomSheet 使用独立 Dialog Window。
 
-    val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    val shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val concentrationScale =
         (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
