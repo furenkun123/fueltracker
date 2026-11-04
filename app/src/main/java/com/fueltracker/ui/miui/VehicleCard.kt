@@ -73,8 +73,8 @@ fun VehicleCard(
         border = if (useGlass) {
             BorderStroke(
                 width = 0.35.dp,
-                color = if (isLight) Color(0xFFB8C1CD).copy(alpha = 0.22f)
-                else Color(0xFF8290A3).copy(alpha = 0.14f)
+                color = if (isLight) Color(0xFF667085).copy(alpha = 0.24f)
+                else Color(0xFF0B1422).copy(alpha = 0.52f)
             )
         } else null
     ) {
