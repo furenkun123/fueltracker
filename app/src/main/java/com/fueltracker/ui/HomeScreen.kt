@@ -706,7 +706,7 @@ fun ActiveParkingConfirmOverlay(
         // 避免渐变背景在导航栏区域额外形成一块浅色矩形。
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
-        color = Color.Transparent,
+        color = baseColor,
         border = BorderStroke(0.8.dp, edgeColor),
         shadowElevation = 0.dp
     ) {
