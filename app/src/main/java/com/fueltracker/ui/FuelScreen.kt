@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.fueltracker.data.FuelRecord
+import com.fueltracker.ui.components.GlassDialogSurface
 import com.fueltracker.ui.components.MiuiDatePickerDialog
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
@@ -682,10 +683,8 @@ private fun HyperFuelGradePickerDialog(
 ) {
     var selectedGrade by remember { mutableStateOf(currentValue) }
     Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            elevation = CardDefaults.cardElevation(8.dp)
+        GlassDialogSurface(
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                 Row(
