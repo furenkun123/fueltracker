@@ -14,7 +14,6 @@ import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.vibrancy
-import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 
@@ -230,7 +229,6 @@ fun Modifier.drawLiquidGlassCard(
                 refractionAmount = params.refractionAmount.dp.toPx()
             )
         },
-        highlight = { Highlight.Plain },
         onDrawSurface = {
             // 在绘制回调中读取浓度，确保材质覆盖层同步刷新。
             // 65% 为当前视觉基准；0% 不叠加材质色，100% 明显增强玻璃层次。
