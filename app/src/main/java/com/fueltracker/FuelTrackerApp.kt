@@ -2,7 +2,10 @@
 package com.fueltracker
 
 import androidx.activity.compose.BackHandler
+import android.graphics.ImageDecoder
+import android.net.Uri
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -12,8 +15,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
@@ -29,18 +30,22 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalConfiguration
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.fueltracker.notif.ParkingNotification
@@ -54,7 +59,6 @@ import com.fueltracker.ui.ParkingScreen
 import com.fueltracker.ui.RecordsScreen
 import com.fueltracker.ui.SettingsScreen
 import com.fueltracker.ui.VehicleScreen
-import com.fueltracker.ui.miui.VehicleCard
 import com.fueltracker.ui.components.PrivacyDialog
 import com.fueltracker.ui.components.UpdateLogDialog
 import com.fueltracker.ui.miui.MiuiNavigationBar
@@ -63,6 +67,7 @@ import com.fueltracker.ui.miui.MiuiTopBarMoreButton
 import com.fueltracker.ui.miui.glass.LocalCardGlassBackdrop
 import com.fueltracker.ui.miui.glass.LocalCardGlassEnabled
 import com.fueltracker.util.UpdateLogManager
+import com.fueltracker.ui.theme.ThemePreferences
 import com.fueltracker.viewmodel.MainViewModel
 import com.fueltracker.viewmodel.ParkingNotificationState
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -76,8 +81,40 @@ fun FuelTrackerApp(
     val context = LocalContext.current
     val density = LocalDensity.current
     val currentVehicle by viewModel.currentVehicle.collectAsState()
-    var vehicleCardBounds by remember { mutableStateOf<Rect?>(null) }
-    var homeListBounds by remember { mutableStateOf<Rect?>(null) }
+
+    val backgroundImageUri = ThemePreferences.backgroundImageUri
+    val configuration = LocalConfiguration.current
+    val backgroundTargetWidth = with(density) { configuration.screenWidthDp.dp.roundToPx() }
+    val backgroundTargetHeight = with(density) { configuration.screenHeightDp.dp.roundToPx() }
+    val backgroundImage by produceState<ImageBitmap?>(
+        initialValue = null,
+        backgroundImageUri,
+        backgroundTargetWidth,
+        backgroundTargetHeight
+    ) {
+        value = if (backgroundImageUri.isNullOrBlank()) {
+            null
+        } else {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val source = ImageDecoder.createSource(
+                        context.contentResolver,
+                        Uri.parse(backgroundImageUri)
+                    )
+                    ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                        val sourceWidth = info.size.width.coerceAtLeast(1)
+                        val sourceHeight = info.size.height.coerceAtLeast(1)
+                        val scale = minOf(1f, 2048f / maxOf(sourceWidth, sourceHeight))
+                        decoder.setTargetSize(
+                            (sourceWidth * scale).roundToInt().coerceAtLeast(1),
+                            (sourceHeight * scale).roundToInt().coerceAtLeast(1)
+                        )
+                        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    }.asImageBitmap()
+                }.getOrNull()
+            }
+        }
+    }
 
     var homeCollapseProgress by remember {
         mutableFloatStateOf(0f)
@@ -196,7 +233,7 @@ fun FuelTrackerApp(
                 .fillMaxSize()
                 .layerBackdrop(cardBackdrop)
         ) {
-            AppGlassBackground()
+            AppGlassBackground(backgroundImage)
         }
 
         // 页面采样层继续供底部导航栏使用。
@@ -205,7 +242,7 @@ fun FuelTrackerApp(
                 .fillMaxSize()
                 .layerBackdrop(appBackdrop)
         ) {
-            AppGlassBackground()
+            AppGlassBackground(backgroundImage)
 
             // 所有内容卡片共享只包含背景的独立采样层，不采集页面自身。
             CompositionLocalProvider(
@@ -249,8 +286,6 @@ fun FuelTrackerApp(
                                     latestConsumption = latest,
                                     averageConsumption = average,
                                     activeParking = activeParking,
-                                    cardBackdrop = cardBackdrop,
-                                    isGlassEnabled = isGlassEnabled,
                                     isClearParkingConfirmVisible = showClearParkingConfirm,
                                     onRequestClearParkingConfirm = { showClearParkingConfirm = true },
 
@@ -288,10 +323,6 @@ fun FuelTrackerApp(
 
                                     onCollapseProgressChange = {
                                         homeCollapseProgress = it
-                                    },
-                                    onVehicleCardBoundsChanged = { cardBounds, listBounds ->
-                                        vehicleCardBounds = cardBounds
-                                        homeListBounds = listBounds
                                     }
                                 )
                             }
@@ -532,49 +563,6 @@ fun FuelTrackerApp(
             }
             }
         }
-        // 车辆卡片作为页面采样层之外的独立玻璃消费者，采样真实页面内容。
-        if (screen == AppScreen.HOME && currentVehicle != null) {
-            val cardBounds = vehicleCardBounds
-            val listBounds = homeListBounds
-            if (cardBounds != null && listBounds != null &&
-                cardBounds.width > 0f && cardBounds.height > 0f &&
-                listBounds.width > 0f && listBounds.height > 0f
-            ) {
-                val cardWidth = with(density) { cardBounds.width.toDp() }
-                Box(
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                listBounds.left.roundToInt(),
-                                listBounds.top.roundToInt()
-                            )
-                        }
-                        .size(
-                            width = with(density) { listBounds.width.toDp() },
-                            height = with(density) { listBounds.height.toDp() }
-                        )
-                        .clipToBounds()
-                ) {
-                    CompositionLocalProvider(
-                        LocalCardGlassBackdrop provides appBackdrop,
-                        LocalCardGlassEnabled provides isGlassEnabled
-                    ) {
-                        VehicleCard(
-                            vehicle = currentVehicle!!,
-                            modifier = Modifier
-                                .offset {
-                                    IntOffset(
-                                        (cardBounds.left - listBounds.left).roundToInt(),
-                                        (cardBounds.top - listBounds.top).roundToInt()
-                                    )
-                                }
-                                .width(cardWidth)
-                        )
-                    }
-                }
-            }
-        }
-
         if (screen == AppScreen.HOME) {
             Box(
                 modifier = Modifier
@@ -694,6 +682,7 @@ fun FuelTrackerApp(
                     )
                 }
             )
+            }
         }
     }
 }
@@ -703,7 +692,7 @@ fun FuelTrackerApp(
  * 同一背景绘制到独立车辆卡片采样层和页面层，保证采样与实际画面一致。
  */
 @Composable
-private fun AppGlassBackground() {
+private fun AppGlassBackground(backgroundImage: ImageBitmap?) {
     val background = MaterialTheme.colorScheme.background
     val isLight = background.luminance() > 0.5f
 
@@ -712,7 +701,23 @@ private fun AppGlassBackground() {
             .fillMaxSize()
             .background(background)
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        if (backgroundImage != null) {
+            Image(
+                bitmap = backgroundImage,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        if (isLight) Color.White.copy(alpha = 0.18f)
+                        else Color.Black.copy(alpha = 0.24f)
+                    )
+            )
+        } else {
+            Canvas(modifier = Modifier.fillMaxSize()) {
             // 测试阶段提高背景色彩与明暗差异，便于观察玻璃的模糊和折射。
             val glow = if (isLight) {
                 Color(0xFF78A9F5).copy(alpha = 0.38f)
