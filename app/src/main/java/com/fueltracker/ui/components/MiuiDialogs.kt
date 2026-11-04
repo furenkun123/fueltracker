@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,25 +63,34 @@ fun GlassDialogSurface(
 ) {
     val shape = RoundedCornerShape(24.dp)
     val surface = MaterialTheme.colorScheme.surface
-    val outline = MaterialTheme.colorScheme.outline
-    val onSurface = MaterialTheme.colorScheme.onSurface
+    val isLight = surface.luminance() > 0.5f
+    val outline = if (isLight) {
+        Color(0xFF475569).copy(alpha = 0.20f)
+    } else {
+        Color(0xFF070D16).copy(alpha = 0.58f)
+    }
+    val highlight = if (isLight) {
+        Color.White.copy(alpha = 0.62f)
+    } else {
+        Color(0xFF94A3B8).copy(alpha = 0.14f)
+    }
 
     Surface(
         modifier = modifier,
         shape = shape,
-        color = surface.copy(alpha = 0.86f),
+        color = surface.copy(alpha = if (isLight) 0.88f else 0.90f),
         border = BorderStroke(
-            1.dp,
+            0.8.dp,
             Brush.linearGradient(
                 listOf(
-                    Color.White.copy(alpha = 0.78f),
-                    outline.copy(alpha = 0.38f),
-                    onSurface.copy(alpha = 0.12f),
-                    Color.White.copy(alpha = 0.52f)
+                    highlight,
+                    outline,
+                    outline.copy(alpha = outline.alpha * 0.72f),
+                    highlight.copy(alpha = highlight.alpha * 0.72f)
                 )
             )
         ),
-        shadowElevation = 18.dp
+        shadowElevation = 20.dp
     ) {
         Column(
             modifier = Modifier
@@ -88,9 +98,63 @@ fun GlassDialogSurface(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            onSurface.copy(alpha = 0.035f),
-                            Color.White.copy(alpha = 0.12f),
-                            surface.copy(alpha = 0.04f)
+                            if (isLight) Color.White.copy(alpha = 0.20f)
+                            else Color(0xFF71839C).copy(alpha = 0.10f),
+                            if (isLight) Color(0xFFDCE8F8).copy(alpha = 0.10f)
+                            else Color(0xFF26364D).copy(alpha = 0.12f),
+                            if (isLight) Color(0xFFB9CBE3).copy(alpha = 0.12f)
+                            else Color(0xFF080F1B).copy(alpha = 0.18f)
+                        )
+                    )
+                ),
+            content = content
+        )
+    }
+}
+
+/**
+ * 底部弹出层使用独立的半透明材质，不跨 Dialog/Window 采样 Backdrop。
+ */
+@Composable
+fun GlassBottomSheetSurface(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val surface = MaterialTheme.colorScheme.surface
+    val isLight = surface.luminance() > 0.5f
+    val outline = if (isLight) {
+        Color(0xFF475569).copy(alpha = 0.20f)
+    } else {
+        Color(0xFF070D16).copy(alpha = 0.58f)
+    }
+    val highlight = if (isLight) {
+        Color.White.copy(alpha = 0.58f)
+    } else {
+        Color(0xFF94A3B8).copy(alpha = 0.12f)
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        color = surface.copy(alpha = if (isLight) 0.88f else 0.90f),
+        border = BorderStroke(
+            0.8.dp,
+            Brush.linearGradient(listOf(highlight, outline, outline, highlight))
+        ),
+        shadowElevation = 20.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            if (isLight) Color.White.copy(alpha = 0.18f)
+                            else Color(0xFF71839C).copy(alpha = 0.10f),
+                            if (isLight) Color(0xFFDCE8F8).copy(alpha = 0.10f)
+                            else Color(0xFF26364D).copy(alpha = 0.12f),
+                            if (isLight) Color(0xFFB9CBE3).copy(alpha = 0.12f)
+                            else Color(0xFF080F1B).copy(alpha = 0.18f)
                         )
                     )
                 ),
@@ -347,15 +411,15 @@ fun MiuiConfirmDialog(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+        containerColor = Color.Transparent,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = {
-            Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
-                Box(modifier = Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-            }
-        }
+        dragHandle = null
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp)) {
+        GlassBottomSheetSurface {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 28.dp)) {
+                Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+                }
             Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(12.dp))
             Text(message, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 22.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -384,6 +448,7 @@ fun MiuiConfirmDialog(
                 }
             }
         }
+        }
     }
 }
 
@@ -393,8 +458,9 @@ fun MiuiConfirmDialog(
 fun MiuiYearMonthSheet(initialYear: Int, initialMonth: Int, availableYears: List<Int>, onDismiss: () -> Unit, onConfirm: (Int, Int) -> Unit) {
     var year by remember { mutableIntStateOf(initialYear) }
     var month by remember { mutableIntStateOf(initialMonth) }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Color.Transparent, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), dragHandle = null) {
+        GlassBottomSheetSurface {
+            Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("取消", Modifier.clickable(onClick = onDismiss).padding(8.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("选择年月", fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -405,6 +471,7 @@ fun MiuiYearMonthSheet(initialYear: Int, initialMonth: Int, availableYears: List
                 WheelList(selectedValue = year, items = availableYears, visibleCount = 3, modifier = Modifier.weight(1.4f), style = WheelStyle.WithBackground, itemLabel = { "${it}年" }, onChange = { year = it })
                 WheelList(selectedValue = month, items = (0..12).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.WithBackground, itemLabel = { if (it == 0) "全年" else String.format("%02d 月", it) }, onChange = { month = it })
             }
+        }
         }
     }
 }
@@ -420,15 +487,15 @@ fun MiuiBottomSheetWrapper(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss, sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+        containerColor = Color.Transparent,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = {
-            Box(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-            }
-        }
+        dragHandle = null
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+        GlassBottomSheetSurface {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 24.dp)) {
+                Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+                }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("取消", Modifier.clickable(onClick = onDismiss).padding(8.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -436,6 +503,7 @@ fun MiuiBottomSheetWrapper(
             }
             Spacer(Modifier.height(12.dp))
             content()
+        }
         }
     }
 }
