@@ -379,6 +379,7 @@ fun HomeScreen(
                 contentAlignment = Alignment.BottomCenter
             ) {
                 ActiveParkingConfirmOverlay(
+                    isFloating = isFloating,
                     onDismiss = { showClearParkingConfirm = false },
                     onConfirm = {
                         showClearParkingConfirm = false
@@ -706,7 +707,11 @@ private fun ActiveParkingCard(
 }
 
 @Composable
-private fun ActiveParkingConfirmOverlay(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+private fun ActiveParkingConfirmOverlay(
+    isFloating: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
     var actionTriggered by remember { mutableStateOf(false) }
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
