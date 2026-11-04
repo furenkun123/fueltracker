@@ -248,7 +248,7 @@ fun MiuiSectionHeader(title: String) {
 fun MiuiGroupCard(content: @Composable ColumnScope.() -> Unit) {
     MiuiCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             content()
