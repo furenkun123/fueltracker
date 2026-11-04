@@ -83,6 +83,7 @@ import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.ui.miui.MiuiFilterChip
 import com.fueltracker.ui.miui.MiuiTextButton
 import com.fueltracker.ui.miui.VehicleCard
+import com.fueltracker.ui.miui.glass.drawGlassBackdrop
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.StatisticsSummary
@@ -91,8 +92,6 @@ import com.fueltracker.util.toDateTimeText
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
 import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
 import java.util.Calendar
@@ -697,12 +696,6 @@ fun ActiveParkingConfirmOverlay(
     var actionTriggered by remember { mutableStateOf(false) }
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
-    // 与底部导航栏保持一致的半透明染色，不用高不透明度实色盖住模糊背景。
-    val backdropTint = if (isLight) {
-        Color(0xFFF8F8FA).copy(alpha = 0.30f)
-    } else {
-        Color(0xFF202024).copy(alpha = 0.22f)
-    }
     val edgeColor = if (isLight) Color.White.copy(alpha = 0.82f)
     else Color.White.copy(alpha = 0.20f)
 
@@ -711,18 +704,10 @@ fun ActiveParkingConfirmOverlay(
         // 避免渐变背景在导航栏区域额外形成一块浅色矩形。
         modifier = Modifier
             .fillMaxWidth()
-            .drawBackdrop(
+            .drawGlassBackdrop(
                 backdrop = backdrop,
-                shape = { shape },
-                effects = {
-                    // 只模糊面板覆盖区域后方的页面内容。
-                    blur(36.dp.toPx())
-                },
-                onDrawSurface = {
-                    // 使用导航栏同款低浓度玻璃染色，保留背景透光感；
-                    // 背景可见但已由上方 blur(36.dp) 充分柔化。
-                    drawRect(color = backdropTint)
-                }
+                shape = shape,
+                isLight = isLight
             ),
         shape = shape,
         color = Color.Transparent,
