@@ -216,7 +216,7 @@ fun Modifier.drawLiquidGlassCard(
 ): Modifier {
     if (backdrop == null) return this
 
-    return drawPlainBackdrop(
+    return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         // 关闭默认白色高光和外投影，只保留玻璃内部柔和的边缘压暗。
