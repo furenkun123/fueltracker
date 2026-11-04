@@ -72,9 +72,9 @@ fun VehicleCard(
         // 边框只保留极淡的边缘提示，避免形成一圈醒目的白色描边。
         border = if (useGlass) {
             BorderStroke(
-                width = 0.2.dp,
-                color = if (isLight) Color(0xFF475569).copy(alpha = 0.16f)
-                else Color(0xFF070D16).copy(alpha = 0.38f)
+                width = 0.8.dp,
+                color = if (isLight) Color(0xFFD1D1D6).copy(alpha = 0.65f)
+                else Color.White.copy(alpha = 0.12f)
             )
         } else null,
         glassEnabled = false
