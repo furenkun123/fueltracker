@@ -171,6 +171,7 @@ fun Modifier.drawGlassSelectionPill(
  * 首页车辆卡片液态玻璃。
  *
  * backdrop 必须来自独立的背景采样层，不能传入包含当前卡片的 appBackdrop。
+ * 通过卡片内部的纵向明暗变化建立体积感，不依赖高亮描边。
  */
 fun Modifier.drawLiquidGlassCard(
     backdrop: Backdrop?,
@@ -181,21 +182,27 @@ fun Modifier.drawLiquidGlassCard(
 
     val surfaceBrush = if (isLight) {
         Brush.verticalGradient(
-            colors = listOf(
-                Color.White.copy(alpha = 0.16f),
-                Color(0xFFE7EFFB).copy(alpha = 0.10f),
-                Color(0xFFDCE8F8).copy(alpha = 0.12f)
+            colorStops = arrayOf(
+                0.00f to Color.White.copy(alpha = 0.15f),
+                0.38f to Color(0xFFE7EFFB).copy(alpha = 0.09f),
+                0.78f to Color(0xFFDCE8F8).copy(alpha = 0.12f),
+                1.00f to Color(0xFFB9CBE3).copy(alpha = 0.17f)
             )
         )
     } else {
+        // 暗色模式提高卡片上半部的亮度，底部逐渐压暗，形成柔和的悬浮层次。
         Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF293548).copy(alpha = 0.24f),
-                Color(0xFF1B2432).copy(alpha = 0.20f),
-                Color(0xFF182334).copy(alpha = 0.24f)
+            colorStops = arrayOf(
+                0.00f to Color(0xFF52627A).copy(alpha = 0.34f),
+                0.30f to Color(0xFF34445B).copy(alpha = 0.30f),
+                0.72f to Color(0xFF202D40).copy(alpha = 0.34f),
+                1.00f to Color(0xFF101A2A).copy(alpha = 0.48f)
             )
         )
     }
+
+    val topHighlightAlpha = if (isLight) 0.10f else 0.075f
+    val bottomShadeAlpha = if (isLight) 0.035f else 0.12f
 
     return drawBackdrop(
         backdrop = backdrop,
@@ -211,6 +218,23 @@ fun Modifier.drawLiquidGlassCard(
         highlight = { Highlight.Plain },
         onDrawSurface = {
             drawRect(brush = surfaceBrush)
+
+            // 只保留顶部柔光，不再绘制完整高亮边框。
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = topHighlightAlpha),
+                    0.22f to Color.White.copy(alpha = topHighlightAlpha * 0.28f),
+                    0.52f to Color.Transparent
+                )
+            )
+
+            // 底部轻微压暗，增强卡片与背景的分层。
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0.48f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = bottomShadeAlpha)
+                )
+            )
         }
     )
 }
