@@ -134,29 +134,43 @@ fun GlassBottomSheetSurface(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    // Material3 ModalBottomSheet 使用独立 Dialog Window。
-
-    val shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
+    val shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val concentrationScale =
         (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
-    val surfaceColor = if (isLight) {
-        Color(0xFFF7FAFF).copy(alpha = 0.88f)
+    val edgeColor = if (isLight) {
+        Color.White.copy(alpha = 0.82f)
     } else {
-        Color(0xFF182334).copy(alpha = 0.92f)
+        Color.White.copy(alpha = 0.20f)
     }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = shape,
-        color = surfaceColor,
-        border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight, concentrationScale)),
+        color = Color.Transparent,
+        border = BorderStroke(0.8.dp, edgeColor),
         shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(glassCardSurfaceBrush(isLight, concentrationScale)),
+                .background(
+                    Brush.verticalGradient(
+                        colors = if (isLight) {
+                            listOf(
+                                Color.White.copy(alpha = 0.46f),
+                                Color(0xFFDCE9FA).copy(alpha = 0.22f),
+                                Color(0xFFB9CBE3).copy(alpha = 0.34f)
+                            )
+                        } else {
+                            listOf(
+                                Color(0xFF7186A5).copy(alpha = 0.24f),
+                                Color(0xFF263A55).copy(alpha = 0.20f),
+                                Color(0xFF0D192B).copy(alpha = 0.42f)
+                            )
+                        }
+                    )
+                ),
             content = content
         )
     }
@@ -166,6 +180,7 @@ fun GlassBottomSheetSurface(
 // 公共弹窗外壳
 // ============================================================
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScrollableSettingsDialog(
     title: String,
@@ -175,17 +190,38 @@ fun ScrollableSettingsDialog(
     spacedContent: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        GlassDialogSurface(
-            modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp).padding(horizontal = 16.dp)
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.16f),
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+        dragHandle = null
+    ) {
+        GlassBottomSheetSurface {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 600.dp)
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 12.dp, bottom = 28.dp)
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        Modifier.width(40.dp).height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f))
+                    )
+                }
                 Text(
                     text = title,
-                    fontSize = if (centeredTitle) 18.sp else 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(16.dp))
@@ -195,13 +231,30 @@ fun ScrollableSettingsDialog(
                     content = content
                 )
                 Spacer(Modifier.height(20.dp))
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(buttonText, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onPrimary)
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Text("取消", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    }
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        )
+                    ) {
+                        Text(buttonText, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
         }
@@ -284,30 +337,41 @@ private fun MiuiInstructionItem(index: Int, text: String) {
 // ============================================================
 // 更新日志弹窗（启动时）
 // ============================================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UpdateLogDialog(
     entries: List<UpdateLogManager.UpdateLogEntry>,
     onDismiss: () -> Unit
 ) {
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.16f),
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+        dragHandle = null
     ) {
-        GlassDialogSurface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 48.dp)
-        ) {
+        GlassBottomSheetSurface {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp)
+                    .heightIn(max = 600.dp)
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 12.dp, bottom = 28.dp)
             ) {
+                Box(Modifier.fillMaxWidth().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f))
+                    )
+                }
                 Text(
                     text = "更新内容",
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(16.dp))
                 LazyColumn(
@@ -318,21 +382,16 @@ fun UpdateLogDialog(
                         UpdateLogEntryItem(entry)
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.textButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                     )
                 ) {
-                    Text(
-                        text = "我知道了",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
+                    Text("我知道了", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -411,7 +470,8 @@ fun MiuiConfirmDialog(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = Color.Transparent,
-        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        scrimColor = Color.Black.copy(alpha = 0.16f),
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {
         GlassBottomSheetSurface {
@@ -457,7 +517,7 @@ fun MiuiConfirmDialog(
 fun MiuiYearMonthSheet(initialYear: Int, initialMonth: Int, availableYears: List<Int>, onDismiss: () -> Unit, onConfirm: (Int, Int) -> Unit) {
     var year by remember { mutableIntStateOf(initialYear) }
     var month by remember { mutableIntStateOf(initialMonth) }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Color.Transparent, shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp), dragHandle = null) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Color.Transparent, scrimColor = Color.Black.copy(alpha = 0.16f), shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp), dragHandle = null) {
         GlassBottomSheetSurface {
             Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp)) {
             Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
