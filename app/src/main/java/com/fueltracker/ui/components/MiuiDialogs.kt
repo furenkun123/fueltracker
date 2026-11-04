@@ -151,7 +151,7 @@ fun GlassBottomSheetSurface(
         shape = shape,
         color = surfaceColor,
         border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight, concentrationScale)),
-        shadowElevation = 20.dp
+        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
