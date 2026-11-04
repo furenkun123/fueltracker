@@ -293,7 +293,6 @@ fun FuelScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .imePadding()
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
