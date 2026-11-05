@@ -22,13 +22,9 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,6 +54,7 @@ import com.fueltracker.ui.components.MiuiYearMonthSheet
 import com.fueltracker.ui.components.SummaryCard
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miui.MiuiCard
+import com.fueltracker.ui.miui.MiuiFloatingIconButton
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.buildMonthTrend
 import com.fueltracker.util.buildStructureData
@@ -296,20 +293,13 @@ fun ExpenseScreen(
                     bottom = if (isFloating) 104.dp else 84.dp
                 )
         ) {
-            FloatingActionButton(
+            MiuiFloatingIconButton(
+                icon = Icons.Default.Receipt,
                 onClick = onAddExpense,
                 containerColor = Color(0xFFFF9500),
                 contentColor = Color.White,
-                shape = CircleShape,
-                elevation = FloatingActionButtonDefaults.elevation(
-                    defaultElevation = 0.dp,
-                    pressedElevation = 0.dp,
-                    focusedElevation = 0.dp,
-                    hoveredElevation = 0.dp
-                )
-            ) {
-                Icon(Icons.Default.Receipt, "记费用")
-            }
+                contentDescription = "记费用"
+            )
         }
     }
 

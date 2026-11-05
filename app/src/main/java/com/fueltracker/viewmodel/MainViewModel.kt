@@ -15,6 +15,7 @@ import com.fueltracker.data.*
 import com.fueltracker.util.BackupManager
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.StatisticsSummary
+import com.fueltracker.ui.miui.glass.GlassPreferences
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlin.math.abs
@@ -83,11 +84,15 @@ class MainViewModel(
     }
 
     //液态玻璃效果
-    var isGlassEffectEnabled by mutableStateOf(true) // 默认开启
+    var isGlassEffectEnabled by mutableStateOf(GlassPreferences.enabled)
         private set
 
     fun toggleGlassEffect() {
         isGlassEffectEnabled = !isGlassEffectEnabled
+        GlassPreferences.setEnabled(
+            getApplication(),
+            isGlassEffectEnabled
+        )
     }
 
     fun navigateTo(screen: AppScreen) {

@@ -347,7 +347,7 @@ private fun EditCategoryDialog(
             onDismissRequest = onDismiss,
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = Color.Transparent,
-            scrimColor = Color.Black.copy(alpha = 0.16f),
+            scrimColor = Color.Black.copy(alpha = 0.30f),
             shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
             dragHandle = null
         ) {
@@ -397,7 +397,7 @@ private fun MiuixInputDialog(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Color.Transparent,
-        scrimColor = Color.Black.copy(alpha = 0.16f),
+        scrimColor = Color.Black.copy(alpha = 0.30f),
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {

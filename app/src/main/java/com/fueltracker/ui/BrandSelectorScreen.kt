@@ -1,7 +1,6 @@
 package com.fueltracker.ui
 
 import android.util.Log
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CarBrand
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.ui.miui.MiuiBackButton
+import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.ui.miui.MiuiSearchTextField
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -111,13 +110,13 @@ fun BrandSelectorScreen(
 
     val letters = remember(filteredBrands) { filteredBrands.keys.toList() }
 
-    // 👇 更新索引映射：0.标题 1.搜索框（去掉了手动输入的占位）
+    // 0：标题，1：搜索框，后续每个字母分组各占一个列表项。
     val letterIndexMap = remember(filteredBrands) {
         val map = mutableMapOf<String, Int>()
         var idx = 2
-        filteredBrands.forEach { (letter, brands) ->
+        filteredBrands.forEach { (letter, _) ->
             map[letter] = idx
-            idx += 1 + brands.size
+            idx += 1
         }
         map
     }
@@ -125,7 +124,6 @@ fun BrandSelectorScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
         if (isLoading) {
@@ -160,25 +158,19 @@ fun BrandSelectorScreen(
                         }
 
                         // 2. 搜索框
-                        stickyHeader(key = "search_box") {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(MaterialTheme.colorScheme.background)
-                            ) {
-                                BrandSearchBox(
-                                    value = searchText,
-                                    onValueChange = { searchText = it },
-                                    onSearchAction = {
-                                        // 👇 如果按了键盘搜索键，且没有结果，直接触发手动输入
-                                        if (filteredBrands.isEmpty() && searchText.isNotBlank()) {
-                                            onManualInput(searchText.trim())
-                                        } else {
-                                            keyboard?.hide()
-                                        }
+                        item(key = "search_box") {
+                            BrandSearchBox(
+                                value = searchText,
+                                onValueChange = { searchText = it },
+                                onSearchAction = {
+                                    // 按下键盘搜索键且没有结果时，直接使用当前输入。
+                                    if (filteredBrands.isEmpty() && searchText.isNotBlank()) {
+                                        onManualInput(searchText.trim())
+                                    } else {
+                                        keyboard?.hide()
                                     }
-                                )
-                            }
+                                }
+                            )
                         }
 
                         // 3. 内容区
@@ -195,35 +187,46 @@ fun BrandSelectorScreen(
                             }
                         } else {
                             filteredBrands.forEach { (letter, brands) ->
-                                // 👇 字母头
-                                stickyHeader(key = letter) {
-                                    Box(
-                                        Modifier
+                                item(key = "letter_$letter") {
+                                    MiuiCard(
+                                        modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(MaterialTheme.colorScheme.background)
-                                            // 👈 强制左边缘为 20dp，上下留出合适的空隙
-                                            .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp)
+                                            .padding(horizontal = 16.dp, vertical = 5.dp),
+                                        shape = RoundedCornerShape(18.dp)
                                     ) {
-                                        Text(
-                                            text = letter,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
+                                        Box(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = letter,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                            thickness = 0.8.dp,
+                                            modifier = Modifier.padding(start = 20.dp)
                                         )
-                                    }
-                                    HorizontalDivider(
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                        thickness = 0.8.dp,
-                                        modifier = Modifier.padding(start = 20.dp)
-                                    )
-                                }
 
-                                items(brands, key = { "${it.letter}_${it.brand}" }) { brand ->
-                                    BrandRow(
-                                        brand = brand,
-                                        isSelected = brand.brand == initialBrand,
-                                        onClick = { onSelected(brand.brand) }
-                                    )
+                                        brands.forEachIndexed { index, brand ->
+                                            BrandRow(
+                                                brand = brand,
+                                                isSelected = brand.brand == initialBrand,
+                                                onClick = { onSelected(brand.brand) }
+                                            )
+                                            if (index != brands.lastIndex) {
+                                                HorizontalDivider(
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                                    thickness = 0.8.dp,
+                                                    modifier = Modifier.padding(start = 20.dp)
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -253,90 +256,89 @@ private fun BrandSearchBox(
     onValueChange: (String) -> Unit,
     onSearchAction: () -> Unit
 ) {
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val searchBoxBg = if (isLight) Color.Black.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.12f)
-
-    Box(
+    MiuiCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .height(42.dp)
-            .clip(RoundedCornerShape(21.dp))
-            .background(searchBoxBg)
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.CenterStart
+            .height(42.dp),
+        shape = RoundedCornerShape(21.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            MiuiSearchTextField(
-                value = value,
-                onValueChange = onValueChange,
-                placeholder = "搜索汽车品牌...",
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Search
-                ),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        onSearchAction()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(42.dp)
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                MiuiSearchTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    placeholder = "搜索汽车品牌...",
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Search
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            onSearchAction()
+                        }
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+                if (value.isNotEmpty()) {
+                    IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Clear, "清除", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                     }
-                ),
-                modifier = Modifier.weight(1f)
-            )
-            if (value.isNotEmpty()) {
-                IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Clear, "清除", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                 }
             }
         }
     }
 }
 
-// 👇 合并后的智能空状态组件
 @Composable
 private fun EmptyBrandState(
     searchText: String,
     onManualInput: (String) -> Unit
 ) {
-    // 👇 1. 用 Surface 或 background 的 Column 代替 Box，把它做成一个紧凑的卡片
-    Column(
+    MiuiCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp) // 控制外边距，紧贴搜索框
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface) // 用卡片色托底
-            .padding(vertical = 32.dp, horizontal = 16.dp), // 内部上下留白
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        shape = RoundedCornerShape(16.dp)
     ) {
-        // 👇 2. 加一个搜索无结果的图标，提升优雅感 (如果报错，请 Alt+Enter 导入)
-        Icon(
-            imageVector = Icons.Default.SearchOff, // 或者用 Icons.Outlined.SearchOff
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.size(48.dp)
-        )
+        Column(
+            modifier = Modifier.padding(vertical = 32.dp, horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.SearchOff,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(48.dp)
+            )
 
-        // 👇 3. 文案优化
-        Text(
-            text = if (searchText.isBlank()) "输入关键字搜索品牌" else "未找到与 \"$searchText\" 相关的品牌",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
+            Text(
+                text = if (searchText.isBlank()) "输入关键字搜索品牌" else "未找到与 \"$searchText\" 相关的品牌",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
 
-        if (searchText.isNotBlank()) {
-            // 👇 4. 按钮更紧凑
-            Button(
-                onClick = { onManualInput(searchText.trim()) },
-                shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
-            ) {
-                Text(
-                    text = "使用 \"$searchText\" 作为品牌",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
+            if (searchText.isNotBlank()) {
+                Button(
+                    onClick = { onManualInput(searchText.trim()) },
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = "使用 \"$searchText\" 作为品牌",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }
@@ -344,27 +346,17 @@ private fun EmptyBrandState(
 
 @Composable
 private fun BrandRow(brand: CarBrand, isSelected: Boolean, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                // 👈 左边缘严格锁定为 20dp
-                .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 14.dp)
-        ) {
-            Text(
-                text = brand.brand,
-                fontSize = 16.sp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-            )
-        }
-        // 👇 修复：使用 onSurface 加透明度，保证在任何背景色下都能清晰看见分割线
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-            thickness = 0.8.dp,
-            // 起点严格锁定在 20dp
-            modifier = Modifier.padding(start = 20.dp)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 14.dp)
+    ) {
+        Text(
+            text = brand.brand,
+            fontSize = 16.sp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )
     }
 }

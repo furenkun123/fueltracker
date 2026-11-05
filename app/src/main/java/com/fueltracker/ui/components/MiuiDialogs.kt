@@ -1,5 +1,6 @@
 package com.fueltracker.ui.components
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -48,134 +49,153 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.fueltracker.ui.miui.glass.GlassDefaults
 import com.fueltracker.ui.miui.glass.GlassPreferences
+import com.fueltracker.ui.miui.glass.LocalAppGlassBackdrop
+import com.fueltracker.ui.miui.glass.LocalAppGlassEnabled
+import com.fueltracker.ui.miui.glass.drawGlassBackdrop
+import com.fueltracker.ui.miui.glass.drawGlassDialogOverlay
 import com.fueltracker.util.UpdateLogManager
 
 
 // ============================================================
 // 公共玻璃弹窗容器
-// 与 MiuiCard 使用同一套渐变和描边参数。
-// Dialog/BottomSheet 属于独立 Window，不跨窗口采样 Backdrop，
-// 因此使用与卡片表面一致的静态材质，避免额外 RenderNode 采集。
+// BottomSheet 优先复用全页面 Backdrop，与“已取车”确认层保持一致；
+// 关闭玻璃或没有采样源时使用静态材质兜底，保证内容始终可读。
 // ============================================================
 
-private fun glassCardSurfaceBrush(
-    isLight: Boolean,
-    concentrationScale: Float
-): Brush =
-    if (isLight) {
+private fun dialogConcentrationScale(): Float =
+    (GlassPreferences.params.concentration / 65f).coerceIn(0.82f, 1.24f)
+
+private fun dialogSurfaceBrush(
+    isLight: Boolean
+): Brush {
+    return if (isLight) {
         Brush.verticalGradient(
             colorStops = arrayOf(
-                0.00f to Color.White.copy(alpha = 0.15f * concentrationScale),
-                0.38f to Color(0xFFE7EFFB).copy(alpha = 0.09f * concentrationScale),
-                0.78f to Color(0xFFDCE8F8).copy(alpha = 0.12f * concentrationScale),
-                1.00f to Color(0xFFB9CBE3).copy(alpha = 0.17f * concentrationScale)
+                0.00f to Color(0xFFFAFCFF),
+                0.42f to Color(0xFFEEF5FC),
+                0.78f to Color(0xFFE1EBF7),
+                1.00f to Color(0xFFD2DFEE)
             )
         )
     } else {
         Brush.verticalGradient(
             colorStops = arrayOf(
-                0.00f to Color(0xFF52627A).copy(alpha = 0.34f * concentrationScale),
-                0.30f to Color(0xFF34445B).copy(alpha = 0.30f * concentrationScale),
-                0.72f to Color(0xFF202D40).copy(alpha = 0.34f * concentrationScale),
-                1.00f to Color(0xFF101A2A).copy(alpha = 0.48f * concentrationScale)
+                0.00f to Color(0xFF2B3E57),
+                0.38f to Color(0xFF1A2B40),
+                0.76f to Color(0xFF111E30),
+                1.00f to Color(0xFF081321)
             )
-        )
-    }
-
-private fun glassCardOutlineColor(
-    isLight: Boolean,
-    concentrationScale: Float
-): Color =
-    if (isLight) {
-        Color(0xFF475569).copy(alpha = 0.16f * concentrationScale)
-    } else {
-        Color(0xFF070D16).copy(alpha = 0.38f * concentrationScale)
-    }
-
-@Composable
-fun GlassDialogSurface(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    val shape = RoundedCornerShape(18.dp)
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val concentrationScale =
-        (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
-    // 65% 保持当前弹窗材质；浓度只控制表面渐变与描边强度。
-    val surfaceColor = if (isLight) {
-        Color(0xFFF7FAFF).copy(alpha = 0.88f)
-    } else {
-        Color(0xFF182334).copy(alpha = 0.92f)
-    }
-
-    Surface(
-        modifier = modifier,
-        shape = shape,
-        color = surfaceColor,
-        border = BorderStroke(0.2.dp, glassCardOutlineColor(isLight, concentrationScale)),
-        shadowElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(glassCardSurfaceBrush(isLight, concentrationScale)),
-            content = content
         )
     }
 }
 
-/**
- * 底部弹出层使用与内容卡片一致的表面渐变和描边。
- * 不跨 Dialog/Window 采样 Backdrop，避免额外 RenderNode 采集。
- */
+private fun dialogTopHighlightBrush(
+    isLight: Boolean,
+    concentrationScale: Float
+): Brush {
+    val highlightAlpha = (if (isLight) {
+        GlassDefaults.Dialog.LIGHT_TOP_HIGHLIGHT_ALPHA
+    } else {
+        GlassDefaults.Dialog.DARK_TOP_HIGHLIGHT_ALPHA
+    } * concentrationScale).coerceIn(0f, 0.32f)
+
+    return Brush.verticalGradient(
+        colorStops = arrayOf(
+            0f to Color.White.copy(alpha = highlightAlpha),
+            0.12f to Color.White.copy(alpha = highlightAlpha * 0.34f),
+            0.38f to Color.Transparent
+        )
+    )
+}
+
+private fun dialogEdgeColor(
+    isLight: Boolean,
+    concentrationScale: Float
+): Color {
+    val edgeAlpha = (if (isLight) {
+        GlassDefaults.Dialog.LIGHT_EDGE_ALPHA
+    } else {
+        GlassDefaults.Dialog.DARK_EDGE_ALPHA
+    } * concentrationScale).coerceIn(0f, 0.88f)
+    return Color.White.copy(alpha = edgeAlpha)
+}
+
 @Composable
-fun GlassBottomSheetSurface(
-    modifier: Modifier = Modifier,
+private fun GlassWindowSurface(
+    modifier: Modifier,
+    shape: RoundedCornerShape,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val concentrationScale =
-        (GlassPreferences.params.concentration / 65f).coerceIn(0f, 1.8f)
-    val edgeColor = if (isLight) {
-        Color.White.copy(alpha = 0.82f)
+    val concentrationScale = dialogConcentrationScale()
+    val backdrop = LocalAppGlassBackdrop.current
+    val activeBackdrop = backdrop.takeIf { LocalAppGlassEnabled.current }
+    val glassModifier = if (activeBackdrop != null) {
+        modifier.drawGlassBackdrop(
+            backdrop = activeBackdrop,
+            shape = shape,
+            isLight = isLight
+        )
     } else {
-        Color.White.copy(alpha = 0.20f)
+        modifier
     }
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = glassModifier,
         shape = shape,
         color = Color.Transparent,
-        border = BorderStroke(0.8.dp, edgeColor),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(
+            GlassDefaults.Dialog.EDGE_WIDTH.dp,
+            dialogEdgeColor(isLight, concentrationScale)
+        ),
         shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = if (isLight) {
-                            listOf(
-                                Color.White.copy(alpha = 0.78f),
-                                Color(0xFFDCE9FA).copy(alpha = 0.68f),
-                                Color(0xFFB9CBE3).copy(alpha = 0.76f)
-                            )
-                        } else {
-                            listOf(
-                                Color(0xFF7186A5).copy(alpha = 0.72f),
-                                Color(0xFF263A55).copy(alpha = 0.76f),
-                                Color(0xFF0D192B).copy(alpha = 0.88f)
-                            )
-                        }
-                    )
+                .then(
+                    if (activeBackdrop != null) {
+                        Modifier.drawGlassDialogOverlay(isLight)
+                    } else {
+                        Modifier
+                            .background(dialogSurfaceBrush(isLight))
+                            .background(dialogTopHighlightBrush(isLight, concentrationScale))
+                    }
                 ),
             content = content
         )
     }
 }
 
+@Composable
+fun GlassDialogSurface(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    GlassWindowSurface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        content = content
+    )
+}
+
+/**
+ * 底部弹出层复用了弹窗的玻璃材质，只改变顶部圆角。
+ */
+@Composable
+fun GlassBottomSheetSurface(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    GlassWindowSurface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+        content = content
+    )
+}
 // ============================================================
 // 公共弹窗外壳
 // ============================================================
@@ -194,7 +214,7 @@ fun ScrollableSettingsDialog(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Color.Transparent,
-        scrimColor = Color.Black.copy(alpha = 0.16f),
+        scrimColor = Color.Black.copy(alpha = 0.30f),
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {
@@ -347,7 +367,7 @@ fun UpdateLogDialog(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Color.Transparent,
-        scrimColor = Color.Black.copy(alpha = 0.16f),
+        scrimColor = Color.Black.copy(alpha = 0.30f),
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {
@@ -485,7 +505,7 @@ fun MiuiConfirmDialog(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = Color.Transparent,
-        scrimColor = Color.Black.copy(alpha = 0.16f),
+        scrimColor = Color.Black.copy(alpha = 0.30f),
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {
@@ -542,7 +562,7 @@ fun MiuiYearMonthSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Color.Transparent,
-        scrimColor = Color.Black.copy(alpha = 0.16f),
+        scrimColor = Color.Black.copy(alpha = 0.30f),
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {
@@ -585,7 +605,7 @@ fun MiuiBottomSheetWrapper(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = Color.Transparent,
-        scrimColor = Color.Black.copy(alpha = 0.16f),
+        scrimColor = Color.Black.copy(alpha = 0.30f),
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {

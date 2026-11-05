@@ -25,18 +25,30 @@ object GlassPreferences {
     private const val KEY_REFRACTION_HEIGHT = "refraction_height"
     private const val KEY_REFRACTION_AMOUNT = "refraction_amount"
     private const val KEY_CONCENTRATION = "concentration"
+    private const val KEY_ENABLED = "enabled"
 
     var params by mutableStateOf(GlassParams())
         private set
 
+    var enabled by mutableStateOf(true)
+        private set
+
     fun init(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        enabled = prefs.getBoolean(KEY_ENABLED, true)
         params = GlassParams(
             blur = prefs.getFloat(KEY_BLUR, 12f).coerceIn(0f, 30f),
             refractionHeight = prefs.getFloat(KEY_REFRACTION_HEIGHT, 14f).coerceIn(0f, 64f),
             refractionAmount = prefs.getFloat(KEY_REFRACTION_AMOUNT, 24f).coerceIn(0f, 128f),
             concentration = prefs.getFloat(KEY_CONCENTRATION, 65f).coerceIn(0f, 100f)
         )
+    }
+
+    fun setEnabled(context: Context, isEnabled: Boolean) {
+        enabled = isEnabled
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+            putBoolean(KEY_ENABLED, isEnabled)
+        }
     }
 
     fun update(context: Context, newParams: GlassParams) {

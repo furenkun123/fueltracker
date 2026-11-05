@@ -34,15 +34,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -65,8 +61,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -80,10 +79,14 @@ import com.fueltracker.ui.components.MiuiYearMonthSheet
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miui.MiuiButton
 import com.fueltracker.ui.miui.MiuiCard
+import com.fueltracker.ui.miui.MiuiCompactFilterChip
 import com.fueltracker.ui.miui.MiuiFilterChip
+import com.fueltracker.ui.miui.MiuiFloatingIconButton
 import com.fueltracker.ui.miui.MiuiTextButton
 import com.fueltracker.ui.miui.VehicleCard
 import com.fueltracker.ui.miui.glass.drawGlassBackdrop
+import com.fueltracker.ui.miui.glass.drawGlassDialogOverlay
+import com.fueltracker.ui.miui.glass.LocalAppGlassEnabled
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.StatisticsSummary
@@ -343,23 +346,13 @@ fun HomeScreen(
                         }
                     }
 
-                    FloatingActionButton(
+                    MiuiFloatingIconButton(
+                        icon = if (fabExpanded) Icons.Default.Close else Icons.Default.Add,
                         onClick = { fabExpanded = !fabExpanded },
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
-                        shape = CircleShape,
-                        elevation = FloatingActionButtonDefaults.elevation(
-                            defaultElevation = 0.dp,
-                            pressedElevation = 0.dp,
-                            focusedElevation = 0.dp,
-                            hoveredElevation = 0.dp
-                        )
-                    ) {
-                        Icon(
-                            if (fabExpanded) Icons.Default.Close else Icons.Default.Add,
-                            contentDescription = null
-                        )
-                    }
+                        contentDescription = if (fabExpanded) "关闭快捷操作" else "添加记录"
+                    )
                 }
             }
         }
@@ -400,19 +393,76 @@ private fun ConsumptionCard(recordCount: Int, latestConsumption: Double?, averag
     MiuiCard(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("当前油耗", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(latestConsumption?.let { "%.2f".format(it) } ?: "--", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("L/100km", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
+        Row(
+            modifier = Modifier.padding(
+                horizontal = 16.dp,
+                vertical = 15.dp
+            ),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "当前油耗",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = latestConsumption
+                            ?.let { "%.2f".format(it) }
+                            ?: "--",
+                        fontSize = 36.sp,
+                        lineHeight = 40.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "L/100km",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                StatItem("平均油耗", averageConsumption?.let { "%.2f L/100km".format(it) } ?: "--")
-                StatItem("加油次数", "$recordCount 次")
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                CompactConsumptionStat(
+                    title = "平均油耗",
+                    value = averageConsumption
+                        ?.let { "%.2f L/100km".format(it) }
+                        ?: "--"
+                )
+                CompactConsumptionStat(
+                    title = "加油次数",
+                    value = "$recordCount 次"
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun CompactConsumptionStat(
+    title: String,
+    value: String
+) {
+    Column(horizontalAlignment = Alignment.End) {
+        Text(
+            text = title,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            fontSize = 18.sp,
+            lineHeight = 21.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
@@ -436,19 +486,71 @@ private fun ConsumptionStatsCard(
 ) {
     MiuiCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("油耗统计", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            val customLabel = when (selectedRange) {
+                ExpenseRange.CUSTOM_MONTH if customMonth == 0 ->
+                    "${customYear}全年"
+                ExpenseRange.CUSTOM_MONTH if customMonth > 0 ->
+                    "${customYear}年${customMonth}月"
+                else -> "选年月"
+            }
 
-            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                // 👈 全部替换为 MiuiFilterChip
-                MiuiFilterChip("全部", selectedRange == ExpenseRange.ALL) { onRangeSelected(ExpenseRange.ALL) }
-                MiuiFilterChip("本月", selectedRange == ExpenseRange.MONTH) { onRangeSelected(ExpenseRange.MONTH) }
-                MiuiFilterChip("今年", selectedRange == ExpenseRange.YEAR) { onRangeSelected(ExpenseRange.YEAR) }
-                val customLabel = when (selectedRange) {
-                    ExpenseRange.CUSTOM_MONTH if customMonth == 0 -> "${customYear}全年"
-                    ExpenseRange.CUSTOM_MONTH if customMonth > 0 -> "${customYear}年${customMonth}月"
-                    else -> "选年月"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "油耗统计",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        space = 5.dp,
+                        alignment = Alignment.End
+                    )
+                ) {
+                    MiuiCompactFilterChip(
+                        "全部",
+                        selectedRange == ExpenseRange.ALL,
+                        onClick = {
+                            onRangeSelected(ExpenseRange.ALL)
+                        },
+                        horizontalPadding = 7.dp,
+                        verticalPadding = 5.dp,
+                        fontSize = 11.sp
+                    )
+                    MiuiCompactFilterChip(
+                        "本月",
+                        selectedRange == ExpenseRange.MONTH,
+                        onClick = {
+                            onRangeSelected(ExpenseRange.MONTH)
+                        },
+                        horizontalPadding = 7.dp,
+                        verticalPadding = 5.dp,
+                        fontSize = 11.sp
+                    )
+                    MiuiCompactFilterChip(
+                        "今年",
+                        selectedRange == ExpenseRange.YEAR,
+                        onClick = {
+                            onRangeSelected(ExpenseRange.YEAR)
+                        },
+                        horizontalPadding = 7.dp,
+                        verticalPadding = 5.dp,
+                        fontSize = 11.sp
+                    )
+                    MiuiCompactFilterChip(
+                        customLabel,
+                        selectedRange == ExpenseRange.CUSTOM_MONTH,
+                        onClick = onCustomMonthClick,
+                        horizontalPadding = 7.dp,
+                        verticalPadding = 5.dp,
+                        fontSize = 11.sp
+                    )
                 }
-                MiuiFilterChip(customLabel, selectedRange == ExpenseRange.CUSTOM_MONTH, onCustomMonthClick)
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -515,57 +617,240 @@ private fun ChartCard(points: List<CostPoint>) {
         monthlyPoints.map { textMeasurer.measure(if (isSameYear) "${it.month}月" else "%02d/%02d".format(it.year % 100, it.month), baseTimeLabelStyle) }
     }
 
-    val topPaddingDp = remember(valueLabelLayouts, density) {
-        with(density) { ((valueLabelLayouts.maxOfOrNull { it.size.height } ?: 0).toDp() + 4.dp).coerceAtLeast(16.dp) }
-    }
-    val chartAreaHeight = 94.dp
-    val timeAxisHeight = 18.dp
-    val canvasHeight = topPaddingDp + chartAreaHeight + timeAxisHeight
-
-    val scrollState = rememberScrollState()
-    val visibleCount = 10
-
-    LaunchedEffect(monthlyPoints.size) {
-        if (monthlyPoints.size > visibleCount) {
-            snapshotFlow { scrollState.maxValue }
-                .firstOrNull { it > 0 }
-                ?.let { scrollState.scrollTo(it) }
+    val valueLabelClearance = remember(valueLabelLayouts, density) {
+        with(density) {
+            (
+                    (valueLabelLayouts.maxOfOrNull { it.size.height } ?: 0)
+                        .toDp() + 12.dp
+                    ).coerceAtLeast(22.dp)
         }
     }
+    val minimumItemWidth = remember(valueLabelLayouts, density) {
+        with(density) {
+            (
+                    (valueLabelLayouts.maxOfOrNull { it.size.width } ?: 0)
+                        .toDp() + 14.dp
+                    ).coerceAtLeast(46.dp)
+        }
+    }
+    val lineTopGap = 10.dp
+    val chartAreaHeight = 96.dp
+    val timeAxisHeight = 18.dp
+    val canvasHeight =
+        valueLabelClearance + chartAreaHeight + timeAxisHeight
+    val valueLabelBackground =
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+    val valueLabelBorder =
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+
+    val scrollState = rememberScrollState()
 
     MiuiCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("加油趋势 (按月 · 元)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "加油趋势 (按月 · 元)",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val visibleCount =
+                    (maxWidth / minimumItemWidth)
+                        .toInt()
+                        .coerceIn(4, 7)
                 val itemWidth = maxWidth / visibleCount
-                val chartWidth = if (monthlyPoints.size <= visibleCount) maxWidth else itemWidth * monthlyPoints.size
-                Box(modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState)) {
-                    Canvas(modifier = Modifier.width(chartWidth).height(canvasHeight)) {
+                val chartWidth =
+                    if (monthlyPoints.size <= visibleCount) {
+                        maxWidth
+                    } else {
+                        itemWidth * monthlyPoints.size
+                    }
+
+                LaunchedEffect(monthlyPoints.size, visibleCount) {
+                    if (monthlyPoints.size > visibleCount) {
+                        snapshotFlow { scrollState.maxValue }
+                            .firstOrNull { it > 0 }
+                            ?.let { scrollState.scrollTo(it) }
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(scrollState)
+                ) {
+                    Canvas(
+                        modifier = Modifier
+                            .width(chartWidth)
+                            .height(canvasHeight)
+                    ) {
                         val slotWidth = size.width / monthlyPoints.size
-                        val barWidth = (slotWidth * 0.5f).coerceIn(4.dp.toPx(), 40.dp.toPx())
-                        val chartHeight = size.height - topPaddingDp.toPx() - timeAxisHeight.toPx()
-                        val timeLabelY = topPaddingDp.toPx() + chartHeight + 4.dp.toPx()
+                        val plotTop = valueLabelClearance.toPx()
+                        val plotBottom =
+                            plotTop + chartAreaHeight.toPx()
+                        val plotHeight =
+                            (plotBottom - plotTop).coerceAtLeast(1f)
+                        val gridColor =
+                            onSurfaceVariantColor.copy(alpha = 0.13f)
 
-                        monthlyPoints.forEachIndexed { index, point ->
-                            val barCenterX = index * slotWidth + slotWidth / 2f
-                            val barLeft = barCenterX - barWidth / 2f
-                            val barHeight = (chartHeight * (point.value / yMax).toFloat().coerceIn(0f, 1f)).coerceAtLeast(2.dp.toPx())
-                            val barTop = topPaddingDp.toPx() + (chartHeight - barHeight)
+                        repeat(3) { gridIndex ->
+                            val fraction = (gridIndex + 1) / 4f
+                            val gridY = plotTop + plotHeight * fraction
+                            drawLine(
+                                color = gridColor,
+                                start = Offset(0f, gridY),
+                                end = Offset(size.width, gridY),
+                                strokeWidth = 0.75.dp.toPx()
+                            )
+                        }
 
-                            drawRoundRect(
-                                color = if (index == monthlyPoints.size - 1) primaryColor else primaryColor.copy(alpha = 0.55f),
-                                topLeft = Offset(barLeft, barTop), size = Size(barWidth, barHeight), cornerRadius = CornerRadius(4.dp.toPx())
+                        val pointOffsets = monthlyPoints.mapIndexed { index, point ->
+                            val x = index * slotWidth + slotWidth / 2f
+                            val normalized =
+                                (point.value / yMax)
+                                    .toFloat()
+                                    .coerceIn(0f, 1f)
+                            val y = plotBottom - plotHeight * normalized
+                            Offset(x, y)
+                        }
+
+                        val firstPoint = pointOffsets.first()
+                        val lastPoint = pointOffsets.last()
+                        val areaPath = Path().apply {
+                            moveTo(firstPoint.x, plotBottom)
+                            pointOffsets.forEach { point ->
+                                lineTo(point.x, point.y)
+                            }
+                            lineTo(lastPoint.x, plotBottom)
+                            close()
+                        }
+                        drawPath(
+                            path = areaPath,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    primaryColor.copy(alpha = 0.18f),
+                                    primaryColor.copy(alpha = 0.025f)
+                                ),
+                                startY = plotTop,
+                                endY = plotBottom
+                            )
+                        )
+
+                        val linePath = Path().apply {
+                            moveTo(firstPoint.x, firstPoint.y)
+                            pointOffsets.drop(1).forEach { point ->
+                                lineTo(point.x, point.y)
+                            }
+                        }
+                        drawPath(
+                            path = linePath,
+                            color = primaryColor,
+                            style = Stroke(
+                                width = 2.dp.toPx(),
+                                cap = StrokeCap.Round,
+                                join = StrokeJoin.Round
+                            )
+                        )
+
+                        monthlyPoints.forEachIndexed { index, _ ->
+                            val point = pointOffsets[index]
+                            val isLatest = index == monthlyPoints.lastIndex
+                            drawCircle(
+                                color = primaryColor.copy(
+                                    alpha = if (isLatest) 0.22f else 0.13f
+                                ),
+                                radius = if (isLatest) {
+                                    7.dp.toPx()
+                                } else {
+                                    5.5.dp.toPx()
+                                },
+                                center = point
+                            )
+                            drawCircle(
+                                color = primaryColor,
+                                radius = if (isLatest) {
+                                    3.5.dp.toPx()
+                                } else {
+                                    2.8.dp.toPx()
+                                },
+                                center = point
                             )
 
-                            val vLayout = valueLabelLayouts[index]
-                            if (vLayout.size.width <= size.width) {
-                                drawText(vLayout, topLeft = Offset((barCenterX - vLayout.size.width / 2f).coerceIn(0f, size.width - vLayout.size.width), barTop - vLayout.size.height - 2.dp.toPx()))
-                            }
+                            val valueLayout = valueLabelLayouts[index]
+                            val valueTop = (
+                                    point.y -
+                                            valueLayout.size.height -
+                                            lineTopGap.toPx()
+                                    ).coerceAtLeast(0f)
+                            val labelHorizontalPadding = 4.dp.toPx()
+                            val labelVerticalPadding = 2.dp.toPx()
+                            val labelLeft = (
+                                    point.x -
+                                            valueLayout.size.width / 2f -
+                                            labelHorizontalPadding
+                                    ).coerceIn(
+                                0f,
+                                size.width -
+                                        valueLayout.size.width -
+                                        labelHorizontalPadding * 2f
+                                    )
+                            val labelTop = (
+                                    valueTop -
+                                            labelVerticalPadding
+                                    ).coerceAtLeast(0f)
+                            val labelWidth =
+                                valueLayout.size.width +
+                                        labelHorizontalPadding * 2f
+                            val labelHeight =
+                                valueLayout.size.height +
+                                        labelVerticalPadding * 2f
+                            val labelCorner = 5.dp.toPx()
+                            drawRoundRect(
+                                color = valueLabelBackground,
+                                topLeft = Offset(labelLeft, labelTop),
+                                size = androidx.compose.ui.geometry.Size(
+                                    labelWidth,
+                                    labelHeight
+                                ),
+                                cornerRadius = CornerRadius(labelCorner)
+                            )
+                            drawRoundRect(
+                                color = valueLabelBorder,
+                                topLeft = Offset(labelLeft, labelTop),
+                                size = androidx.compose.ui.geometry.Size(
+                                    labelWidth,
+                                    labelHeight
+                                ),
+                                cornerRadius = CornerRadius(labelCorner),
+                                style = Stroke(width = 0.65.dp.toPx())
+                            )
+                            drawText(
+                                textLayoutResult = valueLayout,
+                                topLeft = Offset(
+                                    x = labelLeft +
+                                            labelHorizontalPadding,
+                                    y = labelTop +
+                                            labelVerticalPadding
+                                )
+                            )
 
-                            val tLayout = timeLabelLayouts[index]
-                            if (tLayout.size.width <= size.width) {
-                                drawText(tLayout, topLeft = Offset((barCenterX - tLayout.size.width / 2f).coerceIn(0f, size.width - tLayout.size.width), timeLabelY))
-                            }
+                            val timeLayout = timeLabelLayouts[index]
+                            drawText(
+                                textLayoutResult = timeLayout,
+                                topLeft = Offset(
+                                    x = (
+                                            point.x -
+                                                    timeLayout.size.width / 2f
+                                            ).coerceIn(
+                                        0f,
+                                        size.width -
+                                                timeLayout.size.width
+                                    ),
+                                    y = plotBottom + 4.dp.toPx()
+                                )
+                            )
                         }
                     }
                 }
@@ -682,46 +967,46 @@ fun ActiveParkingConfirmOverlay(
     onConfirm: () -> Unit
 ) {
     var actionTriggered by remember { mutableStateOf(false) }
+    val glassEnabled = LocalAppGlassEnabled.current
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
-    val edgeColor = if (isLight) Color.White.copy(alpha = 0.82f)
-    else Color.White.copy(alpha = 0.20f)
+    val edgeColor = if (glassEnabled) {
+        if (isLight) Color.White.copy(alpha = 0.82f)
+        else Color.White.copy(alpha = 0.20f)
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.32f)
+    }
+    val surfaceModifier = if (glassEnabled) {
+        Modifier.drawGlassBackdrop(
+            backdrop = backdrop,
+            shape = shape,
+            isLight = isLight
+        )
+    } else {
+        Modifier
+    }
+    val contentModifier = if (glassEnabled) {
+        Modifier.drawGlassDialogOverlay(isLight)
+    } else {
+        Modifier
+    }
 
     Surface(
         // Surface 本身延伸到屏幕底部；系统导航栏 inset 只留给内容，
         // 避免渐变背景在导航栏区域额外形成一块浅色矩形。
         modifier = Modifier
             .fillMaxWidth()
-            .drawGlassBackdrop(
-                backdrop = backdrop,
-                shape = shape,
-                isLight = isLight
-            ),
+            .then(surfaceModifier),
         shape = shape,
-        color = Color.Transparent,
+        color = if (glassEnabled) Color.Transparent else MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(0.8.dp, edgeColor),
         shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = if (isLight) {
-                            listOf(
-                                Color.White.copy(alpha = 0.46f),
-                                Color(0xFFDCE9FA).copy(alpha = 0.22f),
-                                Color(0xFFB9CBE3).copy(alpha = 0.34f)
-                            )
-                        } else {
-                            listOf(
-                                Color(0xFF7186A5).copy(alpha = 0.24f),
-                                Color(0xFF263A55).copy(alpha = 0.20f),
-                                Color(0xFF0D192B).copy(alpha = 0.42f)
-                            )
-                        }
-                    )
-                )
+                .then(contentModifier)
                 .padding(horizontal = 24.dp)
                 .padding(top = 16.dp, bottom = 28.dp)
                 // 将导航栏安全区放在渐变背景之外，避免底部 inset 出现独立色块。
@@ -740,6 +1025,7 @@ fun ActiveParkingConfirmOverlay(
                 text = "已取车",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -765,7 +1051,12 @@ fun ActiveParkingConfirmOverlay(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 ) {
-                    Text("取消", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        "取消",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
                 TextButton(
                     onClick = {

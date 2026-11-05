@@ -73,7 +73,7 @@ private fun RowScope.CalendarDayCell(
                 fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
                 color = when {
                     isSelected -> MaterialTheme.colorScheme.onPrimary
-                    !cell.inCurrentMonth -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    !cell.inCurrentMonth -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     isToday -> MaterialTheme.colorScheme.primary
                     else -> MaterialTheme.colorScheme.onSurface
                 }
@@ -168,7 +168,7 @@ private fun MiuiYearMonthPickerDialog(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Color.Transparent,
-        scrimColor = Color.Black.copy(alpha = 0.16f),
+        scrimColor = Color.Black.copy(alpha = 0.30f),
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {
@@ -229,7 +229,7 @@ fun MiuiDatePickerDialog(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Color.Transparent,
-        scrimColor = Color.Black.copy(alpha = 0.16f),
+        scrimColor = Color.Black.copy(alpha = 0.30f),
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {

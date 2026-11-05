@@ -33,14 +33,9 @@ fun MiuiStatusBarGlass(
     val statusBarHeight =
         WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    // 与页面背景保持完全一致
     val backgroundColor = MaterialTheme.colorScheme.background
     val isLight = backgroundColor.luminance() > 0.5f
-
-    // 让背景色参与玻璃融合，避免状态栏与页面出现色差
-    val glassTintAlpha = if (isLight) 0.72f else 0.78f
-
-    // 保留原先顶部栏的渐变过渡范围
+    val glassTintAlpha = if (isLight) 0.28f else 0.36f
     val glassHeight = statusBarHeight + 48.dp
 
     if (!isGlassEnabled || statusBarHeight <= 0.dp) return
@@ -50,7 +45,7 @@ fun MiuiStatusBarGlass(
             .fillMaxWidth()
             .height(glassHeight)
     ) {
-        // 第一层：清除底层残留，保持原有 Backdrop 结构
+        // 第一层保留原始背景，避免渐变边缘出现色块断层。
         Box(
             Modifier
                 .fillMaxSize()
@@ -64,7 +59,7 @@ fun MiuiStatusBarGlass(
                 )
         )
 
-        // 第二层：模糊 + 渐变遮罩
+        // 第二层只在状态栏顶部保留完整模糊，向下渐隐到页面背景。
         Box(
             Modifier
                 .fillMaxSize()
@@ -104,24 +99,3 @@ fun MiuiStatusBarGlass(
         )
     }
 }
-
-private fun Modifier.drawWithStatusBarGradient(): Modifier =
-    this.then(
-        Modifier.drawWithContent {
-            drawContent()
-
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.0f to Color.White,
-                        0.25f to Color.White,
-                        0.45f to Color.White.copy(alpha = 0.65f),
-                        0.65f to Color.White.copy(alpha = 0.15f),
-                        0.75f to Color.Transparent,
-                        1.0f to Color.Transparent
-                    )
-                ),
-                blendMode = BlendMode.DstIn
-            )
-        }
-    )

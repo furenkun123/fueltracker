@@ -61,8 +61,11 @@ import com.fueltracker.ui.VehicleScreen
 import com.fueltracker.ui.components.PrivacyDialog
 import com.fueltracker.ui.components.UpdateLogDialog
 import com.fueltracker.ui.miui.MiuiNavigationBar
-import com.fueltracker.ui.miui.MiuiNavigationItem
+import com.fueltracker.ui.miui.MiuiNavigationDestination
+import com.fueltracker.ui.miui.MiuiStatusBarGlass
 import com.fueltracker.ui.miui.MiuiTopBarMoreButton
+import com.fueltracker.ui.miui.glass.LocalAppGlassBackdrop
+import com.fueltracker.ui.miui.glass.LocalAppGlassEnabled
 import com.fueltracker.ui.miui.glass.LocalCardGlassBackdrop
 import com.fueltracker.ui.miui.glass.LocalCardGlassEnabled
 import com.fueltracker.util.UpdateLogManager
@@ -223,9 +226,13 @@ fun FuelTrackerApp(
     // ============================================================
     // 全 App 内容层
     // ============================================================
-    Box(
-        modifier = Modifier.fillMaxSize()
+    CompositionLocalProvider(
+        LocalAppGlassBackdrop provides appBackdrop,
+        LocalAppGlassEnabled provides isGlassEnabled
     ) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // 车辆卡片专用采样层：只捕获背景，不包含 Scaffold、卡片或导航栏。
         Box(
             modifier = Modifier
@@ -562,6 +569,52 @@ fun FuelTrackerApp(
             }
             }
         }
+        // ---------- 悬浮底部导航栏 ----------
+        if (showBottomBar) {
+            MiuiNavigationBar(
+                selectedIndex = when (screen) {
+                    AppScreen.HOME -> 0
+                    AppScreen.RECORDS -> 1
+                    AppScreen.EXPENSES -> 2
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+                backdrop = appBackdrop,
+                isGlassEnabled = isGlassEnabled,
+                isFloating = viewModel.isFloatingBottomBar,
+                items = listOf(
+                    MiuiNavigationDestination(
+                        icon = Icons.Default.Home,
+                        label = "首页"
+                    ),
+                    MiuiNavigationDestination(
+                        icon = Icons.Default.LocalGasStation,
+                        label = "记录"
+                    ),
+                    MiuiNavigationDestination(
+                        icon = Icons.Default.Receipt,
+                        label = "费用"
+                    )
+                ),
+                onTabSelected = { index ->
+                    viewModel.navigateTo(
+                        when (index) {
+                            0 -> AppScreen.HOME
+                            1 -> AppScreen.RECORDS
+                            else -> AppScreen.EXPENSES
+                        }
+                    )
+                }
+            )
+        }
+
+        // 全局状态栏材质位于页面采样层之上，避免 Backdrop 递归采样。
+        MiuiStatusBarGlass(
+            backdrop = appBackdrop,
+            modifier = Modifier.align(Alignment.TopCenter),
+            isGlassEnabled = isGlassEnabled
+        )
+
+        // 首页操作按钮位于状态栏玻璃之上，保持点击与图标清晰度。
         if (screen == AppScreen.HOME) {
             Box(
                 modifier = Modifier
@@ -581,50 +634,6 @@ fun FuelTrackerApp(
                 )
             }
         }
-
-
-        // ---------- 悬浮底部导航栏 ----------
-        if (showBottomBar) {
-            MiuiNavigationBar(
-                selectedIndex = when (screen) {
-                    AppScreen.HOME -> 0
-                    AppScreen.RECORDS -> 1
-                    AppScreen.EXPENSES -> 2
-                },
-                modifier = Modifier.align(Alignment.BottomCenter),
-                backdrop = appBackdrop,
-                isGlassEnabled = isGlassEnabled,
-                isFloating = viewModel.isFloatingBottomBar
-            ) {
-                MiuiNavigationItem(
-                    selected = screen == AppScreen.HOME,
-                    onClick = {
-                        viewModel.navigateTo(AppScreen.HOME)
-                    },
-                    icon = Icons.Default.Home,
-                    label = "首页"
-                )
-
-                MiuiNavigationItem(
-                    selected = screen == AppScreen.RECORDS,
-                    onClick = {
-                        viewModel.navigateTo(AppScreen.RECORDS)
-                    },
-                    icon = Icons.Default.LocalGasStation,
-                    label = "记录"
-                )
-
-                MiuiNavigationItem(
-                    selected = screen == AppScreen.EXPENSES,
-                    onClick = {
-                        viewModel.navigateTo(AppScreen.EXPENSES)
-                    },
-                    icon = Icons.Default.Receipt,
-                    label = "费用"
-                )
-            }
-        }
-
     }
 
     // 独立的 Backdrop 消费者：弹窗本身不进入 appBackdrop 的采样内容。
@@ -682,6 +691,7 @@ fun FuelTrackerApp(
                 }
             )
         }
+    }
     }
 }
 

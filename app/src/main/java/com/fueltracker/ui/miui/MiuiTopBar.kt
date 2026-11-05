@@ -74,14 +74,14 @@ fun MiuiTopBarMoreButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    MiuiTopBarIconButton(
+    MiuiFloatingIconButton(
         icon = Icons.Default.MoreVert,
         onClick = onClick,
         modifier = modifier,
         contentDescription = "更多设置",
         containerSize = 46.dp,
         iconSize = 24.dp,
-        iconTint = MaterialTheme.colorScheme.onBackground,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         containerColor = MaterialTheme.colorScheme.surfaceVariant
     )
 }

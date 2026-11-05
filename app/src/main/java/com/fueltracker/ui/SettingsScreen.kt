@@ -451,10 +451,14 @@ fun SettingsScreen(
                             )
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text("磨砂底栏效果", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                                Text("全局玻璃效果", fontSize = 15.sp, fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.height(2.dp))
                                 Text(
-                                    if (viewModel.isGlassEffectEnabled) "已开启，底栏使用磨砂效果" else "已关闭，底栏使用纯色背景",
+                                    if (viewModel.isGlassEffectEnabled) {
+                                        "已开启，页面、底栏与弹窗使用玻璃材质"
+                                    } else {
+                                        "已关闭，页面、底栏与弹窗使用纯色材质"
+                                    },
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

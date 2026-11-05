@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,6 +57,7 @@ fun <T> WheelList(
 ) {
     if (items.isEmpty()) return
 
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val itemHeight = 38.dp
     val itemHeightPx = with(LocalDensity.current) { itemHeight.toPx() }
 
@@ -148,7 +150,7 @@ fun <T> WheelList(
                             isSelected && style != WheelStyle.Plain ->
                                 MaterialTheme.colorScheme.onSurface
                             isSelected -> MaterialTheme.colorScheme.primary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (isLight) 0.72f else 0.84f)
                         }
                     )
                 }

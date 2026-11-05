@@ -1,6 +1,7 @@
 package com.fueltracker.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,7 +54,6 @@ import com.fueltracker.ui.components.WheelStyle
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miui.MiuiCard
 import com.fueltracker.ui.miui.MiuiFilterChip
-import com.fueltracker.ui.miui.MiuiTextButton
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.IntervalConfidence
@@ -246,41 +247,65 @@ private fun FuelRecordCard(
 
     MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                FlowRow(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        timeText,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                    if (record.fuelGrade.isNotBlank()) TagChip(
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = timeText,
+                    fontSize = 12.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+                if (record.fuelGrade.isNotBlank()) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    TagChip(
                         record.fuelGrade,
                         MaterialTheme.colorScheme.primary,
                         MaterialTheme.colorScheme.primaryContainer
                     )
-                    if (record.isFull) TagChip("加满", Color(0xFF34C759), Color(0xFFE8F8EC))
-                    if (record.hasMissedRecord) TagChip("含漏记", Color(0xFFFF9500), Color(0xFFFFF4E5))
+                }
+                if (record.isFull) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    TagChip("加满", Color(0xFF34C759), Color(0xFFE8F8EC))
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    RecordTextAction("编辑", MaterialTheme.colorScheme.primary, onEdit)
+                    RecordTextAction("删除", Color(0xFFFF3B30).copy(alpha = 0.8f)) {
+                        showDeleteDialog = true
+                    }
+                }
+            }
 
-                    // 新增异常提示标签
+            val hasStatusChip =
+                record.hasMissedRecord ||
+                        isRemainingFuelAnomaly ||
+                        calculationResult?.isOutlier == true ||
+                        calculationResult?.quality?.confidence == IntervalConfidence.LOW ||
+                        calculationResult?.quality?.confidence == IntervalConfidence.UNRELIABLE
+            if (hasStatusChip) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (record.hasMissedRecord) {
+                        TagChip("含漏记", Color(0xFFFF9500), Color(0xFFFFF4E5))
+                    }
                     if (isRemainingFuelAnomaly) {
                         TagChip("油量异常", Color(0xFFFF3B30), Color(0xFFFFE5E5))
                     }
-
                     when {
-                        calculationResult?.isOutlier == true -> TagChip("偏离值", Color(0xFFFF3B30), Color(0xFFFFE5E5))
-                        calculationResult?.quality?.confidence == IntervalConfidence.LOW || calculationResult?.quality?.confidence == IntervalConfidence.UNRELIABLE ->
+                        calculationResult?.isOutlier == true ->
+                            TagChip("偏离值", Color(0xFFFF3B30), Color(0xFFFFE5E5))
+                        calculationResult?.quality?.confidence == IntervalConfidence.LOW ||
+                                calculationResult?.quality?.confidence == IntervalConfidence.UNRELIABLE ->
                             TagChip("预估值", Color(0xFFFF9500), Color(0xFFFFF4E5))
                     }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    MiuiTextButton("编辑", MaterialTheme.colorScheme.primary, onEdit)
-                    MiuiTextButton("删除", Color(0xFFFF3B30).copy(alpha = 0.8f)) { showDeleteDialog = true }
                 }
             }
 
@@ -342,8 +367,47 @@ private fun FuelRecordCard(
 
 @Composable
 private fun TagChip(text: String, color: Color, bgColor: Color) {
-    Surface(color = bgColor, shape = RoundedCornerShape(4.dp)) {
-        Text(text, modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp), fontSize = 10.sp, fontWeight = FontWeight.Medium, color = color)
+    Surface(
+        modifier = Modifier.height(20.dp),
+        color = bgColor,
+        shape = RoundedCornerShape(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                color = color,
+                lineHeight = 12.sp,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecordTextAction(text: String, color: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 5.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 11.sp,
+            lineHeight = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = color,
+            maxLines = 1
+        )
     }
 }
 

@@ -27,6 +27,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CardElevation
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,9 +37,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.fueltracker.ui.miui.glass.LocalAppGlassBackdrop
+import com.fueltracker.ui.miui.glass.LocalAppGlassEnabled
 import com.fueltracker.ui.miui.glass.LocalCardGlassBackdrop
 import com.fueltracker.ui.miui.glass.LocalCardGlassEnabled
 import com.fueltracker.ui.miui.glass.drawLiquidGlassCard
@@ -47,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,6 +100,75 @@ fun MiuiButton(
         )
     }
 }
+
+/**
+ * 页面级悬浮图标按钮。
+ *
+ * 首页新增、费用新增和设置入口共用同一套材质：开启玻璃时使用实时模糊、
+ * 折射与主题染色；关闭玻璃后恢复为对应入口的纯色按钮。
+ */
+@Composable
+fun MiuiFloatingIconButton(
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+    containerSize: Dp = 56.dp,
+    iconSize: Dp = 24.dp,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    enabled: Boolean = true
+) {
+    val backdrop = LocalAppGlassBackdrop.current
+    val useGlass = enabled && LocalAppGlassEnabled.current && backdrop != null
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val shape = CircleShape
+    val effectiveContentColor =
+        if (useGlass) MaterialTheme.colorScheme.onSurface else contentColor
+    val surfaceModifier = if (useGlass) {
+        Modifier.background(
+            brush = Brush.linearGradient(
+                colorStops = arrayOf(
+                    0f to Color.White.copy(alpha = if (isLight) 0.58f else 0.18f),
+                    0.48f to containerColor.copy(alpha = if (isLight) 0.24f else 0.34f),
+                    1f to (if (isLight) Color(0xFF52657D) else Color.Black).copy(
+                        alpha = if (isLight) 0.10f else 0.24f
+                    )
+                )
+            )
+        ).border(
+            width = 0.8.dp,
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = if (isLight) 0.86f else 0.34f),
+                    Color.White.copy(alpha = if (isLight) 0.24f else 0.10f)
+                )
+            ),
+            shape = shape
+        )
+    } else {
+        Modifier.background(
+            if (enabled) containerColor else containerColor.copy(alpha = 0.38f)
+        )
+    }
+
+    Box(
+        modifier = modifier
+            .size(containerSize)
+            .clip(shape)
+            .then(surfaceModifier)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = effectiveContentColor.copy(alpha = if (enabled) 1f else 0.55f),
+            modifier = Modifier.size(iconSize)
+        )
+    }
+}
+
 @Composable
 fun MiuiSwitch(
     checked: Boolean,
@@ -170,7 +245,10 @@ fun MiuiCard(
         modifier = cardModifier,
         shape = shape,
         colors = if (useGlass) {
-            CardDefaults.cardColors(containerColor = Color.Transparent)
+            CardDefaults.cardColors(
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurface
+            )
         } else {
             colors ?: CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         },
@@ -217,7 +295,11 @@ fun MiuiCard(
         enabled = enabled,
         shape = shape,
         colors = if (useGlass) {
-            CardDefaults.cardColors(containerColor = Color.Transparent)
+            CardDefaults.cardColors(
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.52f)
+            )
         } else {
             colors ?: CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         },
@@ -409,70 +491,68 @@ fun MiuiTextField(
         ) {
             Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
                 OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxSize(),
-            singleLine = true,
-            enabled = enabled,
-            isError = isError,
-            shape = RoundedCornerShape(14.dp),
-            interactionSource = interactionSource,
-            textStyle = TextStyle(
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            ),
-            placeholder = placeholder?.let {
-                {
-                    Text(
-                        text = it,
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxSize(),
+                    singleLine = true,
+                    enabled = enabled,
+                    isError = isError,
+                    shape = RoundedCornerShape(14.dp),
+                    interactionSource = interactionSource,
+                    textStyle = TextStyle(
                         fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    placeholder = placeholder?.let {
+                        {
+                            Text(
+                                text = it,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    suffix = {
+                        if (suffix != null) {
+                            if (onSuffixClick != null) {
+                                Text(
+                                    text = "$suffix ▾",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable(onClick = onSuffixClick)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = suffix,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    },
+                    keyboardOptions = keyboardOptions,
+                    keyboardActions = keyboardActions,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent,
+                        errorBorderColor = Color.Transparent,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                        focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                        unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
                     )
-                }
-            },
-            suffix = {
-                if (suffix != null) {
-                    if (onSuffixClick != null) {
-                        Text(
-                            text = "$suffix ▾",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable(onClick = onSuffixClick)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    } else {
-                        Text(
-                            text = suffix,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            },
-            keyboardOptions = keyboardOptions,
-            keyboardActions = keyboardActions,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent,
-
-                focusedBorderColor = Color.Transparent,
-                unfocusedBorderColor = Color.Transparent,
-                disabledBorderColor = Color.Transparent,
-
-                errorBorderColor = Color.Transparent,
-                cursorColor = MaterialTheme.colorScheme.primary,
-                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
                 )
             }
         }
-
         when {
             isError && errorMessage != null -> {
                 Text(
@@ -500,7 +580,6 @@ fun MiuiTextField(
         }
     }
 }
-
 
 @Composable
 fun MiuiClickableItem(
@@ -545,7 +624,27 @@ fun MiuiClickableItem(
  * 通用筛选标签（类似于 MIUI 的 Tab/Chip）
  */
 @Composable
-fun MiuiFilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
+fun MiuiFilterChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    MiuiCompactFilterChip(
+        text = text,
+        selected = selected,
+        onClick = onClick
+    )
+}
+
+@Composable
+fun MiuiCompactFilterChip(
+    text: String,
+    selected: Boolean,
+    horizontalPadding: Dp = 12.dp,
+    verticalPadding: Dp = 6.dp,
+    fontSize: TextUnit = 12.sp,
+    onClick: () -> Unit
+) {
     // 自动判断深浅色
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
@@ -563,12 +662,15 @@ fun MiuiFilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
                 if (selected) MaterialTheme.colorScheme.primary else unselectedBgColor
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(
+                horizontal = horizontalPadding,
+                vertical = verticalPadding
+            ),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            fontSize = 12.sp,
+            fontSize = fontSize,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
