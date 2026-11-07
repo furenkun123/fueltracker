@@ -2,8 +2,8 @@ package com.fueltracker.ui
 
 import android.util.Log
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,12 +29,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -59,9 +52,14 @@ import com.fueltracker.data.CarBrand
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.ui.miuix.MiuixBackButton
 import com.fueltracker.ui.miuix.MiuixButton
-import com.fueltracker.ui.miuix.MiuixTextField
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 
 private fun letterSortKey(letter: String): Int {
@@ -253,8 +251,11 @@ private fun BrandSearchBox(
     onValueChange: (String) -> Unit,
     onSearchAction: () -> Unit
 ) {
-    val searchBoxBg = darkenPickerSearchColor(MiuixTheme.colorScheme.surfaceVariant)
-    val searchBorder = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+    // 1. 底色：用半透明的 surfaceVariant（或者 surface）
+    val searchBoxBg = MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+
+// 2. 边框：把 alpha 降到 0.05f 或 0.08f，看起来若隐若现
+    val searchBorder = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f)
 
     Box(
         modifier = Modifier

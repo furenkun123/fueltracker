@@ -52,8 +52,6 @@ import com.fueltracker.ui.components.ExpenseDetailItemCard
 import com.fueltracker.ui.components.ExpenseStructureCard
 import com.fueltracker.ui.components.ExpenseTrendCard
 import com.fueltracker.ui.components.LazyColumnScrollbar
-import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
-import com.fueltracker.ui.miuix.navigation.NavigationContentRegion
 import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
 import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
 import com.fueltracker.ui.components.SummaryCard
@@ -97,7 +95,6 @@ private sealed class ExpenseListItem {
 @Composable
 fun ExpenseScreen(
     viewModel: MainViewModel,
-    navigationBackdropDetector: NavigationBackdropDetector,
     selectedCategory: String?,
     onSelectedCategoryChange: (String?) -> Unit,
     onAddExpense: () -> Unit,
@@ -218,14 +215,13 @@ fun ExpenseScreen(
                     }
                 }
             } else {
-                item("summary") {
-                    NavigationContentRegion(navigationBackdropDetector, "expenses_summary") {
+                item("summary")  {
                         SummaryCard(summary, selectedRange, rangeLabel, { selectedRange = it }, { showYearMonthPicker = true })
                     }
                 }
                 if (trendYears.isNotEmpty()) {
-                    item("trend") {
-                        NavigationContentRegion(navigationBackdropDetector, "expenses_trend") {
+                    item("trend")
+                    {
                             ExpenseTrendCard(
                                 points = monthTrend,
                                 years = trendYears,
@@ -236,8 +232,7 @@ fun ExpenseScreen(
                     }
                 }
                 if (structureItems.isNotEmpty()) {
-                    item("structure") {
-                        NavigationContentRegion(navigationBackdropDetector, "expenses_structure") {
+                    item("structure")  {
                             ExpenseStructureCard(structureItems, selectedCategory) { cat ->
                                 onSelectedCategoryChange(if (selectedCategory == cat) null else cat)
                             }
@@ -276,7 +271,7 @@ fun ExpenseScreen(
                             is ExpenseListItem.Fuel -> "expenses_fuel_${item.id}"
                             is ExpenseListItem.Expense -> "expenses_item_${item.id}"
                         }
-                        NavigationContentRegion(navigationBackdropDetector, regionKey) {
+                        {
                             ExpenseDetailItemCard(
                                 title = item.title,
                                 time = item.timestamp.toDateTimeText(),
@@ -287,6 +282,7 @@ fun ExpenseScreen(
                                 }
                             )
                         }
+
                     }
                 }
             }

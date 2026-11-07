@@ -309,8 +309,8 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
 @Composable
 private fun PickerSearchBox(value: String, onValueChange: (String) -> Unit, placeholder: String, onSearchAction: () -> Unit) {
     val keyboard = LocalSoftwareKeyboardController.current
-    val bg = darkenPickerSearchColor(MiuixTheme.colorScheme.surfaceVariant)
-    val borderColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+    val bg = MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    val borderColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f)
 
     Box(
         Modifier

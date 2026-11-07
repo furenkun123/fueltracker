@@ -1,5 +1,6 @@
 package com.fueltracker.ui
 
+import android.R.attr.textColor
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -63,6 +64,12 @@ import com.fueltracker.ui.miuix.MiuixInputItem
 import com.fueltracker.viewmodel.MainViewModel
 import java.util.Calendar
 import java.util.Locale
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.TextStyle
 
 // 预设选择列表
 private val FuelTypeOptions = listOf("汽油", "柴油", "插电混动", "油电混动", "增程式", "纯电动")
@@ -103,10 +110,10 @@ fun VehicleScreen(
 
 
 
-    // 👇 双保险：直接判断当前背景的亮度，决定文字用黑还是白
-    val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
-    val textColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
-    val dividerColor = if (isLight) Color(0xFFE0E0E0) else Color(0xFF3A3A3C)
+//    // 👇 双保险：直接判断当前背景的亮度，决定文字用黑还是白
+//    val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
+//    val textColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
+//    val dividerColor = if (isLight) Color(0xFFE0E0E0) else Color(0xFF3A3A3C)
 
     LaunchedEffect(Unit) {
         carDatabase.ensureCatalogLoaded()
@@ -208,62 +215,73 @@ fun VehicleScreen(
                 text = if (isEditMode) "编辑车辆信息" else "添加新车辆",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = textColor
+                color = MiuixTheme.colorScheme.onBackground
             )
         }
 
         MiuixSectionHeader(title = "车辆详细信息")
 
         MiuixGroupCard {
-            MiuixClickableItem("品牌", brand.ifBlank { "选择品牌" }) {
+            // 品牌
+            MiuixListItem("品牌", brand.ifBlank { "选择品牌" }) {
                 pickerStartLevel = PickerLevel.BRAND
                 showCarPicker = true
             }
-            // 👈 改为强对比度分割线
-            HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
+            // 车系（带下拉菜单的特殊处理）
             Box(modifier = Modifier.fillMaxWidth()) {
-                MiuixClickableItem("车系", series.ifBlank { "选择车系" }) {
-                    pickerStartLevel = if (brand.isBlank()) PickerLevel.BRAND else PickerLevel.SERIES
-                    showCarPicker = true
-                }
-                val currentBrandSeries = selectedBrand?.series ?: emptyList()
-                if (currentBrandSeries.isNotEmpty()) {
-                    Box(Modifier.align(Alignment.CenterEnd).padding(end = 16.dp)) {
-                        Icon(
-                            Icons.Default.ArrowDropDown, "选择预置车系",
-                            tint = textColor, // 👈 双保险
-                            modifier = Modifier.size(24.dp).clickable(
-                                interactionSource = remember { MutableInteractionSource() }, indication = null
-                            ) { seriesMenuExpanded = true }
-                        )
-                        WindowListPopup(
-                            show = seriesMenuExpanded,
-                            alignment = PopupPositionProvider.Align.End,
-                            enableWindowDim = false,
-                            onDismissRequest = { seriesMenuExpanded = false }
-                        ) {
-                            ListPopupColumn {
-                                currentBrandSeries.forEachIndexed { index, option ->
-                                    DropdownImpl(
-                                        text = option,
-                                        optionSize = currentBrandSeries.size,
-                                        isSelected = series == option,
-                                        index = index,
-                                        onSelectedIndexChange = {
-                                            series = currentBrandSeries[it]
-                                            seriesMenuExpanded = false
-                                        }
-                                    )
+                MiuixListItem(
+                    title = "车系",
+                    value = series.ifBlank { "选择车系" },
+                    onClick = {
+                        pickerStartLevel = if (brand.isBlank()) PickerLevel.BRAND else PickerLevel.SERIES
+                        showCarPicker = true
+                    },
+                    showArrow = selectedBrand?.series.isNullOrEmpty(), // 如果有下拉菜单就不显示箭头
+                    trailingContent = {
+                        val currentBrandSeries = selectedBrand?.series ?: emptyList()
+                        if (currentBrandSeries.isNotEmpty()) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "选择预置车系",
+                                tint = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) { seriesMenuExpanded = true }
+                            )
+                        }
+                    }
+                )
+
+                // 下拉菜单逻辑保留
+                WindowListPopup(
+                    show = seriesMenuExpanded,
+                    alignment = PopupPositionProvider.Align.End,
+                    enableWindowDim = false,
+                    onDismissRequest = { seriesMenuExpanded = false }
+                ) {
+                    ListPopupColumn {
+                        (selectedBrand?.series ?: emptyList()).forEachIndexed { index, option ->
+                            DropdownImpl(
+                                text = option,
+                                optionSize = selectedBrand?.series?.size ?: 0,
+                                isSelected = series == option,
+                                index = index,
+                                onSelectedIndexChange = {
+                                    series = selectedBrand?.series?.get(it) ?: ""
+                                    seriesMenuExpanded = false
                                 }
-                            }
+                            )
                         }
                     }
                 }
             }
-            HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
-            MiuixClickableItem("车型", model.ifBlank { "选择车型" }) {
+            // 车型
+            MiuixListItem("车型", model.ifBlank { "选择车型" }) {
                 pickerStartLevel = when {
                     brand.isBlank() -> PickerLevel.BRAND
                     series.isBlank() -> PickerLevel.SERIES
@@ -271,9 +289,9 @@ fun VehicleScreen(
                 }
                 showCarPicker = true
             }
-            HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
-            MiuixClickableItem("年款", year) {
+            // 年款
+            MiuixListItem("年款", year) {
                 pickerStartLevel = when {
                     brand.isBlank() -> PickerLevel.BRAND
                     series.isBlank() -> PickerLevel.SERIES
@@ -282,39 +300,49 @@ fun VehicleScreen(
                 }
                 showCarPicker = true
             }
-            HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
-            MiuixClickableItem("能源类型", fuelType) { showFuelTypePickerSheet = true }
-            HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
+            // 能源类型
+            MiuixListItem("能源类型", fuelType) { showFuelTypePickerSheet = true }
 
             if (fuelType != "纯电动") {
-                MiuixClickableItem("燃油标号", fuelGrade.ifBlank { "未设置" }) { showFuelGradePickerSheet = true }
-                HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
+                // 燃油标号
+                MiuixListItem("燃油标号", fuelGrade.ifBlank { "未设置" }) { showFuelGradePickerSheet = true }
 
-                MiuixInputItem("油箱容量 (L)", tankCapacity, { tankCapacity = it }, "例如：50", KeyboardType.Decimal)
-                // 👇 新增：油箱错误提示
+                // 油箱容量
+                MiuixInputListItem(
+                    title = "油箱容量 (L)",
+                    value = tankCapacity,
+                    onValueChange = { tankCapacity = it },
+                    placeholder = "例如：50",
+                    keyboardType = KeyboardType.Decimal
+                )
                 if (tankCapacity.isNotBlank() && (parsedCapacity == null || parsedCapacity <= 0.0)) {
                     Text(
                         text = "油箱容量必须大于 0",
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         color = MiuixTheme.colorScheme.error,
-                        modifier = Modifier.padding(start = 20.dp, top = 4.dp, bottom = 8.dp)
+                        modifier = Modifier.padding(start = 20.dp, bottom = 12.dp)
                     )
                 }
-                HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
             }
 
-            MiuixClickableItem("提车日期", formattedDeliveryDate) { showDatePickerSheet = true }
-            HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
+            // 提车日期
+            MiuixListItem("提车日期", formattedDeliveryDate) { showDatePickerSheet = true }
 
-            MiuixInputItem("提车里程 (km)", initialOdometer, { initialOdometer = it }, "例如：20", KeyboardType.Decimal)
-            // 👇 新增：里程错误提示
+            // 提车里程
+            MiuixInputListItem(
+                title = "提车里程 (km)",
+                value = initialOdometer,
+                onValueChange = { initialOdometer = it },
+                placeholder = "例如：20",
+                keyboardType = KeyboardType.Decimal
+            )
             if (initialOdometer.isNotBlank() && (parsedOdometer == null || parsedOdometer < 0.0)) {
                 Text(
                     text = "提车里程不能为负数",
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     color = MiuixTheme.colorScheme.error,
-                    modifier = Modifier.padding(start = 20.dp, top = 4.dp, bottom = 8.dp)
+                    modifier = Modifier.padding(start = 20.dp, bottom = 12.dp)
                 )
             }
         }
@@ -433,4 +461,96 @@ private fun MiuixDateWheelPickerBottomSheet(
             WheelList(selectedValue = day, items = (1..maxDays).toList(), itemLabel = { "${it}日" }, modifier = Modifier.weight(1f), style = WheelStyle.Plain, onChange = { day = it })
         }
     }
+}
+@Composable
+private fun MiuixListItem(
+    title: String,
+    value: String,
+    showArrow: Boolean = true,
+    trailingContent: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit // 👈 onClick 放最后，支持尾随 Lambda 语法
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, fontSize = 16.sp, color = MiuixTheme.colorScheme.onSurface)
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = value,
+            fontSize = 16.sp,
+            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 16.dp)
+        )
+        if (trailingContent != null) {
+            trailingContent()
+        } else if (showArrow) {
+            Spacer(modifier = Modifier.width(6.dp))
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+    // MIUI 标志性分割线：极细 + 左侧缩进
+    HorizontalDivider(
+        color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+        thickness = 0.5.dp,
+        modifier = Modifier.padding(start = 20.dp)
+    )
+}
+
+@Composable
+private fun MiuixInputListItem(
+    title: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    keyboardType: KeyboardType = KeyboardType.Text
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, fontSize = 16.sp, color = MiuixTheme.colorScheme.onSurface)
+        Spacer(modifier = Modifier.weight(1f))
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = TextStyle(
+                fontSize = 16.sp,
+                color = MiuixTheme.colorScheme.onSurface,
+                textAlign = TextAlign.End
+            ),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            modifier = Modifier.fillMaxWidth(0.6f),
+            singleLine = true,
+            decorationBox = { innerTextField ->
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        fontSize = 16.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.End
+                    )
+                }
+                innerTextField()
+            }
+        )
+    }
+    HorizontalDivider(
+        color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+        thickness = 0.5.dp,
+        modifier = Modifier.padding(start = 20.dp)
+    )
 }

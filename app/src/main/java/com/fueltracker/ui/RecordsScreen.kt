@@ -45,10 +45,7 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
 import com.fueltracker.ui.components.LazyColumnScrollbar
-import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
-import com.fueltracker.ui.miuix.navigation.NavigationContentRegion
 import com.fueltracker.ui.miuix.dialogs.MiuixBottomSheetWrapper
-import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
 import com.fueltracker.ui.components.scrollToHideFab
@@ -155,8 +152,7 @@ fun RecordsScreen(
             if (displayRecords.isEmpty()) {
                 item(key = "empty_state") { EmptyRecordsState(modifier = Modifier.fillMaxWidth().height(300.dp)) }
             } else {
-                items(displayRecords, key = { it.id }) { record ->
-                    NavigationContentRegion(navigationBackdropDetector, "records_${record.id}") {
+                items(displayRecords, key = { it.id }) {
                         FuelRecordCard(
                             record = record,
                             calculationResult = consumptionMap[record.id],

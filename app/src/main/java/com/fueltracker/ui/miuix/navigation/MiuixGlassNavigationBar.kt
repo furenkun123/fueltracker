@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,15 +25,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,34 +39,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.shadow.Shadow as ComposeShadow
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.vibrancy
-import com.kyant.backdrop.shadow.Shadow as BackdropShadow
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import androidx.compose.ui.graphics.shadow.Shadow as ComposeShadow
+import com.kyant.backdrop.shadow.Shadow as BackdropShadow
 
 @Composable
 fun MiuixGlassNavigationBar(
@@ -78,7 +77,6 @@ fun MiuixGlassNavigationBar(
     selectedIndex: Int = 0,
     onSelectedIndexChange: (Int) -> Unit,
     itemCount: Int = 3,
-    navigationBackdropDetector: NavigationBackdropDetector,
     content: @Composable RowScope.() -> Unit
 ) {
     val density = LocalDensity.current
@@ -141,25 +139,11 @@ fun MiuixGlassNavigationBar(
                             24.dp.toPx()
                         }
 
-                        navigationBackdropDetector.updateNavigation(
-                            bounds = coordinates.boundsInWindow(),
-                            marginPx = marginPx
-                        )
+
                     }
                 }
         ) {
-            NavigationBarSurface(
-                backdrop = backdrop,
-                shape = shape,
-                isLight = isLight,
-                isGlassEnabled = isGlassEnabled,
-                isFloating = isFloating,
-                navigationBackdropDetector = navigationBackdropDetector,
-                selectedIndex = selectedIndex,
-                onSelectedIndexChange = onSelectedIndexChange,
-                itemCount = itemCount,
-                content = content
-            )
+
         }
     }
 }
@@ -174,7 +158,6 @@ private fun NavigationBarSurface(
     selectedIndex: Int,
     onSelectedIndexChange: (Int) -> Unit,
     itemCount: Int,
-    navigationBackdropDetector: NavigationBackdropDetector,
     content: @Composable RowScope.() -> Unit
 ) {
     // 浅色模式也使用主题 surface，而不是纯白，缩小玻璃与实色材质的色差。
@@ -183,7 +166,6 @@ private fun NavigationBarSurface(
     // 悬浮导航栏保持稳定的玻璃材质，不再随内容检测在玻璃与实色之间切换。
     val shouldUseGlass = isGlassEnabled && isFloating
 
-    // 使用无过冲的阻尼弹簧，让玻璃与纯色材质缓慢、连续地互相过渡。
     // 相比固定时长 tween，检测状态在滚动中反复变化时也能平滑改变方向。
     val glassProgress by animateFloatAsState(
         targetValue = if (shouldUseGlass) 1f else 0f,

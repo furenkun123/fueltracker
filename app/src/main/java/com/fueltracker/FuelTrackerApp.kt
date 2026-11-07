@@ -39,7 +39,6 @@ import com.fueltracker.ui.VehicleScreen
 import com.fueltracker.ui.miuix.dialogs.MiuixPrivacyDialog
 import com.fueltracker.ui.miuix.dialogs.MiuixUpdateLogDialog
 import com.fueltracker.ui.miuix.navigation.MiuixAppNavigationBar
-import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
 import com.fueltracker.ui.miuix.navigation.AppNavItem
 import com.fueltracker.ui.miuix.MiuixTopBar
 import com.fueltracker.ui.miuix.MiuixTopBarIconButton
@@ -60,9 +59,6 @@ fun FuelTrackerApp(
     }
 
     val appBackdrop = rememberLayerBackdrop()
-    val navigationBackdropDetector = remember {
-        NavigationBackdropDetector()
-    }
 
     // ---------- 启动弹窗 ----------
     val startState = remember {
@@ -202,7 +198,6 @@ fun FuelTrackerApp(
                                     records = records,
                                     latestConsumption = latest,
                                     activeParking = activeParking,
-                                    navigationBackdropDetector = navigationBackdropDetector,
 
                                     onAddVehicle = {
                                         viewModel.navigateToAddVehicle(HOME)
@@ -242,7 +237,6 @@ fun FuelTrackerApp(
                             RECORDS -> {
                                 RecordsScreen(
                                     viewModel = viewModel,
-                                    navigationBackdropDetector = navigationBackdropDetector,
                                     onEdit = { record ->
                                         viewModel.editFuel(
                                             record,
@@ -256,7 +250,6 @@ fun FuelTrackerApp(
                             EXPENSES -> {
                                 ExpenseScreen(
                                     viewModel = viewModel,
-                                    navigationBackdropDetector = navigationBackdropDetector,
                                     selectedCategory = expenseSelectedCategory,
 
                                     onSelectedCategoryChange = {
@@ -529,7 +522,6 @@ fun FuelTrackerApp(
                         viewModel.navigateTo(targetScreen)
                     }
                 },
-                navigationBackdropDetector = navigationBackdropDetector,
                 items = listOf(
                     AppNavItem(Icons.Default.Home, "首页"),
                     AppNavItem(Icons.Default.LocalGasStation, "记录"),
