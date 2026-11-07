@@ -17,7 +17,7 @@ fun MiuixNavigationBar(
     isFloating: Boolean = true,
     selectedIndex: Int = 0,
     onSelectedIndexChange: (Int) -> Unit,
-    items: List<MiuixNavItem>
+    items: List<AppNavItem>
 ) {
     Box(
         modifier = modifier.fillMaxWidth()
