@@ -171,7 +171,7 @@ object FuelCalculator {
         val hasValidAnchor: Boolean
     )
 
-    private data class AnchorInfo(val index: Int, val odometer: Double, val isEstimated: Boolean)
+    private data class AnchorInfo(val index: Int, val odometer: Double)
     private data class WeightedValue(val value: Double, val weight: Double)
     private data class RobustBounds(val median: Double, val mad: Double, val lower: Double, val upper: Double)
 
@@ -373,21 +373,15 @@ object FuelCalculator {
         }
 
         val nextValidIndex = IntArray(visibleRecords.size) { -1 }
-        val priorValidOdometer = BooleanArray(visibleRecords.size)
         var nextIndex = -1
-        var hasPriorOdometer = false
-        for (i in visibleRecords.indices) {
-            priorValidOdometer[i] = hasPriorOdometer
-            if (validOdometer(visibleRecords[i]) != null) hasPriorOdometer = true
-        }
         for (i in visibleRecords.indices.reversed()) {
             nextValidIndex[i] = nextIndex
             if (validOdometer(visibleRecords[i]) != null) nextIndex = i
         }
 
-        // 初始里程统一来自初始 FuelRecord，不再从 Vehicle 读取备用里程。
+        // 只有真实加油记录中的有效里程才能作为加油锚点；初始化里程只用于计算起始区间。
         val firstAnchor = findFirstAnchor(
-            visibleRecords, nextValidIndex, priorValidOdometer, tankCapacity, initialOdo
+            visibleRecords, nextValidIndex, tankCapacity
         ) ?: run {
             val rejected = HashMap<Int, String>()
             visibleRecords.forEachIndexed { index, record -> if (record.isFull) rejected[index] = REASON_NO_ANCHOR }
@@ -863,24 +857,19 @@ object FuelCalculator {
     private fun closer(value: Double, a: Double, b: Double): Boolean = abs(value - a) + ODOMETER_MATCH_TOLERANCE < abs(value - b)
 
     private fun findFirstAnchor(
-        records: List<FuelRecord>, nextValidIndexArray: IntArray, hasPriorValidOdometer: BooleanArray,
-        tankCapacity: Double?, configuredInitialOdometer: Double?
+        records: List<FuelRecord>,
+        nextValidIndexArray: IntArray,
+        tankCapacity: Double?
     ): AnchorInfo? {
         for (index in records.indices) {
             val record = records[index]
             if (!isSuitableAsAnchor(record, tankCapacity)) continue
-            val odometer = validOdometer(record)
-            if (odometer != null) {
-                if (isIsolatedHighValue(records, nextValidIndexArray, index, odometer)) continue
-                return AnchorInfo(index, odometer, false)
-            }
 
-            if (configuredInitialOdometer == null || hasPriorValidOdometer[index]) continue
-            val nextIndex = nextValidIndexArray[index]
-            val next = if (nextIndex >= 0) validOdometer(records[nextIndex]) else null
-            if (next != null && configuredInitialOdometer >= next) continue
-            if (isIsolatedHighValue(records, nextValidIndexArray, index, configuredInitialOdometer)) continue
-            return AnchorInfo(index, configuredInitialOdometer, true)
+            // 不能把车辆初始化时的里程冒充为某条缺少里程的加油记录里程。
+            val odometer = validOdometer(record) ?: continue
+            if (isIsolatedHighValue(records, nextValidIndexArray, index, odometer)) continue
+
+            return AnchorInfo(index, odometer)
         }
         return null
     }
