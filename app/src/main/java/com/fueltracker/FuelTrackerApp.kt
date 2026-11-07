@@ -39,7 +39,7 @@ import com.fueltracker.ui.VehicleScreen
 import com.fueltracker.ui.miuix.MiuixPrivacyDialog
 import com.fueltracker.ui.miuix.MiuixUpdateLogDialog
 import com.fueltracker.ui.miuix.MiuixAppNavigationBar
-import com.fueltracker.ui.miuix.MiuixNavItem
+import com.fueltracker.ui.miuix.AppNavItem
 import com.fueltracker.ui.miuix.MiuixTopBar
 import com.fueltracker.ui.miuix.MiuixTopBarIconButton
 import com.fueltracker.util.UpdateLogManager
@@ -524,9 +524,9 @@ fun FuelTrackerApp(
                     }
                 },
                 items = listOf(
-                    MiuixNavItem(Icons.Default.Home, "首页"),
-                    MiuixNavItem(Icons.Default.LocalGasStation, "记录"),
-                    MiuixNavItem(Icons.Default.Receipt, "费用")
+                    AppNavItem(Icons.Default.Home, "首页"),
+                    AppNavItem(Icons.Default.LocalGasStation, "记录"),
+                    AppNavItem(Icons.Default.Receipt, "费用")
                 )
             )
         }
