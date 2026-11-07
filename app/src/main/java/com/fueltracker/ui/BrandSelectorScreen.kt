@@ -194,12 +194,11 @@ fun BrandSelectorScreen(
                         } else {
                             filteredBrands.forEach { (letter, brands) ->
                                 // 👇 字母头
-                                stickyHeader(key = letter) {
+                                item(key = "letter_$letter") {
                                     Box(
                                         Modifier
                                             .fillMaxWidth()
                                             .background(MiuixTheme.colorScheme.background)
-                                            // 👈 强制左边缘为 20dp，上下留出合适的空隙
                                             .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp)
                                     ) {
                                         Text(
