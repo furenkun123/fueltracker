@@ -36,8 +36,8 @@ import com.fueltracker.ui.ParkingScreen
 import com.fueltracker.ui.RecordsScreen
 import com.fueltracker.ui.SettingsScreen
 import com.fueltracker.ui.VehicleScreen
-import com.fueltracker.ui.miuix.MiuixPrivacyDialog
-import com.fueltracker.ui.miuix.MiuixUpdateLogDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixPrivacyDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixUpdateLogDialog
 import com.fueltracker.ui.miuix.MiuixAppNavigationBar
 import com.fueltracker.ui.miuix.AppNavItem
 import com.fueltracker.ui.miuix.MiuixTopBar
