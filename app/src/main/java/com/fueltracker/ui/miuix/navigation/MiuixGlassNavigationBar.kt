@@ -180,9 +180,8 @@ private fun NavigationBarSurface(
     // 浅色模式也使用主题 surface，而不是纯白，缩小玻璃与实色材质的色差。
     val solidColor = MiuixTheme.colorScheme.surface
 
-    val shouldUseGlass = isGlassEnabled &&
-            isFloating &&
-            navigationBackdropDetector.hasNearbyContent
+    // 悬浮导航栏保持稳定的玻璃材质，不再随内容检测在玻璃与实色之间切换。
+    val shouldUseGlass = isGlassEnabled && isFloating
 
     // 使用无过冲的阻尼弹簧，让玻璃与纯色材质缓慢、连续地互相过渡。
     // 相比固定时长 tween，检测状态在滚动中反复变化时也能平滑改变方向。
@@ -200,10 +199,12 @@ private fun NavigationBarSurface(
             .fillMaxWidth()
             .clip(shape)
             .then(
-                if (isFloating && !isLight) {
+                if (isFloating) {
                     Modifier.border(
-                        width = 1.dp,
-                        color = MiuixTheme.colorScheme.outline.copy(alpha = 0.84f),
+                        width = 0.6.dp,
+                        color = Color.White.copy(
+                            alpha = if (isLight) 0.34f else 0.16f
+                        ),
                         shape = shape
                     )
                 } else {
