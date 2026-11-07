@@ -141,7 +141,7 @@ fun VehicleScreen(
     LaunchedEffect(fuelType) {
         if (fuelType == "纯电动") {
             fuelGrade = ""
-        } else if (fuelGrade.isNotBlank() && fuelGrade !in currentFuelGradeOptions) {
+        } else if (fuelGrade.isBlank() || fuelGrade !in currentFuelGradeOptions) {
             fuelGrade = if (fuelType == "柴油") "0# 柴油" else "95#"
         }
     }
@@ -169,7 +169,9 @@ fun VehicleScreen(
                     if (fuelUnit == "L") parsedFuel <= parsedCapacity else parsedFuel <= 100.0
             )
 
-    val canSave = brand.isNotBlank() && model.isNotBlank() && isCapacityValid && isOdometerValid && isFuelValid
+    val isFuelGradeValid = fuelType == "纯电动" || fuelGrade.isNotBlank()
+    val canSave = brand.isNotBlank() && model.isNotBlank() && fuelType.isNotBlank() &&
+            isFuelGradeValid && isCapacityValid && isOdometerValid && isFuelValid
 
     if (showCarPicker) {
         BackHandler { showCarPicker = false }
