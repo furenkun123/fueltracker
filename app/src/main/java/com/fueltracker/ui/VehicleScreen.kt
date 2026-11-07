@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CarBrand
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.data.Vehicle
-import com.fueltracker.ui.miuix.MiuixBottomSheetWrapper
+import com.fueltracker.ui.miuix.dialogs.MiuixBottomSheetWrapper
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
 import com.fueltracker.ui.miuix.MiuixBackButton
