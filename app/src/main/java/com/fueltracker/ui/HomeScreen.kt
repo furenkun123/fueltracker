@@ -67,8 +67,6 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
-import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
-import com.fueltracker.ui.miuix.navigation.NavigationContentRegion
 import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
 import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
 import com.fueltracker.ui.components.scrollToHideFab
@@ -98,7 +96,6 @@ fun HomeScreen(
     vehicle: Vehicle?,
     records: List<FuelRecord>,
     latestConsumption: Double? = null,
-    navigationBackdropDetector: NavigationBackdropDetector,
     activeParking: ExpenseRecord? = null,
     onAddVehicle: () -> Unit,
     onAddFuel: () -> Unit,
@@ -226,39 +223,26 @@ fun HomeScreen(
 
             if (vehicle == null) {
                 item {
-                    NavigationContentRegion(navigationBackdropDetector, "home_empty_vehicle") {
-                        EmptyVehicleCard(onAddVehicle)
-                    }
+                    EmptyVehicleCard(onAddVehicle)
                 }
             } else {
                 item {
-                    NavigationContentRegion(
-                        detector = navigationBackdropDetector,
-                        key = "home_vehicle"
-                    ) {
-                        MiuixVehicleCard(vehicle)
-                    }
+                    MiuixVehicleCard(vehicle)
                 }
 
                 if (activeParking != null) {
                     item(key = "active_parking_${activeParking.id}") {
-                        NavigationContentRegion(navigationBackdropDetector, "home_parking_${activeParking.id}") {
-                            ActiveParkingCard(
+                        ActiveParkingCard(
                                 parking = activeParking,
                                 onClick = { onEditParking(activeParking) },
                                 onClear = onClearParking,
                                 onIgnore = onIgnoreParking
                             )
-                        }
                     }
                 }
 
                 item {
-                    NavigationContentRegion(
-                        detector = navigationBackdropDetector,
-                        key = "home_consumption"
-                    ) {
-                        ConsumptionCard(
+                    ConsumptionCard(
                             latestConsumption = resolvedLatestConsumption,
                             summary = statsSummary,
                             selectedRange = selectedRange,
@@ -267,14 +251,11 @@ fun HomeScreen(
                             onRangeSelected = { selectedRange = it },
                             onCustomMonthClick = { showYearMonthPicker = true }
                         )
-                    }
                 }
 
                 if (costData.size >= 2) {
                     item {
-                        NavigationContentRegion(navigationBackdropDetector, "home_chart") {
-                            ChartCard(points = costData)
-                        }
+                        ChartCard(points = costData)
                     }
                 }
 
@@ -290,15 +271,11 @@ fun HomeScreen(
 
                 if (recentRecords.isEmpty()) {
                     item {
-                        NavigationContentRegion(navigationBackdropDetector, "home_empty_records") {
-                            EmptyRecordCard()
-                        }
+                        EmptyRecordCard()
                     }
                 } else {
                     items(recentRecords, key = { it.id }) { record ->
-                        NavigationContentRegion(navigationBackdropDetector, "home_record_${record.id}") {
-                            HomeFuelRecordItem(record)
-                        }
+                        HomeFuelRecordItem(record)
                     }
                 }
             }
