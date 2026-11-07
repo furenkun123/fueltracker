@@ -96,10 +96,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.fueltracker.BuildConfig
 import com.fueltracker.data.Vehicle
-import com.fueltracker.ui.miuix.MiuixInstructionsDialog
-import com.fueltracker.ui.miuix.MiuixConfirmDialog
-import com.fueltracker.ui.miuix.MiuixPrivacyDialog
-import com.fueltracker.ui.miuix.MiuixUpdateHistoryDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixInstructionsDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixPrivacyDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixUpdateHistoryDialog
 import com.fueltracker.ui.miuix.MiuixBackButton
 import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixSwitch
