@@ -2,7 +2,11 @@ package com.fueltracker.ui
 
 import android.R.attr.subtitle
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -31,6 +36,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -123,6 +129,7 @@ private fun <T> PickerListScreen(
     var loadError by remember { mutableStateOf<String?>(null) }
     var all by remember { mutableStateOf<List<T>>(emptyList()) }
     var search by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
 
     LaunchedEffect(loadKey) {
         loading = true; loadError = null; search = ""; all = emptyList()
@@ -151,9 +158,9 @@ private fun <T> PickerListScreen(
 
     PickerScaffold(
         title, onBack, search, { search = it },
-        searchPlaceholder, loading, loadError, showSearch, onSearchAction
+        searchPlaceholder, loading, loadError, showSearch, onSearchAction, listState
     ) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             if (!showSearch) {
                 item(key = "manual_header") {
                     ManualInputCard(manualTitle, manualPlaceholder, loadKey, onManualInput)
@@ -193,6 +200,7 @@ private fun PickerScaffold(
     errorMessage: String?,
     showSearch: Boolean,
     onSearchAction: () -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState,
     content: @Composable () -> Unit
 ) {
     Column(
@@ -202,20 +210,26 @@ private fun PickerScaffold(
             .statusBarsPadding()
             .imePadding()
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            MiuixBackButton(onClick = onBack)
-            Spacer(Modifier.width(12.dp))
-
-            Text(
-                text = title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MiuixTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
+        val showTitle by remember(listState) {
+            derivedStateOf {
+                listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+            }
+        }
+        AnimatedVisibility(visible = showTitle, enter = fadeIn(), exit = fadeOut()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MiuixBackButton(onClick = onBack)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+            }
         }
 
         if (showSearch) {
@@ -304,8 +318,18 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
 private fun PickerSearchBox(value: String, onValueChange: (String) -> Unit, placeholder: String, onSearchAction: () -> Unit) {
     val keyboard = LocalSoftwareKeyboardController.current
     val bg = MiuixTheme.colorScheme.surfaceVariant
+    val borderColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f)
 
-    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(42.dp).clip(RoundedCornerShape(21.dp)).background(bg).padding(horizontal = 12.dp)) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .height(42.dp)
+            .clip(RoundedCornerShape(21.dp))
+            .background(bg)
+            .border(0.6.dp, borderColor, RoundedCornerShape(21.dp))
+            .padding(horizontal = 12.dp)
+    ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Search, null, tint = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
