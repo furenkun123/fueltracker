@@ -58,15 +58,9 @@ object BackupManager {
         }
 
         vehicles.forEach { vehicle ->
-            // 👇 修复：保留完整的校验逻辑和右大括号
-            if (vehicle.fuelType != "纯电动") {
-                require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
-                    "数据库存在油箱容量非正数的燃油车，无法备份"
-                }
-            } else {
-                require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity >= 0.0) {
-                    "数据库存在容量非法的纯电动车，无法备份"
-                }
+            require(vehicle.fuelType != "纯电动") { "备份包含当前版本不支持的纯电动车辆" }
+            require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
+                "数据库存在油箱容量非正数的车辆，无法备份"
             }
         }
 
@@ -79,11 +73,9 @@ object BackupManager {
             val owner = vehiclesById[vehicleId] ?: throw IllegalStateException("初始化记录引用了不存在的车辆")
             val initial = initialRecords.single()
             require(initial.odometer != null) { "数据库中的车辆初始化记录缺少当前里程，无法备份" }
-            if (owner.fuelType != "纯电动") {
-                val initialFuel = initial.initialFuel ?: initial.remainingFuel
-                require(initialFuel != null && initialFuel <= owner.tankCapacity + 1e-6) {
-                    "数据库中的车辆初始化油量缺失或超过油箱容量，无法备份"
-                }
+            val initialFuel = initial.initialFuel ?: initial.remainingFuel
+            require(initialFuel != null && initialFuel <= owner.tankCapacity + 1e-6) {
+                "数据库中的车辆初始化油量缺失或超过油箱容量，无法备份"
             }
         }
         require(vehicles.all { initialRecordsByVehicle.containsKey(it.id) }) {
@@ -292,12 +284,8 @@ object BackupManager {
                 }
                 val fuelType = json.requireString("fuelType")
 
-                // 👇 修复：只保留这个 if-else 校验，彻底删掉后面的 require(tankCapacity > 0)
-                if (fuelType != "纯电动") {
-                    require(tankCapacity.isFinite() && tankCapacity > 0.0) { "燃油车油箱容量必须大于 0" }
-                } else {
-                    require(tankCapacity.isFinite() && tankCapacity >= 0.0) { "纯电动车容量不能为负数" }
-                }
+                require(fuelType != "纯电动") { "备份包含当前版本不支持的纯电动车辆" }
+                require(tankCapacity.isFinite() && tankCapacity > 0.0) { "油箱容量必须大于 0" }
 
                 if (id <= 0L) throw IllegalArgumentException("车辆 ID 非法")
                 vehicles.add(
@@ -412,7 +400,7 @@ object BackupManager {
                 val existingIndex = records.indexOfFirst {
                     it.vehicleId == vehicle.id && it.isInitialRecord
                 }
-                val legacyFuel = if (vehicle.fuelType == "纯电动") null else legacy.fuel
+                val legacyFuel = legacy.fuel
 
                 if (existingIndex >= 0) {
                     val existing = records[existingIndex]
@@ -459,11 +447,9 @@ object BackupManager {
                 val owner = vehiclesById[vehicleId] ?: throw IllegalArgumentException("初始化记录引用了不存在的车辆")
                 val initial = initialRecords.single()
                 require(initial.odometer != null) { "车辆初始化记录缺少当前里程" }
-                if (owner.fuelType != "纯电动") {
-                    val initialFuel = initial.initialFuel ?: initial.remainingFuel
-                    require(initialFuel != null) { "燃油车辆初始化记录缺少当前剩余油量" }
-                    require(initialFuel <= owner.tankCapacity + 1e-6) { "车辆初始化油量超过油箱容量" }
-                }
+                val initialFuel = initial.initialFuel ?: initial.remainingFuel
+                require(initialFuel != null) { "车辆初始化记录缺少当前剩余油量" }
+                require(initialFuel <= owner.tankCapacity + 1e-6) { "车辆初始化油量超过油箱容量" }
             }
             require(vehicles.all { initialRecordsByVehicle.containsKey(it.id) }) {
                 "备份文件损坏：有车辆缺少初始化记录"
