@@ -204,7 +204,9 @@ fun ExpenseScreen(
             if (isEmpty) {
                 item(key = "empty_state") {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -215,75 +217,95 @@ fun ExpenseScreen(
                     }
                 }
             } else {
-                item("summary")  {
-                        SummaryCard(summary, selectedRange, rangeLabel, { selectedRange = it }, { showYearMonthPicker = true })
-                    }
+                item(key = "summary") {
+                    SummaryCard(
+                        summary,
+                        selectedRange,
+                        rangeLabel,
+                        { selectedRange = it },
+                        { showYearMonthPicker = true }
+                    )
                 }
+
                 if (trendYears.isNotEmpty()) {
-                    item("trend")
-                    {
-                            ExpenseTrendCard(
-                                points = monthTrend,
-                                years = trendYears,
-                                selectedYear = selectedTrendYear,
-                                onYearSelected = { selectedTrendYear = it }
-                            )
-                        }
+                    item(key = "trend") {
+                        ExpenseTrendCard(
+                            points = monthTrend,
+                            years = trendYears,
+                            selectedYear = selectedTrendYear,
+                            onYearSelected = { selectedTrendYear = it }
+                        )
                     }
                 }
+
                 if (structureItems.isNotEmpty()) {
-                    item("structure")  {
-                            ExpenseStructureCard(structureItems, selectedCategory) { cat ->
-                                onSelectedCategoryChange(if (selectedCategory == cat) null else cat)
-                            }
-                        }
-                    }
-                }
-
-                item("list_header") {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (selectedCategory == null) "明细" else "明细 · $selectedCategory", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MiuixTheme.colorScheme.onSurfaceSecondary)
-                        if (selectedCategory != null) {
-                            Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable { onSelectedCategoryChange(null) }.padding(8.dp)) {
-                                Text("清除", fontSize = 12.sp, color = MiuixTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                }
-
-                if (filteredItems.isEmpty()) {
-                    item("list_empty") {
-                        MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                            Text("该范围内没有记录", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.padding(20.dp))
-                        }
-                    }
-                } else {
-                    items(
-                        items = filteredItems,
-                        key = { item ->
-                            when (item) {
-                                is ExpenseListItem.Fuel -> "fuel_${item.id}"
-                                is ExpenseListItem.Expense -> "expense_${item.id}"
-                            }
-                        }
-                    ) { item ->
-                        val regionKey = when (item) {
-                            is ExpenseListItem.Fuel -> "expenses_fuel_${item.id}"
-                            is ExpenseListItem.Expense -> "expenses_item_${item.id}"
-                        }
-                        {
-                            ExpenseDetailItemCard(
-                                title = item.title,
-                                time = item.timestamp.toDateTimeText(),
-                                amount = item.amount,
-                                onEdit = {
-                                    if (item is ExpenseListItem.Fuel) onEditFuel(item.record)
-                                    else onEditExpense((item as ExpenseListItem.Expense).record)
-                                }
+                    item(key = "structure") {
+                        ExpenseStructureCard(structureItems, selectedCategory) { category ->
+                            onSelectedCategoryChange(
+                                if (selectedCategory == category) null else category
                             )
                         }
-
                     }
+                }
+            }
+
+            item(key = "list_header") {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (selectedCategory == null) "明细" else "明细 · $selectedCategory",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    )
+                    if (selectedCategory != null) {
+                        Box(
+                            Modifier.clip(RoundedCornerShape(8.dp))
+                                .clickable { onSelectedCategoryChange(null) }
+                                .padding(8.dp)
+                        ) {
+                            Text("清除", fontSize = 12.sp, color = MiuixTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
+
+            if (filteredItems.isEmpty()) {
+                item(key = "list_empty") {
+                    MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                        Text(
+                            "该范围内没有记录",
+                            fontSize = 13.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                            modifier = Modifier.padding(20.dp)
+                        )
+                    }
+                }
+            } else {
+                items(
+                    items = filteredItems,
+                    key = { item ->
+                        when (item) {
+                            is ExpenseListItem.Fuel -> "fuel_\${item.id}"
+                            is ExpenseListItem.Expense -> "expense_\${item.id}"
+                        }
+                    }
+                ) { item ->
+                    ExpenseDetailItemCard(
+                        title = item.title,
+                        time = item.timestamp.toDateTimeText(),
+                        amount = item.amount,
+                        onEdit = {
+                            if (item is ExpenseListItem.Fuel) {
+                                onEditFuel(item.record)
+                            } else {
+                                onEditExpense((item as ExpenseListItem.Expense).record)
+                            }
+                        }
+                    )
                 }
             }
         }
