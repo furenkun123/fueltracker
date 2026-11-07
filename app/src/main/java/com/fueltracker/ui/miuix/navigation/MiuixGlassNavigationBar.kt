@@ -791,23 +791,22 @@ private fun Modifier.drawGlassSelectionPill(
     backdrop: Backdrop,
     isLight: Boolean
 ): Modifier {
+    val pillShape = RoundedCornerShape(
+        MiuixGlassDefaults.Navigation.pillCornerRadius
+    )
+
     return drawBackdrop(
         backdrop = backdrop,
 
-        shape = {
-            RoundedCornerShape(
-                MiuixGlassDefaults.Navigation.pillCornerRadius
-            )
-        },
+        shape = { pillShape },
 
         effects = {
-            // 提高模糊强度，让选中胶囊呈现更明显的细腻磨砂感。
-            blur(2.4.dp.toPx())
+            // 以磨砂为主，弱化折射，避免选中项内部的背景文字仍然过于清晰。
+            blur(3.2.dp.toPx())
 
-            // 保留轻微折射，避免磨砂层看起来像完全不透明的色块。
             lens(
-                refractionHeight = 8.dp.toPx(),
-                refractionAmount = 8.dp.toPx(),
+                refractionHeight = 6.dp.toPx(),
+                refractionAmount = 5.dp.toPx(),
                 depthEffect = false,
                 chromaticAberration = false
             )
@@ -816,16 +815,26 @@ private fun Modifier.drawGlassSelectionPill(
         highlight = null,
 
         shadow = {
-            BackdropShadow.Default.copy(alpha = 0.12f)
+            BackdropShadow.Default.copy(alpha = if (isLight) 0.20f else 0.24f)
         },
 
         onDrawSurface = {
-            drawRect(
-                Color.White.copy(
-                    // 提高表面雾化层的覆盖度，让选中项与底栏背景更容易区分。
-                    alpha = if (isLight) 0.40f else 0.20f
-                )
-            )
+            // 底栏本身接近白色，单纯叠加白色只会让胶囊与底栏融在一起。
+            // 改用低饱和灰蓝雾面，让选中区域形成明确但不突兀的明度差。
+            val frostColor = if (isLight) {
+                Color(0xFFDDE3EC).copy(alpha = 0.66f)
+            } else {
+                Color(0xFF626A78).copy(alpha = 0.38f)
+            }
+            drawRect(frostColor)
         }
+    ).border(
+        width = 0.8.dp,
+        color = if (isLight) {
+            Color.White.copy(alpha = 0.92f)
+        } else {
+            Color.White.copy(alpha = 0.22f)
+        },
+        shape = pillShape
     )
 }
