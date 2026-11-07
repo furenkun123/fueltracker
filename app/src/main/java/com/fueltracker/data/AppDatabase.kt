@@ -137,10 +137,23 @@ abstract class AppDatabase : RoomDatabase() {
                     SELECT
                         v.id,
                         CASE
-                            WHEN v.deliveryDate IS NOT NULL AND v.deliveryDate > 0 THEN v.deliveryDate
-                            WHEN (SELECT MIN(timestamp) FROM fuel_records WHERE vehicleId = v.id) IS NOT NULL
-                                THEN MAX(1, (SELECT MIN(timestamp) - 1 FROM fuel_records WHERE vehicleId = v.id))
-                            ELSE CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                            WHEN (
+                                SELECT MIN(timestamp)
+                                FROM fuel_records
+                                WHERE vehicleId = v.id
+                                  AND (v.deliveryDate IS NULL OR timestamp >= v.deliveryDate)
+                            ) IS NOT NULL
+                            THEN MAX(
+                                COALESCE(NULLIF(v.deliveryDate, 0), 1),
+                                (SELECT MIN(timestamp) - 1
+                                 FROM fuel_records
+                                 WHERE vehicleId = v.id
+                                   AND (v.deliveryDate IS NULL OR timestamp >= v.deliveryDate))
+                            )
+                            ELSE MAX(
+                                COALESCE(NULLIF(v.deliveryDate, 0), 1),
+                                CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                            )
                         END,
                         v.fuelGrade,
                         v.initialOdometer,
