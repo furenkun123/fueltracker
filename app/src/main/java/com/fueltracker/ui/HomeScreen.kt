@@ -77,8 +77,6 @@ import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixFilterChip
 import com.fueltracker.ui.miuix.MiuixTextButton
 import com.fueltracker.ui.components.MiuixVehicleCard
-import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
-import com.fueltracker.ui.miuix.navigation.NavigationContentRegion
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.StatisticsSummary
