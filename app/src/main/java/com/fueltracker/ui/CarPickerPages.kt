@@ -195,7 +195,7 @@ private fun PickerScaffold(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MiuixTheme.colorScheme.surface)
+            .background(MiuixTheme.colorScheme.background)
             .statusBarsPadding()
             .imePadding()
     ) {
@@ -253,7 +253,7 @@ private fun PickerScaffold(
 
 @Composable
 private fun PickerItemWrapper(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.surface)) {
+    Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.background)) {
         Box(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp)) { content() }
         // ✅ 替换 M3 的 HorizontalDivider
         Box(Modifier.fillMaxWidth().padding(start = 20.dp).height(0.8.dp).background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f)))
