@@ -45,8 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.fueltracker.data.FuelRecord
-import com.fueltracker.ui.miuix.MiuixConfirmDialog
-import com.fueltracker.ui.miuix.MiuixDatePickerDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixDatePickerDialog
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
 import com.fueltracker.ui.miuix.MiuixBackButton
