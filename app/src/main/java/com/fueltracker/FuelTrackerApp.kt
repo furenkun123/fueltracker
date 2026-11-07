@@ -43,7 +43,6 @@ import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
 import com.fueltracker.ui.miuix.navigation.AppNavItem
 import com.fueltracker.ui.miuix.MiuixTopBar
 import com.fueltracker.ui.miuix.MiuixTopBarIconButton
-import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
 import com.fueltracker.viewmodel.ParkingNotificationState
