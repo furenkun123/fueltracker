@@ -73,7 +73,7 @@ fun NavigationContentRegion(
 
     Box(
         modifier = modifier.onGloballyPositioned { coordinates ->
-            if (coordinates.isAttached && coordinates.isPlaced) {
+            if (coordinates.isAttached) {
                 detector.updateContent(
                     key = key,
                     bounds = coordinates.boundsInWindow()
