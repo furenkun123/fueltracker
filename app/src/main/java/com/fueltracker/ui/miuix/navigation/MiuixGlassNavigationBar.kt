@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.shadow.Shadow as ComposeShadow
 import androidx.compose.ui.platform.LocalDensity
@@ -198,7 +199,6 @@ private fun NavigationBarSurface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(solidColor.copy(alpha = 1f - glassProgress))
             .then(
                 if (isFloating && !isLight) {
                     Modifier.border(
@@ -289,15 +289,17 @@ private fun NavigationBarSurface(
         }
 
 
-        // 第一层：玻璃背景。与纯色底材交叉淡入淡出。
+        // 第一层：始终使用同一张背景表面，通过颜色插值在实色与玻璃态之间连续变化。
+        // 不再叠加两张不同颜色的底层，避免交叉淡入淡出时出现灰白色混合区。
         Box(
             Modifier
                 .matchParentSize()
-                .graphicsLayer { alpha = glassProgress }
                 .drawGlassNavigationBackdrop(
                     backdrop = backdrop,
                     shape = shape,
-                    isLight = isLight
+                    isLight = isLight,
+                    solidColor = solidColor,
+                    glassProgress = glassProgress
                 )
         )
 
@@ -649,7 +651,9 @@ private object MiuixGlassDefaults {
 private fun Modifier.drawGlassNavigationBackdrop(
     backdrop: Backdrop,
     shape: Shape,
-    isLight: Boolean
+    isLight: Boolean,
+    solidColor: Color,
+    glassProgress: Float
 ): Modifier {
     return drawBackdrop(
         backdrop = backdrop,
@@ -659,13 +663,12 @@ private fun Modifier.drawGlassNavigationBackdrop(
             // 保持背景色彩活力
             vibrancy()
 
-            // 不追求过度模糊
-            blur(1.5.dp.toPx())
+            // 模糊与折射跟随同一个进度渐进增强/减弱。
+            blur(1.5.dp.toPx() * glassProgress)
 
-            // 增强玻璃边缘折射
             lens(
-                refractionHeight = 18.dp.toPx(),
-                refractionAmount = 13.dp.toPx(),
+                refractionHeight = 18.dp.toPx() * glassProgress,
+                refractionAmount = 13.dp.toPx() * glassProgress,
                 depthEffect = false,
                 chromaticAberration = false
             )
@@ -677,15 +680,15 @@ private fun Modifier.drawGlassNavigationBackdrop(
         // 外部已经有 Modifier.shadow，避免重复叠加
         shadow = null,
 
-        // 控制玻璃本身的色调
+        // 只绘制一张表面：从主题实色连续插值到半透明玻璃色。
+        // 避免实色底层与玻璃底层交叉叠加造成颜色发灰、发白。
         onDrawSurface = {
-            drawRect(
-                if (isLight) {
-                    Color.White.copy(alpha = 0.15f)
-                } else {
-                    Color(0xFF202028).copy(alpha = 0.07f)
-                }
-            )
+            val glassTint = if (isLight) {
+                Color.White.copy(alpha = 0.15f)
+            } else {
+                Color(0xFF202028).copy(alpha = 0.07f)
+            }
+            drawRect(lerp(solidColor, glassTint, glassProgress.coerceIn(0f, 1f)))
         }
     )
 }
