@@ -180,7 +180,7 @@ private fun <T> PickerListScreen(
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .background(MiuixTheme.colorScheme.background)
+                            .background(lightenPickerBackground(MiuixTheme.colorScheme.background))
                     ) {
                         PickerSearchBox(search, { search = it }, searchPlaceholder, onSearchAction)
                     }
@@ -224,7 +224,7 @@ private fun PickerScaffold(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MiuixTheme.colorScheme.background)
+            .background(lightenPickerBackground(MiuixTheme.colorScheme.background))
             .statusBarsPadding()
             .imePadding()
     ) {
@@ -252,7 +252,7 @@ private fun PickerScaffold(
 
 @Composable
 private fun PickerItemWrapper(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.background)) {
+    Column(Modifier.fillMaxWidth().background(lightenPickerBackground(MiuixTheme.colorScheme.background))) {
         Box(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp)) { content() }
         // ✅ 替换 M3 的 HorizontalDivider
         Box(Modifier.fillMaxWidth().padding(start = 20.dp).height(0.8.dp).background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f)))
@@ -442,4 +442,15 @@ private fun TrimRow(trim: Trim, onClick: () -> Unit) {
             }
         }
     }
+}
+
+/** Slightly lift the picker pages above the search field without changing the search field material. */
+private fun lightenPickerBackground(color: Color): Color {
+    val amount = 0.07f
+    return Color(
+        red = color.red + (1f - color.red) * amount,
+        green = color.green + (1f - color.green) * amount,
+        blue = color.blue + (1f - color.blue) * amount,
+        alpha = color.alpha
+    )
 }
