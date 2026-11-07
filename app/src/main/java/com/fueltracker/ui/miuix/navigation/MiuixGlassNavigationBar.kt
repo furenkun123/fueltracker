@@ -49,7 +49,6 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -79,7 +78,6 @@ fun MiuixGlassNavigationBar(
     itemCount: Int = 3,
     content: @Composable RowScope.() -> Unit
 ) {
-    val density = LocalDensity.current
     val isLight =
         MiuixTheme.colorScheme.background.luminance() > 0.5f
 
@@ -98,15 +96,9 @@ fun MiuixGlassNavigationBar(
     }
 
     val shape: Shape =
-        if (isFloating) {
-            RoundedCornerShape(32.dp)
-        } else {
-            RoundedCornerShape(0.dp)
-        }
+        if (isFloating) RoundedCornerShape(32.dp) else RoundedCornerShape(0.dp)
 
-    Box(
-        modifier = modifier.fillMaxWidth()
-    ) {
+    Box(modifier = modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -114,36 +106,31 @@ fun MiuixGlassNavigationBar(
                     if (isFloating) {
                         Modifier
                             .navigationBarsPadding()
-                            .padding(
-                                horizontal = 24.dp,
-                                vertical = 16.dp
-                            )
+                            .padding(horizontal = 24.dp, vertical = 16.dp)
                     } else {
                         Modifier
                     }
                 )
                 .then(
                     if (isFloating) {
-                        Modifier.dropShadow(
-                            shape = shape,
-                            shadow = floatingShadow
-                        )
+                        Modifier.dropShadow(shape = shape, shadow = floatingShadow)
                     } else {
                         Modifier
                     }
                 )
                 .clip(shape)
-                .onGloballyPositioned { coordinates ->
-                    if (coordinates.isAttached) {
-                        val marginPx = with(density) {
-                            24.dp.toPx()
-                        }
-
-
-                    }
-                }
         ) {
-
+            NavigationBarSurface(
+                backdrop = backdrop,
+                shape = shape,
+                isLight = isLight,
+                isGlassEnabled = isGlassEnabled,
+                isFloating = isFloating,
+                selectedIndex = selectedIndex,
+                onSelectedIndexChange = onSelectedIndexChange,
+                itemCount = itemCount,
+                content = content
+            )
         }
     }
 }
