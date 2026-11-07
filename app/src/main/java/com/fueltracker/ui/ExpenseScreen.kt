@@ -53,8 +53,8 @@ import com.fueltracker.ui.components.ExpenseDetailItemCard
 import com.fueltracker.ui.components.ExpenseStructureCard
 import com.fueltracker.ui.components.ExpenseTrendCard
 import com.fueltracker.ui.components.LazyColumnScrollbar
-import com.fueltracker.ui.miuix.MiuixConfirmDialog
-import com.fueltracker.ui.miuix.MiuixYearMonthSheet
+import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
 import com.fueltracker.ui.components.SummaryCard
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miuix.MiuixCard
