@@ -351,10 +351,12 @@ class MainViewModel(
         viewModelScope.launch {
             val result = try {
                 require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) { "车辆品牌和车型不能为空" }
+                require(vehicle.fuelType.isNotBlank()) { "能源类型不能为空" }
                 require(currentOdometer.isFinite() && currentOdometer >= 0.0) { "当前里程必须是有效的非负数" }
 
                 val isElectric = vehicle.fuelType == "纯电动"
                 if (!isElectric) {
+                    require(vehicle.fuelGrade.isNotBlank()) { "燃油标号不能为空" }
                     require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
                         "油箱容量必须大于 0 的有限数值"
                     }
@@ -425,8 +427,10 @@ class MainViewModel(
             val prev = _currentVehicleOverride.value
             val result = try {
                 require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) { "车辆品牌和车型不能为空" }
+                require(vehicle.fuelType.isNotBlank()) { "能源类型不能为空" }
 
                 if (vehicle.fuelType != "纯电动") {
+                    require(vehicle.fuelGrade.isNotBlank()) { "燃油标号不能为空" }
                     require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0 的有限数值" }
                 }
 
