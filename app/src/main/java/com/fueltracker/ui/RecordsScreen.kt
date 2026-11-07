@@ -151,12 +151,11 @@ fun RecordsScreen(
             } else {
                 items(displayRecords, key = { it.id }) { record ->
                     FuelRecordCard(
-                            record = record,
-                            calculationResult = consumptionMap[record.id],
-                            vehicle = vehicle,
-                            onEdit = { onEdit(record) }
-                        )
-                    }
+                        record = record,
+                        calculationResult = consumptionMap[record.id],
+                        vehicle = vehicle,
+                        onEdit = { onEdit(record) }
+                    )
                 }
             }
         }
