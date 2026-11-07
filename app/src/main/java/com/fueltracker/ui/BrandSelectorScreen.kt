@@ -1,9 +1,6 @@
 package com.fueltracker.ui
 
 import android.util.Log
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
@@ -119,7 +116,7 @@ fun BrandSelectorScreen(
     // 👇 更新索引映射：0.标题 1.搜索框（去掉了手动输入的占位）
     val letterIndexMap = remember(filteredBrands) {
         val map = mutableMapOf<String, Int>()
-        var idx = 1
+        var idx = 2
         filteredBrands.forEach { (letter, brands) ->
             map[letter] = idx
             idx += 1 + brands.size
@@ -133,28 +130,6 @@ fun BrandSelectorScreen(
             .background(MiuixTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        // 标题随列表上滑收起，搜索框保持吸顶可见。
-        val showTitle by remember {
-            derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
-        }
-        AnimatedVisibility(visible = showTitle, enter = fadeIn(), exit = fadeOut()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MiuixBackButton(onClick = onBack)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "选择品牌",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurface
-                )
-            }
-        }
-
         Box(Modifier.weight(1f).fillMaxWidth()) {
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -164,8 +139,26 @@ fun BrandSelectorScreen(
             Row(Modifier.fillMaxSize()) {
                 Column(Modifier.weight(1f)) {
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        // 标题作为列表首项，行为与首页标题一致：随内容自然滚出。
+                        item(key = "brand_title") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                MiuixBackButton(onClick = onBack)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "选择品牌",
+                                    fontSize = 26.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MiuixTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
 
-                        // 2. 搜索框
+                        // 搜索框吸顶，滚动时始终保留在顶部
                         stickyHeader(key = "search_box") {
                             Box(
                                 modifier = Modifier
