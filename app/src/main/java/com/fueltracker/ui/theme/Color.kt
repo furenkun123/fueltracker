@@ -11,7 +11,7 @@ val Blue400 = Color(0xFF4096FF)
 val BackgroundLight = Color(0xFFE5E5EA)
 
 // 👇 2. 卡片颜色：不用纯白，用非常柔和的“米灰白/微霜白”（如 #F8F8FA），去掉了刺眼感
-val SurfaceWhite = Color(0xFFF8F8FA)
+val SurfaceWhite = Color(0xFFF2F2F4)
 
 // 👇 3. 输入框等内嵌背景：比卡片再深一点，形成略微凹陷的视觉
 val SurfaceVariantLight = Color(0xFFE5E5EA)
