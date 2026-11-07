@@ -380,7 +380,6 @@ class MainViewModel(
                             volume = 0.0,
                             actualPaidAmount = 0.0,
                             unitPrice = 0.0,
-                            remainingFuel = currentFuel,
                             isInitialRecord = true,
                             initialFuel = currentFuel,
                             note = "车辆初始记录"
