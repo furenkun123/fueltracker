@@ -14,7 +14,7 @@ fun MiuixAppNavigationBar(
     selectedIndex: Int,
     onSelectedIndexChange: (Int) -> Unit,
     backdrop: Backdrop,
-    items: List<MiuixNavItem>,
+    items: List<AppNavItem>,
     modifier: Modifier = Modifier
 ) {
     if (isFloating) {
