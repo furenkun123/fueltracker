@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ExpenseRecord::class,
         CustomCategoryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -93,8 +93,135 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `custom_categories` " +
-                            "(`name` TEXT NOT NULL, PRIMARY KEY(`name`))"
+                            "(`name` TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY(`name`))"
                 )
+            }
+        }
+
+        /**
+         * v5 → v6：
+         * 1. 将 Vehicle 中的旧初始里程/油量迁移为 FuelRecord 初始化记录；
+         * 2. 移除车辆表中不再使用的官方油耗和初始状态字段；
+         * 3. 将自定义分类主键统一为 NOCASE，修复旧迁移与实体定义不一致的问题。
+         */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 已存在的初始化记录优先保留，只补齐旧 Vehicle 中仍有价值的字段。
+                db.execSQL(
+                    """
+                    UPDATE fuel_records
+                    SET
+                        odometer = COALESCE(
+                            odometer,
+                            (SELECT initialOdometer FROM vehicles WHERE vehicles.id = fuel_records.vehicleId)
+                        ),
+                        initialFuel = COALESCE(
+                            initialFuel,
+                            (SELECT CASE WHEN fuelType = '纯电动' THEN NULL ELSE initialFuel END
+                             FROM vehicles WHERE vehicles.id = fuel_records.vehicleId)
+                        ),
+                        remainingFuel = COALESCE(
+                            remainingFuel,
+                            (SELECT CASE WHEN fuelType = '纯电动' THEN NULL ELSE initialFuel END
+                             FROM vehicles WHERE vehicles.id = fuel_records.vehicleId)
+                        )
+                    WHERE isInitialRecord = 1
+                    """.trimIndent()
+                )
+
+                // 没有初始化记录的旧车辆，按旧字段补建一条；时间尽量放在交车日或首条加油记录之前。
+                db.execSQL(
+                    """
+                    INSERT INTO fuel_records (
+                        vehicleId, timestamp, fuelGrade, odometer, volume,
+                        totalAmount, discount, actualPaidAmount, unitPrice,
+                        remainingFuel, isFull, isInitialRecord, initialFuel,
+                        hasMissedRecord, missedOdometer, missedVolume, note, consumption
+                    )
+                    SELECT
+                        v.id,
+                        CASE
+                            WHEN v.deliveryDate IS NOT NULL AND v.deliveryDate > 0 THEN v.deliveryDate
+                            WHEN (SELECT MIN(timestamp) FROM fuel_records WHERE vehicleId = v.id) IS NOT NULL
+                                THEN MAX(1, (SELECT MIN(timestamp) - 1 FROM fuel_records WHERE vehicleId = v.id))
+                            ELSE CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                        END,
+                        v.fuelGrade,
+                        v.initialOdometer,
+                        0.0,
+                        NULL,
+                        NULL,
+                        0.0,
+                        0.0,
+                        CASE WHEN v.fuelType = '纯电动' THEN NULL ELSE v.initialFuel END,
+                        0,
+                        1,
+                        CASE WHEN v.fuelType = '纯电动' THEN NULL ELSE v.initialFuel END,
+                        0,
+                        NULL,
+                        NULL,
+                        '车辆初始化数据迁移',
+                        NULL
+                    FROM vehicles AS v
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM fuel_records AS f
+                        WHERE f.vehicleId = v.id AND f.isInitialRecord = 1
+                    )
+                    """.trimIndent()
+                )
+
+                // 旧版本创建的分类表可能没有 NOCASE；重建时顺便合并大小写不同的重复项。
+                db.execSQL("DROP TABLE IF EXISTS custom_categories_new")
+                db.execSQL(
+                    """
+                    CREATE TABLE custom_categories_new (
+                        name TEXT NOT NULL COLLATE NOCASE,
+                        PRIMARY KEY(name)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO custom_categories_new(name)
+                    SELECT TRIM(name) FROM custom_categories
+                    ORDER BY name COLLATE NOCASE
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE custom_categories")
+                db.execSQL("ALTER TABLE custom_categories_new RENAME TO custom_categories")
+
+                // Room 旧 SQLite 版本兼容：重建 vehicles，避免依赖 DROP COLUMN。
+                db.execSQL("DROP TABLE IF EXISTS vehicles_new")
+                db.execSQL(
+                    """
+                    CREATE TABLE vehicles_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        brand TEXT NOT NULL,
+                        series TEXT NOT NULL,
+                        model TEXT NOT NULL,
+                        year INTEGER NOT NULL,
+                        tankCapacity REAL NOT NULL,
+                        fuelType TEXT NOT NULL,
+                        fuelGrade TEXT NOT NULL,
+                        deliveryDate INTEGER,
+                        isCurrent INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO vehicles_new (
+                        id, brand, series, model, year, tankCapacity,
+                        fuelType, fuelGrade, deliveryDate, isCurrent
+                    )
+                    SELECT
+                        id, brand, series, model, year, tankCapacity,
+                        fuelType, fuelGrade, deliveryDate, isCurrent
+                    FROM vehicles
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE vehicles")
+                db.execSQL("ALTER TABLE vehicles_new RENAME TO vehicles")
             }
         }
 
@@ -105,7 +232,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "fuel_tracker.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4,MIGRATION_4_5)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                     .also {
                         INSTANCE = it
