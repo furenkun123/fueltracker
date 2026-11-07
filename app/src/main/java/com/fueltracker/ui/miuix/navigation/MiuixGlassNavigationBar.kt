@@ -829,11 +829,12 @@ private fun Modifier.drawGlassSelectionPill(
             drawRect(frostColor)
         }
     ).border(
-        width = 0.8.dp,
+        // 只保留很轻的边缘提亮，避免形成明显的白色双层轮廓。
+        width = 0.4.dp,
         color = if (isLight) {
-            Color.White.copy(alpha = 0.92f)
+            Color.White.copy(alpha = 0.38f)
         } else {
-            Color.White.copy(alpha = 0.22f)
+            Color.White.copy(alpha = 0.12f)
         },
         shape = pillShape
     )
