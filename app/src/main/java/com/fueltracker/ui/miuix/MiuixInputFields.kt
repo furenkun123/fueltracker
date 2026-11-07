@@ -249,3 +249,31 @@ fun MiuixSearchTextField(
         }
     )
 }
+
+@Composable
+fun MiuixFieldLabel(
+    text: String,
+    modifier: Modifier = Modifier,
+    isRequired: Boolean = false
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MiuixTheme.colorScheme.onSurface
+        )
+
+        if (isRequired) {
+            Text(
+                text = " *",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.error
+            )
+        }
+    }
+}
