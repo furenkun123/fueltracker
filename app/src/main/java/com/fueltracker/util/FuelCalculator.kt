@@ -380,12 +380,9 @@ object FuelCalculator {
 
         val tankCapacity = vehicle?.tankCapacity?.takeIf { it.isFinite() && it > 0.0 }
 
-        // 👇 修改：优先用初始记录的里程，其次才用提车里程
-        val effectiveInitialOdometer = initialOdo
-            ?: vehicle?.initialOdometer?.takeIf { it.isFinite() && it > 0.0 }
-
+        // 初始里程统一来自初始 FuelRecord，不再从 Vehicle 读取备用里程。
         val firstAnchor = findFirstAnchor(
-            visibleRecords, nextValidIndex, priorValidOdometer, tankCapacity, effectiveInitialOdometer
+            visibleRecords, nextValidIndex, priorValidOdometer, tankCapacity, initialOdo
         ) ?: run {
             val rejected = HashMap<Int, String>()
             visibleRecords.forEachIndexed { index, record -> if (record.isFull) rejected[index] = REASON_NO_ANCHOR }
