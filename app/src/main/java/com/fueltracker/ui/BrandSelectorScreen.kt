@@ -48,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -82,6 +83,7 @@ fun BrandSelectorScreen(
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
+    val searchHeaderOffset = with(LocalDensity.current) { 58.dp.roundToPx() }
 
     var allBrands by remember { mutableStateOf<List<CarBrand>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -231,7 +233,7 @@ fun BrandSelectorScreen(
                 if (letters.isNotEmpty()) {
                     AlphabetIndexBar(letters) { letter ->
                         letterIndexMap[letter]?.let { targetIndex ->
-                            scope.launch { listState.animateScrollToItem(targetIndex) }
+                            scope.launch { listState.animateScrollToItem(targetIndex, scrollOffset = -searchHeaderOffset) }
                         }
                     }
                 }
