@@ -189,7 +189,7 @@ private fun NavigationBarSurface(
     // 材质切换采用渐变过渡，避免滚动时检测状态变化造成瞬间闪切。
     val glassProgress by animateFloatAsState(
         targetValue = if (shouldUseGlass) 1f else 0f,
-        animationSpec = tween(durationMillis = 320),
+        animationSpec = tween(durationMillis = 600),
         label = "navigationGlassTransition"
     )
 
