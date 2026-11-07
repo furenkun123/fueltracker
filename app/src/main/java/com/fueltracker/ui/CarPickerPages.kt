@@ -2,9 +2,6 @@ package com.fueltracker.ui
 
 import android.R.attr.subtitle
 import android.util.Log
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,7 +33,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -161,6 +157,24 @@ private fun <T> PickerListScreen(
         searchPlaceholder, loading, loadError, showSearch, onSearchAction, listState
     ) {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+            // 标题作为列表首项，和首页标题一样随列表自然滚出。
+            item(key = "picker_title") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MiuixBackButton(onClick = onBack)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = title,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MiuixTheme.colorScheme.onBackground,
+                        maxLines = 1
+                    )
+                }
+            }
+
             if (!showSearch) {
                 item(key = "manual_header") {
                     ManualInputCard(manualTitle, manualPlaceholder, loadKey, onManualInput)
@@ -210,28 +224,6 @@ private fun PickerScaffold(
             .statusBarsPadding()
             .imePadding()
     ) {
-        val showTitle by remember(listState) {
-            derivedStateOf {
-                listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-            }
-        }
-        AnimatedVisibility(visible = showTitle, enter = fadeIn(), exit = fadeOut()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MiuixBackButton(onClick = onBack)
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    text = title,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurface,
-                    maxLines = 1
-                )
-            }
-        }
-
         if (showSearch) {
             PickerSearchBox(search, onSearchChange, placeholder, onSearchAction)
         }
