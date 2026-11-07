@@ -462,7 +462,7 @@ object FuelCalculator {
         }
 
         var segmentStartOdometer = firstAnchor.odometer
-        var segmentStartEstimated = firstAnchor.isEstimated
+        var segmentStartEstimated = false
         var segmentStartTimestamp = visibleRecords[firstAnchor.index].timestamp
         var segmentStartIndex = firstAnchor.index
         var lastReliableOdometer = segmentStartOdometer
