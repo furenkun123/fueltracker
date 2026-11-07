@@ -423,12 +423,14 @@ object BackupManager {
                 } else if (legacy.odometer != null || legacyFuel != null) {
                     check(nextRecordId < Long.MAX_VALUE) { "备份记录 ID 已达到上限" }
                     nextRecordId += 1L
-                    val firstFuelTimestamp = records.asSequence()
+                    val deliveryStart = vehicle.deliveryDate?.takeIf { it > 0L }
+                    val firstVisibleFuelTimestamp = records.asSequence()
                         .filter { it.vehicleId == vehicle.id && !it.isInitialRecord }
+                        .filter { deliveryStart == null || it.timestamp >= deliveryStart }
                         .minOfOrNull { it.timestamp }
-                    val initialTimestamp = vehicle.deliveryDate?.takeIf { it > 0L }
-                        ?: firstFuelTimestamp?.let { (it - 1L).coerceAtLeast(1L) }
-                        ?: backupCreatedAt
+                    val initialTimestamp = firstVisibleFuelTimestamp
+                        ?.let { maxOf(deliveryStart ?: 1L, (it - 1L).coerceAtLeast(1L)) }
+                        ?: maxOf(deliveryStart ?: 1L, backupCreatedAt)
 
                     records.add(
                         FuelRecord(
