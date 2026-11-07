@@ -47,8 +47,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.data.DEFAULT_EXPENSE_CATEGORIES
 import com.fueltracker.data.ExpenseCategoryStore
 import com.fueltracker.data.ExpenseRecord
-import com.fueltracker.ui.miuix.MiuixConfirmDialog
-import com.fueltracker.ui.miuix.MiuixDatePickerDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixDatePickerDialog
 import com.fueltracker.ui.miuix.MiuixBackButton
 import com.fueltracker.ui.miuix.MiuixButton
 import com.fueltracker.ui.miuix.MiuixCard
