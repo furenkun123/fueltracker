@@ -75,7 +75,7 @@ import com.fueltracker.ui.miuix.MiuixButton
 import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixFilterChip
 import com.fueltracker.ui.miuix.MiuixTextButton
-import com.fueltracker.ui.miuix.MiuixVehicleCard
+import com.fueltracker.ui.components.vehicle.MiuixVehicleCard
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.StatisticsSummary
