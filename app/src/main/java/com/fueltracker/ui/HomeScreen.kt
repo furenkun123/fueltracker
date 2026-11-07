@@ -67,6 +67,8 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
+import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
+import com.fueltracker.ui.miuix.navigation.NavigationContentRegion
 import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
 import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
 import com.fueltracker.ui.components.scrollToHideFab
@@ -226,7 +228,9 @@ fun HomeScreen(
 
             if (vehicle == null) {
                 item {
-                    EmptyVehicleCard(onAddVehicle)
+                    NavigationContentRegion(navigationBackdropDetector, "home_empty_vehicle") {
+                        EmptyVehicleCard(onAddVehicle)
+                    }
                 }
             } else {
                 item {
@@ -240,12 +244,14 @@ fun HomeScreen(
 
                 if (activeParking != null) {
                     item(key = "active_parking_${activeParking.id}") {
-                        ActiveParkingCard(
-                            parking = activeParking,
-                            onClick = { onEditParking(activeParking) },
-                            onClear = onClearParking,
-                            onIgnore = onIgnoreParking
-                        )
+                        NavigationContentRegion(navigationBackdropDetector, "home_parking_${activeParking.id}") {
+                            ActiveParkingCard(
+                                parking = activeParking,
+                                onClick = { onEditParking(activeParking) },
+                                onClear = onClearParking,
+                                onIgnore = onIgnoreParking
+                            )
+                        }
                     }
                 }
 
@@ -268,7 +274,9 @@ fun HomeScreen(
 
                 if (costData.size >= 2) {
                     item {
-                        ChartCard(points = costData)
+                        NavigationContentRegion(navigationBackdropDetector, "home_chart") {
+                            ChartCard(points = costData)
+                        }
                     }
                 }
 
@@ -284,11 +292,15 @@ fun HomeScreen(
 
                 if (recentRecords.isEmpty()) {
                     item {
-                        EmptyRecordCard()
+                        NavigationContentRegion(navigationBackdropDetector, "home_empty_records") {
+                            EmptyRecordCard()
+                        }
                     }
                 } else {
-                    items(recentRecords, key = { it.id }) {
-                        HomeFuelRecordItem(it)
+                    items(recentRecords, key = { it.id }) { record ->
+                        NavigationContentRegion(navigationBackdropDetector, "home_record_${record.id}") {
+                            HomeFuelRecordItem(record)
+                        }
                     }
                 }
             }
