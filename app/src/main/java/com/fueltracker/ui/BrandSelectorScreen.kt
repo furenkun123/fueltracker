@@ -114,7 +114,7 @@ fun BrandSelectorScreen(
     // 👇 更新索引映射：0.标题 1.搜索框（去掉了手动输入的占位）
     val letterIndexMap = remember(filteredBrands) {
         val map = mutableMapOf<String, Int>()
-        var idx = 2
+        var idx = 1
         filteredBrands.forEach { (letter, brands) ->
             map[letter] = idx
             idx += 1 + brands.size
@@ -122,12 +122,32 @@ fun BrandSelectorScreen(
         map
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MiuixTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
+        // 品牌页保留固定标题，滚动时不随品牌列表一起移动。
+        val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
+        val titleColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            MiuixBackButton(onClick = onBack)
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "选择品牌",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = titleColor
+            )
+        }
+
+        Box(Modifier.weight(1f).fillMaxWidth()) {
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -136,28 +156,6 @@ fun BrandSelectorScreen(
             Row(Modifier.fillMaxSize()) {
                 Column(Modifier.weight(1f)) {
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-
-                        // 1. 标题
-                        item(key = "top_bar") {
-                            val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
-                            val titleColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                MiuixBackButton(onClick = onBack)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = "选择品牌",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = titleColor
-                                )
-                            }
-                        }
 
                         // 2. 搜索框
                         stickyHeader(key = "search_box") {
@@ -240,6 +238,7 @@ fun BrandSelectorScreen(
                 }
             }
         }
+        }
     }
 }
 
@@ -253,8 +252,7 @@ private fun BrandSearchBox(
     onValueChange: (String) -> Unit,
     onSearchAction: () -> Unit
 ) {
-    val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
-    val searchBoxBg = if (isLight) Color.Black.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.12f)
+    val searchBoxBg = MiuixTheme.colorScheme.surfaceVariant
 
     Box(
         modifier = Modifier
