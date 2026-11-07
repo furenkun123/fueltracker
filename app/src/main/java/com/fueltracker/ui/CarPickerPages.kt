@@ -66,7 +66,7 @@ fun SeriesSelectorScreen(brand: String, onBack: () -> Unit, onSelected: (String)
     val appContext = LocalContext.current.applicationContext
     val db = remember(appContext) { CarDatabase.get(appContext) }
     PickerListScreen(
-        title = "选择车系", subtitle = brand, manualTitle = "手动输入车系",
+        manualTitle = "手动输入车系",
         manualPlaceholder = "未找到车系？在此直接输入", searchPlaceholder = "搜索车系...",
         presetLabel = "车系", emptyHint = "暂无预置车系，可手动输入", loadKey = brand,
         load = { withContext(Dispatchers.IO) { ensureDbLoaded(db); db.series(brand) } },
@@ -81,7 +81,7 @@ fun YearSelectorScreen(brand: String, series: String, onBack: () -> Unit, onSele
     val appContext = LocalContext.current.applicationContext
     val db = remember(appContext) { CarDatabase.get(appContext) }
     PickerListScreen(
-        title = "选择年款", subtitle = "$brand · $series", manualTitle = "手动输入年款",
+        manualTitle = "手动输入年款",
         manualPlaceholder = "未找到年款？如：2024款", searchPlaceholder = "搜索年款，或直接输入...",
         presetLabel = "年款", emptyHint = "暂无预置年款，可手动输入", loadKey = brand to series,
         load = { withContext(Dispatchers.IO) { ensureDbLoaded(db); db.years(brand, series) } },
@@ -96,7 +96,7 @@ fun TrimSelectorScreen(brand: String, series: String, year: String, onBack: () -
     val appContext = LocalContext.current.applicationContext
     val db = remember(appContext) { CarDatabase.get(appContext) }
     PickerListScreen(
-        title = "选择车型", subtitle = "$brand · $series · $year", manualTitle = "手动输入车型",
+        manualTitle = "手动输入车型",
         manualPlaceholder = "未找到车型？在此直接输入", searchPlaceholder = "搜索车型...",
         presetLabel = "车型", emptyHint = "暂无预置车型，可手动输入", loadKey = Triple(brand, series, year),
         load = { withContext(Dispatchers.IO) { ensureDbLoaded(db); db.trims(brand, series, year) } },
@@ -108,7 +108,7 @@ fun TrimSelectorScreen(brand: String, series: String, year: String, onBack: () -
 
 @Composable
 private fun <T> PickerListScreen(
-    title: String, subtitle: String, manualTitle: String, manualPlaceholder: String,
+    manualTitle: String, manualPlaceholder: String,
     searchPlaceholder: String, presetLabel: String, loadKey: Any?, load: suspend () -> List<T>,
     itemKey: (T) -> Any, itemSearchText: (T) -> String,
     row: @Composable (item: T, onClick: () -> Unit) -> Unit,
@@ -146,7 +146,7 @@ private fun <T> PickerListScreen(
     }
 
     PickerScaffold(
-        title, subtitle, onBack, search, { search = it },
+        onBack, search, { search = it },
         searchPlaceholder, loading, loadError, showSearch, onSearchAction
     ) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -180,8 +180,6 @@ private fun <T> PickerListScreen(
 
 @Composable
 private fun PickerScaffold(
-    title: String,
-    subtitle: String,
     onBack: () -> Unit,
     search: String,
     onSearchChange: (String) -> Unit,
@@ -206,23 +204,7 @@ private fun PickerScaffold(
             MiuixBackButton(onClick = onBack)
             Spacer(Modifier.width(12.dp))
 
-            Column {
-                Text(
-                    text = title,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurface
-                )
-                if (subtitle.isNotBlank()) {
-                    Text(
-                        text = subtitle,
-                        fontSize = 10.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+            // 车系、年款和车型页不固定显示标题，给搜索和列表留出空间。
         }
 
         if (showSearch) {
