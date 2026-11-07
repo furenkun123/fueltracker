@@ -801,11 +801,13 @@ private fun Modifier.drawGlassSelectionPill(
         },
 
         effects = {
-            blur(0.8.dp.toPx())
+            // 提高模糊强度，让选中胶囊呈现更明显的细腻磨砂感。
+            blur(2.4.dp.toPx())
 
+            // 保留轻微折射，避免磨砂层看起来像完全不透明的色块。
             lens(
-                refractionHeight = 10.dp.toPx(),
-                refractionAmount = 12.dp.toPx(),
+                refractionHeight = 8.dp.toPx(),
+                refractionAmount = 8.dp.toPx(),
                 depthEffect = false,
                 chromaticAberration = false
             )
@@ -820,7 +822,8 @@ private fun Modifier.drawGlassSelectionPill(
         onDrawSurface = {
             drawRect(
                 Color.White.copy(
-                    alpha = if (isLight) 0.28f else 0.10f
+                    // 提高表面雾化层的覆盖度，让选中项与底栏背景更容易区分。
+                    alpha = if (isLight) 0.40f else 0.20f
                 )
             )
         }
