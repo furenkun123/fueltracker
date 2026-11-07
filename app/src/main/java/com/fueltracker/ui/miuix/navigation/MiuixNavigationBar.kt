@@ -67,6 +67,7 @@ fun MiuixAppNavigationBar(
     onSelectedIndexChange: (Int) -> Unit,
     backdrop: Backdrop,
     items: List<AppNavItem>,
+    navigationBackdropDetector: NavigationBackdropDetector,
     modifier: Modifier = Modifier
 ) {
     if (isFloating) {
@@ -77,7 +78,8 @@ fun MiuixAppNavigationBar(
             isFloating = true,
             selectedIndex = selectedIndex,
             onSelectedIndexChange = onSelectedIndexChange,
-            itemCount = items.size
+            itemCount = items.size,
+            navigationBackdropDetector = navigationBackdropDetector
         ) {
             items.forEachIndexed { index, item ->
                 MiuixGlassNavigationItem(
