@@ -67,8 +67,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.boundsInWindow
 
 @Composable
 fun MiuixGlassNavigationBar(
@@ -82,6 +80,7 @@ fun MiuixGlassNavigationBar(
     navigationBackdropDetector: NavigationBackdropDetector,
     content: @Composable RowScope.() -> Unit
 ) {
+    val density = LocalDensity.current
     val isLight =
         MiuixTheme.colorScheme.background.luminance() > 0.5f
 
@@ -137,7 +136,7 @@ fun MiuixGlassNavigationBar(
                 .clip(shape)
                 .onGloballyPositioned { coordinates ->
                     if (coordinates.isAttached && coordinates.isPlaced) {
-                        val marginPx = with(LocalDensity.current) {
+                        val marginPx = with(density) {
                             24.dp.toPx()
                         }
 
@@ -174,6 +173,7 @@ private fun NavigationBarSurface(
     selectedIndex: Int,
     onSelectedIndexChange: (Int) -> Unit,
     itemCount: Int,
+    navigationBackdropDetector: NavigationBackdropDetector,
     content: @Composable RowScope.() -> Unit
 ) {
     val solidColor = if (isLight) {
