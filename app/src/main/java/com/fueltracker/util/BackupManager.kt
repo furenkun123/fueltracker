@@ -70,7 +70,7 @@ object BackupManager {
         }
         val vehiclesById = vehicles.associateBy { it.id }
         for ((vehicleId, initialRecords) in initialRecordsByVehicle) {
-            require(vehiclesById.containsKey(vehicleId)) { "初始化记录引用了不存在的车辆" }
+            val owner = vehiclesById[vehicleId] ?: throw IllegalStateException("初始化记录引用了不存在的车辆")
             val initial = initialRecords.single()
             require(initial.odometer != null) { "数据库中的车辆初始化记录缺少当前里程，无法备份" }
             val initialFuel = initial.initialFuel ?: initial.remainingFuel
@@ -444,7 +444,7 @@ object BackupManager {
             }
             val vehiclesById = vehicles.associateBy { it.id }
             for ((vehicleId, initialRecords) in initialRecordsByVehicle) {
-                require(vehiclesById.containsKey(vehicleId)) { "初始化记录引用了不存在的车辆" }
+                val owner = vehiclesById[vehicleId] ?: throw IllegalArgumentException("初始化记录引用了不存在的车辆")
                 val initial = initialRecords.single()
                 require(initial.odometer != null) { "车辆初始化记录缺少当前里程" }
                 val initialFuel = initial.initialFuel ?: initial.remainingFuel
