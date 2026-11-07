@@ -331,10 +331,9 @@ class MainViewModel(
         val vehicle = vehicleDao.getVehicleById(vehicleId) ?: throw IllegalArgumentException("车辆不存在：$vehicleId")
 
         // 👇 兜底：如果数据库里查出这辆车的油箱容量已经是 Infinity，直接拦截
-        if (vehicle.fuelType != "纯电动") {
-            require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
-                "该车辆的油箱容量数据异常，请先前往设置编辑车辆修正"
-            }
+        require(vehicle.fuelType != "纯电动") { "当前版本不支持纯电动车辆" }
+        require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
+            "该车辆的油箱容量数据异常，请先前往设置编辑车辆修正"
         }
         return vehicle
     }
@@ -354,16 +353,14 @@ class MainViewModel(
                 require(vehicle.fuelType.isNotBlank()) { "能源类型不能为空" }
                 require(currentOdometer.isFinite() && currentOdometer >= 0.0) { "当前里程必须是有效的非负数" }
 
-                val isElectric = vehicle.fuelType == "纯电动"
-                if (!isElectric) {
-                    require(vehicle.fuelGrade.isNotBlank()) { "燃油标号不能为空" }
-                    require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
-                        "油箱容量必须大于 0 的有限数值"
-                    }
-                    require(currentFuel != null && currentFuel.isFinite() &&
-                            currentFuel >= 0.0 && currentFuel <= vehicle.tankCapacity) {
-                        "当前剩余油量必须填写，且不能超过油箱容量"
-                    }
+                require(vehicle.fuelType != "纯电动") { "当前版本不支持纯电动车辆" }
+                require(vehicle.fuelGrade.isNotBlank()) { "燃油标号不能为空" }
+                require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
+                    "油箱容量必须大于 0 的有限数值"
+                }
+                require(currentFuel != null && currentFuel.isFinite() &&
+                        currentFuel >= 0.0 && currentFuel <= vehicle.tankCapacity) {
+                    "当前剩余油量必须填写，且不能超过油箱容量"
                 }
 
                 val insertedVehicle = vehicle.copy(isCurrent = true)
@@ -429,10 +426,9 @@ class MainViewModel(
                 require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) { "车辆品牌和车型不能为空" }
                 require(vehicle.fuelType.isNotBlank()) { "能源类型不能为空" }
 
-                if (vehicle.fuelType != "纯电动") {
-                    require(vehicle.fuelGrade.isNotBlank()) { "燃油标号不能为空" }
-                    require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0 的有限数值" }
-                }
+                require(vehicle.fuelType != "纯电动") { "当前版本不支持纯电动车辆" }
+                require(vehicle.fuelGrade.isNotBlank()) { "燃油标号不能为空" }
+                require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0 的有限数值" }
 
                 val old = vehicleDao.getVehicleById(vehicle.id) ?: throw IllegalArgumentException("车辆不存在")
                 val updated = vehicle.copy(isCurrent = old.isCurrent)
