@@ -307,7 +307,7 @@
       },
       {
         "tableName": "custom_categories",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, PRIMARY KEY(`name`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY(`name`))",
         "fields": [
           {
             "fieldPath": "name",

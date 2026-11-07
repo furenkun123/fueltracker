@@ -1,6 +1,5 @@
 package com.fueltracker.ui
 
-import android.R.attr.textColor
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -21,17 +20,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDropDown
-import top.yukonga.miuix.kmp.basic.DropdownImpl
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.PopupPositionProvider
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.window.WindowListPopup
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,17 +37,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CarBrand
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.data.Vehicle
-import com.fueltracker.ui.miuix.dialogs.MiuixBottomSheetWrapper
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
 import com.fueltracker.ui.miuix.MiuixBackButton
@@ -59,17 +56,18 @@ import com.fueltracker.ui.miuix.MiuixButton
 import com.fueltracker.ui.miuix.MiuixGroupCard
 import com.fueltracker.ui.miuix.MiuixSectionHeader
 import com.fueltracker.ui.miuix.MiuixTextButton
-import com.fueltracker.ui.miuix.MiuixClickableItem
-import com.fueltracker.ui.miuix.MiuixInputItem
+import com.fueltracker.ui.miuix.dialogs.MiuixBottomSheetWrapper
 import com.fueltracker.viewmodel.MainViewModel
+import top.yukonga.miuix.kmp.basic.DropdownImpl
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.ListPopupColumn
+import top.yukonga.miuix.kmp.basic.PopupPositionProvider
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowListPopup
 import java.util.Calendar
 import java.util.Locale
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.TextStyle
 
 // 预设选择列表
 private val FuelTypeOptions = listOf("汽油", "柴油", "插电混动", "油电混动", "增程式", "纯电动")
@@ -108,18 +106,12 @@ fun VehicleScreen(
     val carDatabase = remember { CarDatabase.get(context) }
     var allBrands by remember { mutableStateOf<List<CarBrand>>(emptyList()) }
 
-
-
-//    // 👇 双保险：直接判断当前背景的亮度，决定文字用黑还是白
-//    val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
-//    val textColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
-//    val dividerColor = if (isLight) Color(0xFFE0E0E0) else Color(0xFF3A3A3C)
-
     LaunchedEffect(Unit) {
         carDatabase.ensureCatalogLoaded()
         allBrands = carDatabase.brandsByLetter().flatMap { (l, brands) -> brands.map { CarBrand(it, l) } }
     }
 
+    // 基础信息
     var brand by remember(vehicle) { mutableStateOf(vehicle?.brand ?: "") }
     var series by remember(vehicle) { mutableStateOf(vehicle?.series ?: "") }
     var model by remember(vehicle) { mutableStateOf(vehicle?.model ?: "") }
@@ -127,9 +119,14 @@ fun VehicleScreen(
     var fuelType by remember(vehicle) { mutableStateOf(vehicle?.fuelType ?: "汽油") }
     var fuelGrade by remember(vehicle) { mutableStateOf(vehicle?.fuelGrade ?: "95#") }
     var tankCapacity by remember(vehicle) { mutableStateOf(vehicle?.tankCapacity?.takeIf { it > 0 }?.toString()?.removeSuffix(".0") ?: "") }
-    var initialOdometer by remember(vehicle) { mutableStateOf(vehicle?.initialOdometer?.toString()?.removeSuffix(".0") ?: "") }
     var deliveryDateMillis by remember(vehicle) { mutableStateOf(vehicle?.deliveryDate) }
 
+    // 初始/当前状态
+    var initialOdometer by remember(vehicle) { mutableStateOf(vehicle?.initialOdometer?.toString()?.removeSuffix(".0") ?: "") }
+    var initialFuel by remember(vehicle) { mutableStateOf(vehicle?.initialFuel?.toString()?.removeSuffix(".0") ?: "") }
+    var fuelUnit by remember { mutableStateOf("L") }
+
+    // UI 状态
     var showCarPicker by remember { mutableStateOf(false) }
     var pickerStartLevel by remember { mutableStateOf(PickerLevel.BRAND) }
     var showDatePickerSheet by remember { mutableStateOf(false) }
@@ -152,18 +149,19 @@ fun VehicleScreen(
         deliveryDateMillis?.let { java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(java.util.Date(it)) } ?: "未填写"
     }
 
-    // 提前解析数值
+    // === 校验逻辑 ===
     val parsedCapacity = tankCapacity.toDoubleOrNull()
     val parsedOdometer = initialOdometer.toDoubleOrNull()
+    val parsedFuel = initialFuel.toDoubleOrNull()
 
-// 校验逻辑：
-// 1. 品牌、车型必填
-// 2. 非纯电：油箱容量必填且必须 > 0
-// 3. 提车里程必填且必须 >= 0
     val isCapacityValid = fuelType == "纯电动" || (parsedCapacity != null && parsedCapacity.isFinite() && parsedCapacity > 0.0)
     val isOdometerValid = parsedOdometer != null && parsedOdometer.isFinite() && parsedOdometer >= 0.0
 
-    val canSave = brand.isNotBlank() && model.isNotBlank() && isCapacityValid && isOdometerValid
+    val isFuelValid = fuelType == "纯电动" || initialFuel.isBlank() || parsedFuel != null && parsedFuel.isFinite() && parsedFuel >= 0.0 &&
+            if (fuelUnit == "L") (parsedCapacity != null && parsedFuel <= parsedCapacity)
+            else (parsedFuel <= 100.0)
+
+    val canSave = brand.isNotBlank() && model.isNotBlank() && isCapacityValid && isOdometerValid && isFuelValid
 
     if (showCarPicker) {
         BackHandler { showCarPicker = false }
@@ -237,10 +235,8 @@ fun VehicleScreen(
                         pickerStartLevel = if (brand.isBlank()) PickerLevel.BRAND else PickerLevel.SERIES
                         showCarPicker = true
                     },
-                    showArrow = selectedBrand?.series.isNullOrEmpty(), // 如果有下拉菜单就不显示箭头
-                    trailingContent = {
-                        val currentBrandSeries = selectedBrand?.series ?: emptyList()
-                        if (currentBrandSeries.isNotEmpty()) {
+                    trailingContent = if (!selectedBrand?.series.isNullOrEmpty()) {
+                        {
                             Icon(
                                 imageVector = Icons.Default.ArrowDropDown,
                                 contentDescription = "选择预置车系",
@@ -253,10 +249,9 @@ fun VehicleScreen(
                                     ) { seriesMenuExpanded = true }
                             )
                         }
-                    }
+                    } else null
                 )
 
-                // 下拉菜单逻辑保留
                 WindowListPopup(
                     show = seriesMenuExpanded,
                     alignment = PopupPositionProvider.Align.End,
@@ -305,10 +300,8 @@ fun VehicleScreen(
             MiuixListItem("能源类型", fuelType) { showFuelTypePickerSheet = true }
 
             if (fuelType != "纯电动") {
-                // 燃油标号
                 MiuixListItem("燃油标号", fuelGrade.ifBlank { "未设置" }) { showFuelGradePickerSheet = true }
 
-                // 油箱容量
                 MiuixInputListItem(
                     title = "油箱容量 (L)",
                     value = tankCapacity,
@@ -317,19 +310,12 @@ fun VehicleScreen(
                     keyboardType = KeyboardType.Decimal
                 )
                 if (tankCapacity.isNotBlank() && (parsedCapacity == null || parsedCapacity <= 0.0)) {
-                    Text(
-                        text = "油箱容量必须大于 0",
-                        fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.error,
-                        modifier = Modifier.padding(start = 20.dp, bottom = 12.dp)
-                    )
+                    Text("油箱容量必须大于 0", fontSize = 13.sp, color = MiuixTheme.colorScheme.error, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp))
                 }
             }
 
-            // 提车日期
             MiuixListItem("提车日期", formattedDeliveryDate) { showDatePickerSheet = true }
 
-            // 提车里程
             MiuixInputListItem(
                 title = "提车里程 (km)",
                 value = initialOdometer,
@@ -338,12 +324,30 @@ fun VehicleScreen(
                 keyboardType = KeyboardType.Decimal
             )
             if (initialOdometer.isNotBlank() && (parsedOdometer == null || parsedOdometer < 0.0)) {
-                Text(
-                    text = "提车里程不能为负数",
-                    fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.error,
-                    modifier = Modifier.padding(start = 20.dp, bottom = 12.dp)
+                Text("提车里程不能为负数", fontSize = 13.sp, color = MiuixTheme.colorScheme.error, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp))
+            }
+
+            // 初始/当前油量（纯电不显示）
+            if (fuelType != "纯电动") {
+                MiuixFuelInputListItem(
+                    title = "当前油量",
+                    value = initialFuel,
+                    onValueChange = { initialFuel = it },
+                    unit = fuelUnit,
+                    onUnitToggle = {
+                        fuelUnit = if (fuelUnit == "L") "%" else "L"
+                        initialFuel = "" // 切换单位时清空原有数值
+                    },
+                    placeholder = if (fuelUnit == "L") "选填，默认为 0" else "选填，默认为 0"
                 )
+                if (initialFuel.isNotBlank() && !isFuelValid) {
+                    Text(
+                        text = if (fuelUnit == "L") "不能超过油箱容量" else "百分比不能超过 100",
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 16.dp, bottom = 12.dp)
+                    )
+                }
             }
         }
 
@@ -351,32 +355,36 @@ fun VehicleScreen(
 
         MiuixButton(
             text = if (isEditMode) "保存修改" else "确认添加",
-            enabled = canSave && !isSaving,  // 👈 增加防抖
+            enabled = canSave && !isSaving,
             onClick = {
                 isSaving = true
                 val parsedYear = year.removeSuffix("年").toIntOrNull() ?: Calendar.getInstance().get(Calendar.YEAR)
-
-                // 纯电车型 parsedCapacity 为 null 时，保留旧的 tankCapacity，防止被覆盖成 0
                 val finalCapacity = parsedCapacity ?: (vehicle?.tankCapacity ?: 0.0)
                 val finalOdometer = parsedOdometer ?: 0.0
 
-                val baseVehicle = (vehicle ?: Vehicle(brand="", series="", model="", year=0, fuelType="", fuelGrade="", tankCapacity=0.0, initialOdometer=0.0)).copy(
+                // 👈 核心换算逻辑：如果用户选的是 %，就算出对应的 L 存进去
+                val inputFuel = parsedFuel ?: 0.0
+                val finalFuel = if (fuelUnit == "%") {
+                    (inputFuel / 100.0) * finalCapacity // 百分比转升
+                } else {
+                    inputFuel // 本来就是升
+                }
+
+                val baseVehicle = (vehicle ?: Vehicle(brand="", series="", model="", year=0, fuelType="", fuelGrade="", tankCapacity=0.0)).copy(
                     brand = brand.trim(), series = series.trim(), model = model.trim(),
                     year = parsedYear, fuelType = fuelType.trim(), fuelGrade = fuelGrade.trim(),
-                    tankCapacity = finalCapacity, initialOdometer = finalOdometer, deliveryDate = deliveryDateMillis
+                    tankCapacity = finalCapacity,
+                    initialOdometer = finalOdometer,
+                    initialFuel = finalFuel, // 👈 统一存为升（L）
+                    deliveryDate = deliveryDateMillis
                 )
 
-                // 👇 统一回调处理
                 val onResult: (Result<Unit>) -> Unit = { result ->
                     isSaving = false
                     if (result.isSuccess) {
                         onSaved()
                     } else {
-                        Toast.makeText(
-                            context,
-                            "保存失败：${result.exceptionOrNull()?.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        Toast.makeText(context, "保存失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                     }
                 }
 
@@ -390,7 +398,7 @@ fun VehicleScreen(
         Spacer(modifier = Modifier.height(32.dp))
     }
 
-    // 使用统一的底部滚轮弹窗
+    // 弹窗
     if (showFuelTypePickerSheet) {
         MiuixSingleWheelPickerSheet(
             title = "选择能源类型",
@@ -462,48 +470,63 @@ private fun MiuixDateWheelPickerBottomSheet(
         }
     }
 }
+
+// ==========================================
+// 下方是统一的列表 UI 组件
+// ==========================================
+
 @Composable
 private fun MiuixListItem(
     title: String,
     value: String,
     showArrow: Boolean = true,
     trailingContent: (@Composable () -> Unit)? = null,
-    onClick: () -> Unit // 👈 onClick 放最后，支持尾随 Lambda 语法
+    onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, fontSize = 16.sp, color = MiuixTheme.colorScheme.onSurface)
-        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = title,
+            fontSize = 16.sp,
+            color = MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.width(100.dp) // 固定宽度保证对齐
+        )
+
         Text(
             text = value,
             fontSize = 16.sp,
             color = MiuixTheme.colorScheme.onSurfaceSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 16.dp)
+            textAlign = TextAlign.Start,
+            modifier = Modifier.weight(1f)
         )
-        if (trailingContent != null) {
-            trailingContent()
-        } else if (showArrow) {
-            Spacer(modifier = Modifier.width(6.dp))
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f),
-                modifier = Modifier.size(20.dp)
-            )
+
+        Box(
+            modifier = Modifier.size(24.dp),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            if (trailingContent != null) {
+                trailingContent()
+            } else if (showArrow) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
-    // MIUI 标志性分割线：极细 + 左侧缩进
     HorizontalDivider(
         color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
         thickness = 0.5.dp,
-        modifier = Modifier.padding(start = 20.dp)
+        modifier = Modifier.padding(horizontal = 16.dp)
     )
 }
 
@@ -518,21 +541,26 @@ private fun MiuixInputListItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, fontSize = 16.sp, color = MiuixTheme.colorScheme.onSurface)
-        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = title,
+            fontSize = 16.sp,
+            color = MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.width(100.dp)
+        )
+
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
             textStyle = TextStyle(
                 fontSize = 16.sp,
                 color = MiuixTheme.colorScheme.onSurface,
-                textAlign = TextAlign.End
+                textAlign = TextAlign.Start
             ),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            modifier = Modifier.fillMaxWidth(0.6f),
+            modifier = Modifier.weight(1f),
             singleLine = true,
             decorationBox = { innerTextField ->
                 if (value.isEmpty()) {
@@ -540,17 +568,94 @@ private fun MiuixInputListItem(
                         text = placeholder,
                         fontSize = 16.sp,
                         color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.End
+                        textAlign = TextAlign.Start
                     )
                 }
                 innerTextField()
             }
         )
+        Spacer(modifier = Modifier.width(24.dp))
     }
     HorizontalDivider(
         color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
         thickness = 0.5.dp,
-        modifier = Modifier.padding(start = 20.dp)
+        modifier = Modifier.padding(horizontal = 16.dp)
+    )
+}
+
+@Composable
+private fun MiuixFuelInputListItem(
+    title: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    unit: String,
+    onUnitToggle: () -> Unit,
+    placeholder: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            fontSize = 16.sp,
+            color = MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.width(100.dp)
+        )
+
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = TextStyle(
+                fontSize = 16.sp,
+                color = MiuixTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Start
+            ),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            decorationBox = { innerTextField ->
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        fontSize = 16.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                        textAlign = TextAlign.Start
+                    )
+                }
+                innerTextField()
+            }
+        )
+
+        // 👈 切换单位的精美小按钮
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp)) // 加个圆角，让点击时的水波纹好看些
+                .clickable(onClick = onUnitToggle)
+                .padding(horizontal = 8.dp, vertical = 6.dp), // 扩大点击区域
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.SwapHoriz,
+                contentDescription = "切换单位",
+                modifier = Modifier.size(16.dp), // 稍微放大到 16dp，和文字更协调
+                tint = MiuixTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(4.dp)) // 图标和文字之间留点空隙
+            Text(
+                text = if (unit == "L") "%" else "L", // 显示将要切换成的目标单位
+                fontSize = 13.sp, // 稍微放大到 13sp，更易读
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.primary,
+                maxLines = 1
+            )
+        }
+    }
+    HorizontalDivider(
+        color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+        thickness = 0.5.dp,
+        modifier = Modifier.padding(horizontal = 16.dp)
     )
 }

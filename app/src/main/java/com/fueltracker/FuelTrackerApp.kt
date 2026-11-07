@@ -31,7 +31,6 @@ import com.fueltracker.ui.ExpenseEditScreen
 import com.fueltracker.ui.ExpenseScreen
 import com.fueltracker.ui.FuelScreen
 import com.fueltracker.ui.HomeScreen
-import com.fueltracker.ui.InitialRecordScreen
 import com.fueltracker.ui.ParkingScreen
 import com.fueltracker.ui.RecordsScreen
 import com.fueltracker.ui.SettingsScreen
@@ -113,8 +112,7 @@ fun FuelTrackerApp(
         when (screen) {
             RECORDS,
             SETTINGS,
-            EXPENSES,
-            INITIAL_RECORD,
+            EXPENSES, // 👈 恢复 EXPENSES
             ADD_FUEL,
             ADD_PARKING,
             EDIT_PARKING ->
@@ -189,8 +187,7 @@ fun FuelTrackerApp(
                                 val latest by
                                 viewModel.latestConsumption.collectAsState()
 
-                                val average by
-                                viewModel.averageConsumption.collectAsState()
+                                // 👈 删除了未使用的 average 变量
 
                                 HomeScreen(
                                     viewModel = viewModel,
@@ -276,7 +273,6 @@ fun FuelTrackerApp(
                                     }
                                 )
                             }
-
                         }
                     }
                 }
@@ -294,23 +290,12 @@ fun FuelTrackerApp(
                                 viewModel.navigateTo(addVehicleOrigin)
                             },
                             onSaved = {
-                                viewModel.navigateTo(INITIAL_RECORD)
+                                viewModel.navigateTo(HOME)
                             }
                         )
                     }
 
-                    // ---------- 初始记录 ----------
-                    INITIAL_RECORD -> {
-                        InitialRecordScreen(
-                            viewModel = viewModel,
-                            onCompleted = {
-                                viewModel.navigateTo(HOME)
-                            },
-                            onBack = {
-                                viewModel.navigateTo(HOME)
-                            }
-                        )
-                    }
+                    // 👈 彻底删除了 INITIAL_RECORD 的渲染块
 
                     // ---------- 添加加油记录 ----------
                     ADD_FUEL -> {
@@ -468,7 +453,6 @@ fun FuelTrackerApp(
                             )
                         }
                     }
-
                 }
             }
         }
@@ -504,6 +488,7 @@ fun FuelTrackerApp(
                     HOME -> 0
                     RECORDS -> 1
                     EXPENSES -> 2
+                    else -> 0
                 },
                 modifier = Modifier.align(Alignment.BottomCenter),
                 backdrop = appBackdrop,
@@ -569,7 +554,7 @@ fun FuelTrackerApp(
 enum class AppScreen {
     HOME,
     ADD_VEHICLE,
-    INITIAL_RECORD,
+    // 👈 删除了 INITIAL_RECORD,
     ADD_FUEL,
     RECORDS,
     EDIT_FUEL,
