@@ -342,19 +342,54 @@ class MainViewModel(
     // =========================================================
     // 车辆操作
     // =========================================================
-    fun addVehicle(vehicle: Vehicle, onComplete: (Result<Unit>) -> Unit = {}) {
+    fun addVehicle(
+        vehicle: Vehicle,
+        currentOdometer: Double,
+        currentFuel: Double?,
+        onComplete: (Result<Unit>) -> Unit = {}
+    ) {
         viewModelScope.launch {
             val result = try {
                 require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) { "车辆品牌和车型不能为空" }
+                require(currentOdometer.isFinite() && currentOdometer >= 0.0) { "当前里程必须是有效的非负数" }
 
-                // 👇 加上 isFinite() 校验
-                require(vehicle.initialOdometer.isFinite() && vehicle.initialOdometer >= 0.0) { "提车里程必须是有效的非负数" }
-                if (vehicle.fuelType != "纯电动") {
-                    require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0 的有限数值" }
+                val isElectric = vehicle.fuelType == "纯电动"
+                if (!isElectric) {
+                    require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
+                        "油箱容量必须大于 0 的有限数值"
+                    }
+                    require(currentFuel != null && currentFuel.isFinite() &&
+                            currentFuel >= 0.0 && currentFuel <= vehicle.tankCapacity) {
+                        "当前剩余油量必须填写，且不能超过油箱容量"
+                    }
                 }
 
-                val newId = vehicleDao.insertAsCurrent(vehicle.copy(isCurrent = true))
-                _currentVehicleOverride.value = vehicle.copy(id = newId, isCurrent = true)
+                val insertedVehicle = vehicle.copy(isCurrent = true)
+                val newId = database.withTransaction {
+                    val id = vehicleDao.insertAsCurrent(insertedVehicle)
+                    val initialTimestamp = maxOf(
+                        System.currentTimeMillis(),
+                        insertedVehicle.deliveryDate ?: 0L
+                    )
+                    fuelDao.insert(
+                        FuelRecord(
+                            vehicleId = id,
+                            timestamp = initialTimestamp,
+                            fuelGrade = insertedVehicle.fuelGrade,
+                            odometer = currentOdometer,
+                            volume = 0.0,
+                            actualPaidAmount = 0.0,
+                            unitPrice = 0.0,
+                            remainingFuel = currentFuel,
+                            isInitialRecord = true,
+                            initialFuel = currentFuel,
+                            note = "车辆初始记录"
+                        )
+                    )
+                    id
+                }
+
+                _currentVehicleOverride.value = insertedVehicle.copy(id = newId)
                 Result.success(Unit)
             } catch (e: CancellationException) {
                 throw e
@@ -392,8 +427,6 @@ class MainViewModel(
             val result = try {
                 require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) { "车辆品牌和车型不能为空" }
 
-                // 👇 加上 isFinite() 校验
-                require(vehicle.initialOdometer.isFinite() && vehicle.initialOdometer >= 0.0) { "提车里程必须是有效的非负数" }
                 if (vehicle.fuelType != "纯电动") {
                     require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0 的有限数值" }
                 }
@@ -704,40 +737,8 @@ class MainViewModel(
 
 
     // =========================================================
-    // 初始记录与备份恢复
+    // 备份恢复
     // =========================================================
-    fun addInitialRecord(odometer: Double?, currentFuel: Double?, onComplete: (Result<Unit>) -> Unit = {}) {
-        viewModelScope.launch {
-            val result = try {
-                val vehicle = getCurrentVehicleFromDatabase() ?: throw IllegalStateException("当前无车辆，无法保存初始记录")
-                requireNullableNonNegative(odometer, "初始里程")
-                requireNullableNonNegative(currentFuel, "当前油量")
-
-                database.withTransaction {
-                    val existing = fuelDao.getRecordsByVehicleId(vehicle.id)
-                    if (existing.any { it.isInitialRecord }) {
-                        throw IllegalStateException("该车辆已存在初始化记录")
-                    }
-
-                    fuelDao.insert(
-                        FuelRecord(
-                            vehicleId = vehicle.id, fuelGrade = vehicle.fuelGrade,
-                            timestamp = System.currentTimeMillis(), odometer = odometer,
-                            volume = 0.0, actualPaidAmount = 0.0, unitPrice = 0.0,
-                            remainingFuel = currentFuel, isInitialRecord = true, initialFuel = currentFuel
-                        )
-                    )
-                }
-                Result.success(Unit)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "addInitialRecord failed", e)
-                Result.failure(e)
-            }
-            onComplete(result)
-        }
-    }
 
     fun createBackup(uri: Uri, onResult: (Result<Unit>) -> Unit) {
         if (isBackupOperationRunning) return onResult(Result.failure(IllegalStateException("操作进行中")))
