@@ -126,7 +126,7 @@ fun BrandSelectorScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MiuixTheme.colorScheme.background)
+            .background(lightenPickerBackground(MiuixTheme.colorScheme.background))
             .statusBarsPadding()
     ) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -162,7 +162,7 @@ fun BrandSelectorScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(MiuixTheme.colorScheme.background)
+                                    .background(lightenPickerBackground(MiuixTheme.colorScheme.background))
                             ) {
                                 BrandSearchBox(
                                     value = searchText,
@@ -198,7 +198,7 @@ fun BrandSelectorScreen(
                                     Box(
                                         Modifier
                                             .fillMaxWidth()
-                                            .background(MiuixTheme.colorScheme.background)
+                                            .background(lightenPickerBackground(MiuixTheme.colorScheme.background))
                                             .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp)
                                     ) {
                                         Text(
@@ -349,7 +349,7 @@ private fun EmptyBrandState(
 
 @Composable
 private fun BrandRow(brand: CarBrand, isSelected: Boolean, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.background)) {
+    Column(Modifier.fillMaxWidth().background(lightenPickerBackground(MiuixTheme.colorScheme.background))) {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -387,4 +387,15 @@ private fun AlphabetIndexBar(letters: List<String>, onLetterClick: (String) -> U
             )
         }
     }
+}
+
+/** Slightly lift the picker pages above the search field without changing the search field material. */
+private fun lightenPickerBackground(color: Color): Color {
+    val amount = 0.07f
+    return Color(
+        red = color.red + (1f - color.red) * amount,
+        green = color.green + (1f - color.green) * amount,
+        blue = color.blue + (1f - color.blue) * amount,
+        alpha = color.alpha
+    )
 }
