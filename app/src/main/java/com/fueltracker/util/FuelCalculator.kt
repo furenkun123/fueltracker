@@ -353,7 +353,8 @@ object FuelCalculator {
             .filter { deliveryDate == null || it.timestamp >= deliveryDate }
             .minByOrNull { it.timestamp }
 
-        val initialOdo = initialRecord?.odometer?.takeIf { it.isFinite() && it > 0.0 }
+        // 0 km 对全新车辆是合法起点；普通加油记录仍由 validOdometer 单独校验。
+        val initialOdo = initialRecord?.odometer?.takeIf { it.isFinite() && it >= 0.0 }
         val initialFuel = initialRecord?.initialFuel?.takeIf { it.isFinite() && it >= 0.0 }
             ?: initialRecord?.remainingFuel?.takeIf { it.isFinite() && it >= 0.0 }
 
