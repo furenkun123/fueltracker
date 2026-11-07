@@ -182,21 +182,22 @@ private fun NavigationBarSurface(
         MiuixTheme.colorScheme.surface
     }
 
-    val glassEnabled = isGlassEnabled &&
+    val shouldUseGlass = isGlassEnabled &&
             isFloating &&
             navigationBackdropDetector.hasNearbyContent
+
+    // 材质切换采用渐变过渡，避免滚动时检测状态变化造成瞬间闪切。
+    val glassProgress by animateFloatAsState(
+        targetValue = if (shouldUseGlass) 1f else 0f,
+        animationSpec = tween(durationMillis = 320),
+        label = "navigationGlassTransition"
+    )
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(
-                if (glassEnabled) {
-                    Color.Transparent
-                } else {
-                    solidColor
-                }
-            )
+            .background(solidColor.copy(alpha = 1f - glassProgress))
             .then(
                 if (isFloating && !isLight) {
                     Modifier.border(
@@ -287,36 +288,33 @@ private fun NavigationBarSurface(
         }
 
 
-        // 第一层：玻璃背景
-        if (glassEnabled) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .drawGlassNavigationBackdrop(
-                        backdrop = backdrop,
-                        shape = shape,
-                        isLight = isLight
-                    )
-            )
-        }
+        // 第一层：玻璃背景。与纯色底材交叉淡入淡出。
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer { alpha = glassProgress }
+                .drawGlassNavigationBackdrop(
+                    backdrop = backdrop,
+                    shape = shape,
+                    isLight = isLight
+                )
+        )
 
         // 第二层：底部淡色叠加
-        if (glassEnabled) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .drawGlassNavigationOverlay(isLight)
-            )
-        }
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer { alpha = glassProgress }
+                .drawGlassNavigationOverlay(isLight)
+        )
 
         // 第三层：顶部反光
-        if (glassEnabled) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .drawGlassNavigationHighlight(isLight)
-            )
-        }
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer { alpha = glassProgress }
+                .drawGlassNavigationHighlight(isLight)
+        )
 
         // 第四层：弹性选中胶囊
         val currentPillIndex = if (isDragging) {
@@ -330,51 +328,51 @@ private fun NavigationBarSurface(
                     horizontalPadding.toPx()
         }
 
-        if (glassEnabled) {
-            Box(
-                modifier = Modifier
-                    .offset {
-                        IntOffset(
-                            x = pillOffset.toInt(),
-                            y = MiuixGlassDefaults.Navigation.pillOffsetY.roundToPx()
-                        )
-                    }
-                    .width(pillWidth)
-                    .height(MiuixGlassDefaults.Navigation.pillHeight)
-                    .graphicsLayer {
-                        scaleX = pillScaleX
-                        scaleY = pillScaleY
-                    }
-                    .drawGlassSelectionPill(
-                        backdrop = backdrop,
-                        isLight = isLight
+        Box(
+            modifier = Modifier
+                .offset {
+                    IntOffset(
+                        x = pillOffset.toInt(),
+                        y = MiuixGlassDefaults.Navigation.pillOffsetY.roundToPx()
                     )
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .offset {
-                        IntOffset(
-                            x = pillOffset.toInt(),
-                            y = MiuixGlassDefaults.Navigation.pillOffsetY.roundToPx()
-                        )
-                    }
-                    .width(pillWidth)
-                    .height(MiuixGlassDefaults.Navigation.pillHeight)
-                    .graphicsLayer {
-                        scaleX = pillScaleX
-                        scaleY = pillScaleY
-                    }
-                    .clip(RoundedCornerShape(MiuixGlassDefaults.Navigation.pillCornerRadius))
-                    .background(
-                        if (isLight) {
-                            MiuixTheme.colorScheme.primary.copy(alpha = 0.09f)
-                        } else {
-                            MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                        }
+                }
+                .width(pillWidth)
+                .height(MiuixGlassDefaults.Navigation.pillHeight)
+                .graphicsLayer {
+                    scaleX = pillScaleX
+                    scaleY = pillScaleY
+                    alpha = glassProgress
+                }
+                .drawGlassSelectionPill(
+                    backdrop = backdrop,
+                    isLight = isLight
+                )
+        )
+
+        Box(
+            modifier = Modifier
+                .offset {
+                    IntOffset(
+                        x = pillOffset.toInt(),
+                        y = MiuixGlassDefaults.Navigation.pillOffsetY.roundToPx()
                     )
-            )
-        }
+                }
+                .width(pillWidth)
+                .height(MiuixGlassDefaults.Navigation.pillHeight)
+                .graphicsLayer {
+                    scaleX = pillScaleX
+                    scaleY = pillScaleY
+                    alpha = 1f - glassProgress
+                }
+                .clip(RoundedCornerShape(MiuixGlassDefaults.Navigation.pillCornerRadius))
+                .background(
+                    if (isLight) {
+                        MiuixTheme.colorScheme.primary.copy(alpha = 0.09f)
+                    } else {
+                        MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    }
+                )
+        )
 
         // 第五层：导航内容
         val horizontalPaddingPx = with(LocalDensity.current) {
