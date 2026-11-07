@@ -289,8 +289,8 @@ fun ExpenseScreen(
                     items = filteredItems,
                     key = { item ->
                         when (item) {
-                            is ExpenseListItem.Fuel -> "fuel_\${item.id}"
-                            is ExpenseListItem.Expense -> "expense_\${item.id}"
+                            is ExpenseListItem.Fuel -> "fuel_${item.id}"
+                            is ExpenseListItem.Expense -> "expense_${item.id}"
                         }
                     }
                 ) { item ->
