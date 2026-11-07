@@ -283,23 +283,22 @@ fun VehicleScreen(
                 }
             }
 
+            // 年款
+            MiuixListItem("年款", year) {
+                pickerStartLevel = when {
+                    brand.isBlank() -> PickerLevel.BRAND
+                    series.isBlank() -> PickerLevel.SERIES
+                    else -> PickerLevel.YEAR
+                }
+                showCarPicker = true
+            }
+
             // 车型
             MiuixListItem("车型", model.ifBlank { "选择车型" }) {
                 pickerStartLevel = when {
                     brand.isBlank() -> PickerLevel.BRAND
                     series.isBlank() -> PickerLevel.SERIES
                     else -> PickerLevel.TRIM
-                }
-                showCarPicker = true
-            }
-
-            // 年款
-            MiuixListItem("年款", year) {
-                pickerStartLevel = when {
-                    brand.isBlank() -> PickerLevel.BRAND
-                    series.isBlank() -> PickerLevel.SERIES
-                    model.isBlank() -> PickerLevel.TRIM
-                    else -> PickerLevel.YEAR
                 }
                 showCarPicker = true
             }
@@ -322,11 +321,13 @@ fun VehicleScreen(
                 }
             }
 
-            MiuixListItem("交车日期", formattedDeliveryDate) { showDatePickerSheet = true }
+            MiuixListItem("交车日期", formattedDeliveryDate)
+        }
 
-            // 初始化数据属于 FuelRecord，仅在添加车辆时录入。
-            if (!isEditMode) {
-                MiuixSectionHeader(title = "初始数据（必填）")
+        // 初始数据属于 FuelRecord，仅在添加车辆时录入，不混入车辆资料卡片。
+        if (!isEditMode) {
+            MiuixSectionHeader(title = "初始数据（必填）")
+            MiuixGroupCard {
                 MiuixInputListItem(
                     title = "当前里程 (km)",
                     value = initialOdometer,
@@ -366,6 +367,7 @@ fun VehicleScreen(
                         )
                     }
                 }
+            }
             }
         }
 
