@@ -35,7 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fueltracker.ui.miuix.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
 import com.fueltracker.ui.miuix.MiuixButton
 import com.fueltracker.ui.miuix.MiuixGroupCard
 import com.fueltracker.ui.miuix.MiuixSectionHeader
