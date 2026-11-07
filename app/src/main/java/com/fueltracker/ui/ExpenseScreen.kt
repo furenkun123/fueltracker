@@ -52,6 +52,8 @@ import com.fueltracker.ui.components.ExpenseDetailItemCard
 import com.fueltracker.ui.components.ExpenseStructureCard
 import com.fueltracker.ui.components.ExpenseTrendCard
 import com.fueltracker.ui.components.LazyColumnScrollbar
+import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
+import com.fueltracker.ui.miuix.navigation.NavigationContentRegion
 import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
 import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
 import com.fueltracker.ui.components.SummaryCard
@@ -95,6 +97,7 @@ private sealed class ExpenseListItem {
 @Composable
 fun ExpenseScreen(
     viewModel: MainViewModel,
+    navigationBackdropDetector: NavigationBackdropDetector,
     selectedCategory: String?,
     onSelectedCategoryChange: (String?) -> Unit,
     onAddExpense: () -> Unit,
@@ -216,22 +219,28 @@ fun ExpenseScreen(
                 }
             } else {
                 item("summary") {
-                    SummaryCard(summary, selectedRange, rangeLabel, { selectedRange = it }, { showYearMonthPicker = true })
+                    NavigationContentRegion(navigationBackdropDetector, "expenses_summary") {
+                        SummaryCard(summary, selectedRange, rangeLabel, { selectedRange = it }, { showYearMonthPicker = true })
+                    }
                 }
                 if (trendYears.isNotEmpty()) {
                     item("trend") {
-                        ExpenseTrendCard(
-                            points = monthTrend,
-                            years = trendYears,
-                            selectedYear = selectedTrendYear,
-                            onYearSelected = { selectedTrendYear = it }
-                        )
+                        NavigationContentRegion(navigationBackdropDetector, "expenses_trend") {
+                            ExpenseTrendCard(
+                                points = monthTrend,
+                                years = trendYears,
+                                selectedYear = selectedTrendYear,
+                                onYearSelected = { selectedTrendYear = it }
+                            )
+                        }
                     }
                 }
                 if (structureItems.isNotEmpty()) {
                     item("structure") {
-                        ExpenseStructureCard(structureItems, selectedCategory) { cat ->
-                            onSelectedCategoryChange(if (selectedCategory == cat) null else cat)
+                        NavigationContentRegion(navigationBackdropDetector, "expenses_structure") {
+                            ExpenseStructureCard(structureItems, selectedCategory) { cat ->
+                                onSelectedCategoryChange(if (selectedCategory == cat) null else cat)
+                            }
                         }
                     }
                 }
@@ -263,15 +272,21 @@ fun ExpenseScreen(
                             }
                         }
                     ) { item ->
-                        ExpenseDetailItemCard(
-                            title = item.title,
-                            time = item.timestamp.toDateTimeText(),
-                            amount = item.amount,
-                            onEdit = {
-                                if (item is ExpenseListItem.Fuel) onEditFuel(item.record)
-                                else onEditExpense((item as ExpenseListItem.Expense).record)
-                            }
-                        )
+                        val regionKey = when (item) {
+                            is ExpenseListItem.Fuel -> "expenses_fuel_${item.id}"
+                            is ExpenseListItem.Expense -> "expenses_item_${item.id}"
+                        }
+                        NavigationContentRegion(navigationBackdropDetector, regionKey) {
+                            ExpenseDetailItemCard(
+                                title = item.title,
+                                time = item.timestamp.toDateTimeText(),
+                                amount = item.amount,
+                                onEdit = {
+                                    if (item is ExpenseListItem.Fuel) onEditFuel(item.record)
+                                    else onEditExpense((item as ExpenseListItem.Expense).record)
+                                }
+                            )
+                        }
                     }
                 }
             }
