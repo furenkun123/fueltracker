@@ -186,10 +186,14 @@ private fun NavigationBarSurface(
             isFloating &&
             navigationBackdropDetector.hasNearbyContent
 
-    // 材质切换采用渐变过渡，避免滚动时检测状态变化造成瞬间闪切。
+    // 使用无过冲的阻尼弹簧，让玻璃与纯色材质缓慢、连续地互相过渡。
+    // 相比固定时长 tween，检测状态在滚动中反复变化时也能平滑改变方向。
     val glassProgress by animateFloatAsState(
         targetValue = if (shouldUseGlass) 1f else 0f,
-        animationSpec = tween(durationMillis = 600),
+        animationSpec = spring(
+            dampingRatio = 1f,
+            stiffness = 45f
+        ),
         label = "navigationGlassTransition"
     )
 
