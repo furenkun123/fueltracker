@@ -1,8 +1,12 @@
 package com.fueltracker.ui
 
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +39,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -128,23 +133,26 @@ fun BrandSelectorScreen(
             .background(MiuixTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        // 品牌页保留固定标题，滚动时不随品牌列表一起移动。
-        val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
-        val titleColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            MiuixBackButton(onClick = onBack)
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "选择品牌",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = titleColor
-            )
+        // 标题随列表上滑收起，搜索框保持吸顶可见。
+        val showTitle by remember {
+            derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
+        }
+        AnimatedVisibility(visible = showTitle, enter = fadeIn(), exit = fadeOut()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MiuixBackButton(onClick = onBack)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "选择品牌",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
+            }
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -253,6 +261,7 @@ private fun BrandSearchBox(
     onSearchAction: () -> Unit
 ) {
     val searchBoxBg = MiuixTheme.colorScheme.surfaceVariant
+    val searchBorder = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f)
 
     Box(
         modifier = Modifier
@@ -261,6 +270,7 @@ private fun BrandSearchBox(
             .height(42.dp)
             .clip(RoundedCornerShape(21.dp))
             .background(searchBoxBg)
+            .then(Modifier.border(0.6.dp, searchBorder, RoundedCornerShape(21.dp)))
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart
     ) {
