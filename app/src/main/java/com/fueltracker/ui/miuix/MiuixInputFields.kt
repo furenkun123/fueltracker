@@ -149,14 +149,37 @@ fun MiuixInputItem(
             text = label,
             modifier = Modifier.width(110.dp)
         )
-        TextField(
+        // 使用透明的 BasicTextField，让输入内容直接融入卡片，不再绘制独立灰色输入框背景。
+        BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            label = placeholder,
-            useLabelAsPlaceholder = true,
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            modifier = Modifier.weight(1f)
+            textStyle = TextStyle(
+                fontSize = 15.sp,
+                color = MiuixTheme.colorScheme.onSurface
+            ),
+            cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
+            modifier = Modifier
+                .weight(1f)
+                .height(52.dp)
+                .padding(horizontal = 12.dp),
+            decorationBox = { innerTextField ->
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (value.isEmpty()) {
+                        Text(
+                            text = placeholder,
+                            fontSize = 15.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                            maxLines = 1
+                        )
+                    }
+                    innerTextField()
+                }
+            }
         )
     }
 }
