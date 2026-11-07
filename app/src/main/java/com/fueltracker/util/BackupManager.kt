@@ -20,8 +20,13 @@ import kotlinx.coroutines.NonCancellable
 
 object BackupManager {
 
-    private const val FORMAT_VERSION = 2
-    private val SUPPORTED_VERSIONS = setOf(1, 2)
+    private const val FORMAT_VERSION = 3
+    private val SUPPORTED_VERSIONS = setOf(1, 2, 3)
+
+    private data class LegacyInitialData(
+        val odometer: Double?,
+        val fuel: Double?
+    )
 
     private data class BackupSnapshot(
         val vehicles: List<Vehicle>,
@@ -63,10 +68,14 @@ object BackupManager {
                     "数据库存在容量非法的纯电动车，无法备份"
                 }
             }
-            requireNullableFiniteNonNegative(vehicle.officialConsumption, "车辆官方油耗")
-            requireFiniteNonNegative(vehicle.initialOdometer, "车辆初始里程")
-            requireFiniteNonNegative(vehicle.initialFuel, "车辆初始油量")
-        } // 👈 这个括号必须有！
+        }
+
+        records.filter { it.isInitialRecord }
+            .groupBy { it.vehicleId }
+            .values
+            .forEach { initialRecords ->
+                require(initialRecords.size <= 1) { "同一辆车不能存在多条初始化记录" }
+            }
 
         records.forEach { record ->
             require(record.timestamp > 0L) { "数据库存在无效加油时间，无法备份" }
@@ -184,9 +193,6 @@ object BackupManager {
                         put("fuelType", v.fuelType)
                         put("fuelGrade", v.fuelGrade)
                         put("tankCapacity", v.tankCapacity)
-                        put("officialConsumption", v.officialConsumption ?: JSONObject.NULL)
-                        put("initialOdometer", v.initialOdometer)
-                        put("initialFuel", v.initialFuel)
                         put("deliveryDate", v.deliveryDate ?: JSONObject.NULL)
                         put("isCurrent", v.isCurrent)
                     })
@@ -258,13 +264,17 @@ object BackupManager {
             val expenseArray = root.readBusinessArray("expenses", required = version >= 2)
 
             val vehicles = mutableListOf<Vehicle>()
+            val legacyInitialData = mutableMapOf<Long, LegacyInitialData>()
             for (i in 0 until vehicleArray.length()) {
                 val json = vehicleArray.getJSONObject(i)
                 val id = json.requireLong("id")
                 val tankCapacity = json.requireDouble("tankCapacity")
-                val initialOdometer = json.requireDouble("initialOdometer")
-                val initialFuel = json.requireDouble("initialFuel")
-                val officialConsumption = json.getNullableDouble("officialConsumption")
+                // v1/v2 备份把初始数据保存在 Vehicle；v3 起统一保存在 FuelRecord。
+                val legacyOdometer = json.getNullableDouble("initialOdometer")
+                val legacyFuel = json.getNullableDouble("initialFuel")
+                if (legacyOdometer != null || legacyFuel != null) {
+                    legacyInitialData[id] = LegacyInitialData(legacyOdometer, legacyFuel)
+                }
                 val fuelType = json.requireString("fuelType")
 
                 // 👇 修复：只保留这个 if-else 校验，彻底删掉后面的 require(tankCapacity > 0)
@@ -275,10 +285,6 @@ object BackupManager {
                 }
 
                 if (id <= 0L) throw IllegalArgumentException("车辆 ID 非法")
-                requireFiniteNonNegative(initialOdometer, "车辆初始里程")
-                requireFiniteNonNegative(initialFuel, "车辆初始油量")
-                requireNullableFiniteNonNegative(officialConsumption, "车辆官方油耗")
-
                 vehicles.add(
                     Vehicle(
                         id = id,
@@ -289,9 +295,6 @@ object BackupManager {
                         fuelType = fuelType,
                         fuelGrade = json.requireString("fuelGrade"),
                         tankCapacity = tankCapacity,
-                        officialConsumption = officialConsumption,
-                        initialOdometer = initialOdometer,
-                        initialFuel = initialFuel,
                         deliveryDate = json.getNullableLong("deliveryDate"),
                         isCurrent = json.requireBoolean("isCurrent")
                     )
@@ -385,6 +388,59 @@ object BackupManager {
                 )
             }
             requireUniqueIds(records.map { it.id }, "加油记录")
+
+            // 兼容旧备份：将旧 Vehicle 初始字段转换为 FuelRecord；已有初始化记录只补缺失字段。
+            var nextRecordId = records.maxOfOrNull { it.id } ?: 0L
+            val backupCreatedAt = root.optLong("createdAt", System.currentTimeMillis()).coerceAtLeast(1L)
+            for (vehicle in vehicles) {
+                val legacy = legacyInitialData[vehicle.id] ?: continue
+                val existingIndex = records.indexOfFirst {
+                    it.vehicleId == vehicle.id && it.isInitialRecord
+                }
+                val legacyFuel = if (vehicle.fuelType == "纯电动") null else legacy.fuel
+
+                if (existingIndex >= 0) {
+                    val existing = records[existingIndex]
+                    records[existingIndex] = existing.copy(
+                        odometer = existing.odometer ?: legacy.odometer,
+                        initialFuel = existing.initialFuel ?: legacyFuel,
+                        remainingFuel = existing.remainingFuel ?: legacyFuel
+                    )
+                } else if (legacy.odometer != null || legacyFuel != null) {
+                    check(nextRecordId < Long.MAX_VALUE) { "备份记录 ID 已达到上限" }
+                    nextRecordId += 1L
+                    val firstFuelTimestamp = records.asSequence()
+                        .filter { it.vehicleId == vehicle.id && !it.isInitialRecord }
+                        .minOfOrNull { it.timestamp }
+                    val initialTimestamp = vehicle.deliveryDate?.takeIf { it > 0L }
+                        ?: firstFuelTimestamp?.let { (it - 1L).coerceAtLeast(1L) }
+                        ?: backupCreatedAt
+
+                    records.add(
+                        FuelRecord(
+                            id = nextRecordId,
+                            vehicleId = vehicle.id,
+                            timestamp = initialTimestamp,
+                            fuelGrade = vehicle.fuelGrade,
+                            odometer = legacy.odometer,
+                            volume = 0.0,
+                            actualPaidAmount = 0.0,
+                            unitPrice = 0.0,
+                            remainingFuel = legacyFuel,
+                            isInitialRecord = true,
+                            initialFuel = legacyFuel,
+                            note = "由旧备份转换的车辆初始化记录"
+                        )
+                    )
+                }
+            }
+            requireUniqueIds(records.map { it.id }, "加油记录")
+            records.filter { it.isInitialRecord }
+                .groupBy { it.vehicleId }
+                .values
+                .forEach { initialRecords ->
+                    require(initialRecords.size == 1) { "备份文件损坏：同一辆车存在多条初始化记录" }
+                }
 
             val expenses = mutableListOf<ExpenseRecord>()
             for (i in 0 until expenseArray.length()) {
