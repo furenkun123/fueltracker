@@ -321,7 +321,7 @@ fun VehicleScreen(
                 }
             }
 
-            MiuixListItem("交车日期", formattedDeliveryDate)
+            MiuixListItem("交车日期", formattedDeliveryDate) { showDatePickerSheet = true }
         }
 
         // 初始数据属于 FuelRecord，仅在添加车辆时录入，不混入车辆资料卡片。
@@ -367,7 +367,6 @@ fun VehicleScreen(
                         )
                     }
                 }
-            }
             }
         }
 
