@@ -62,20 +62,58 @@ fun SummaryCard(
 ) {
     MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                MiuixFilterChip("全部", selectedRange == ExpenseRange.ALL) { onRangeSelected(ExpenseRange.ALL) }
-                MiuixFilterChip("本月", selectedRange == ExpenseRange.MONTH) { onRangeSelected(ExpenseRange.MONTH) }
-                MiuixFilterChip("今年", selectedRange == ExpenseRange.YEAR) { onRangeSelected(ExpenseRange.YEAR) }
-                MiuixFilterChip(if (selectedRange == ExpenseRange.CUSTOM_MONTH) rangeLabel else "选年月", selectedRange == ExpenseRange.CUSTOM_MONTH, onCustomClick)
+
+            // 👈 将标题和筛选按钮放在同一个 Row 里
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween, // 两端对齐
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 左侧：全部支出
+                Text(
+                    text = if (summary.rangeLabel == "全部") "全部支出" else "${summary.rangeLabel}支出",
+                    fontSize = 13.sp,                       // 👈 统一为 13.sp
+                    fontWeight = FontWeight.SemiBold,       // 👈 统一为 SemiBold
+                    maxLines = 1
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // 右侧：筛选按钮组
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End), // 靠右对齐
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MiuixFilterChip("全部", selectedRange == ExpenseRange.ALL) { onRangeSelected(ExpenseRange.ALL) }
+                    MiuixFilterChip("本月", selectedRange == ExpenseRange.MONTH) { onRangeSelected(ExpenseRange.MONTH) }
+                    MiuixFilterChip("今年", selectedRange == ExpenseRange.YEAR) { onRangeSelected(ExpenseRange.YEAR) }
+                    MiuixFilterChip(
+                        text = if (selectedRange == ExpenseRange.CUSTOM_MONTH) rangeLabel else "选年月",
+                        selected = selectedRange == ExpenseRange.CUSTOM_MONTH,
+                        onClick = onCustomClick
+                    )
+                }
             }
-            Text("${summary.rangeLabel}支出", fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
+
+            // 下面是金额和笔数（保持不变）
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("¥", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
                 Text(summary.totalAmount.toPlainMoneyText(), fontSize = 32.sp, fontWeight = FontWeight.Bold)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                Column { Text("笔数", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary); Text("${summary.count} 笔", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
-                if (summary.showDaily) Column { Text("日均", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary); Text(summary.dailyAverage.toMoneyText(), fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+                Column {
+                    Text("笔数", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
+                    Text("${summary.count} 笔", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+                if (summary.showDaily) {
+                    Column {
+                        Text("日均", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
+                        Text(summary.dailyAverage.toMoneyText(), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
         }
     }

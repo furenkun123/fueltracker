@@ -19,8 +19,8 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
-val appVersionCode = 49
-val appVersionName = "1.7"
+val appVersionCode = 50
+val appVersionName = "1.71"
 
 android {
     namespace = "com.fueltracker"

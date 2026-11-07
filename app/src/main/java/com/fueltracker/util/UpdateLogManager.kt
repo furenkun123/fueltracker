@@ -55,6 +55,11 @@ object UpdateLogManager {
         49 to listOf(
             "微调UI",
             "修复bug"
+        ),
+        50 to listOf(
+            "调整部分页面布局、选择器交互及深色模式显示效果",
+            "导航栏优化",
+            "调整最低 Android 系统版本为 11"
         )
         // 后续版本继续追加
     )
@@ -72,7 +77,8 @@ object UpdateLogManager {
         41 to "1.62",
         45 to "1.66",
         48 to "1.69",
-        49 to "1.70"
+        49 to "1.70",
+        50 to "1.71"
     )
 
     /**

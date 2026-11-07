@@ -321,6 +321,7 @@ fun VehicleScreen(
 
             MiuixListItem("交车日期", formattedDeliveryDate) { showDatePickerSheet = true }
         }
+        Spacer(modifier = Modifier.height(14.dp))
 
         // 初始数据属于 FuelRecord，仅在添加车辆时录入，不混入车辆资料卡片。
         if (!isEditMode) {
@@ -330,7 +331,7 @@ fun VehicleScreen(
                     title = "当前里程 (km)",
                     value = initialOdometer,
                     onValueChange = { initialOdometer = it },
-                    placeholder = "必填，例如：20000",
+                    placeholder = "必填",
                     keyboardType = KeyboardType.Decimal
                 )
                 if (initialOdometer.isNotBlank() && (parsedOdometer == null || parsedOdometer < 0.0)) {
@@ -338,22 +339,28 @@ fun VehicleScreen(
                 }
 
                 MiuixFuelInputListItem(
-                    title = "当前剩余油量",
+                    title = "当前油量",
                     value = initialFuel,
                     onValueChange = { initialFuel = it },
                     unit = fuelUnit,
                     onUnitToggle = {
-                        val capacity = parsedCapacity
-                        val value = parsedFuel
                         if (initialFuel.isNotBlank()) {
-                            initialFuel = if (value != null && capacity != null && capacity > 0.0) {
-                                val converted = if (fuelUnit == "L") value / capacity * 100.0 else value / 100.0 * capacity
-                                String.format(Locale.US, "%.2f", converted)
-                            } else ""
+                            initialFuel = if (parsedFuel != null && parsedCapacity != null && parsedCapacity > 0.0) {
+                                val converted = if (fuelUnit == "L") {
+                                    parsedFuel / parsedCapacity * 100.0
+                                } else {
+                                    parsedFuel / 100.0 * parsedCapacity
+                                }
+                                // 👈 直接返回转换并格式化后的字符串
+                                String.format(Locale.US, "%.2f", converted).removeSuffix(".00").removeSuffix(".0")
+                            } else {
+                                "" // 如果油箱容量无效，直接清空
+                            }
                         }
+                        // 👈 切换单位标记放最后
                         fuelUnit = if (fuelUnit == "L") "%" else "L"
                     },
-                    placeholder = "必填，可填写 0"
+                    placeholder = "必填"
                 )
                 if (initialFuel.isNotBlank() && !isFuelValid) {
                     Text(
@@ -556,12 +563,16 @@ private fun MiuixInputListItem(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // 👈 统一宽度 100.dp
         Text(
             text = title,
             fontSize = 16.sp,
             color = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.width(100.dp)
         )
+
+        // 👈 加一个固定间距，让输入框起点对齐且有呼吸感
+        Spacer(modifier = Modifier.width(16.dp))
 
         BasicTextField(
             value = value,
@@ -610,12 +621,16 @@ private fun MiuixFuelInputListItem(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // 👈 同样锁死为 100.dp，与上面保持绝对一致
         Text(
             text = title,
             fontSize = 16.sp,
             color = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.width(100.dp)
         )
+
+        // 👈 同样加 16.dp 间距，让“必填”两个字和上面的“必填”对齐
+        Spacer(modifier = Modifier.width(16.dp))
 
         BasicTextField(
             value = value,
@@ -634,33 +649,37 @@ private fun MiuixFuelInputListItem(
                         text = placeholder,
                         fontSize = 16.sp,
                         color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        textAlign = TextAlign.Start
+                        textAlign = TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 innerTextField()
             }
         )
 
-        // 👈 切换单位的精美小按钮
+        // 切换小按钮
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(6.dp)) // 加个圆角，让点击时的水波纹好看些
+                .padding(start = 8.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f))
                 .clickable(onClick = onUnitToggle)
-                .padding(horizontal = 8.dp, vertical = 6.dp), // 扩大点击区域
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Rounded.SwapHoriz,
                 contentDescription = "切换单位",
-                modifier = Modifier.size(16.dp), // 稍微放大到 16dp，和文字更协调
-                tint = MiuixTheme.colorScheme.primary
+                modifier = Modifier.size(14.dp),
+                tint = MiuixTheme.colorScheme.onSurfaceSecondary
             )
-            Spacer(modifier = Modifier.width(4.dp)) // 图标和文字之间留点空隙
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
-                text = if (unit == "L") "%" else "L", // 显示将要切换成的目标单位
-                fontSize = 13.sp, // 稍微放大到 13sp，更易读
-                fontWeight = FontWeight.Bold,
-                color = MiuixTheme.colorScheme.primary,
+                text = if (unit == "L") "%" else "L",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onSurfaceSecondary,
                 maxLines = 1
             )
         }

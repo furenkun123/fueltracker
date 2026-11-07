@@ -395,10 +395,10 @@ object BackupManager {
             // 兼容旧备份：将旧 Vehicle 初始字段转换为 FuelRecord；已有初始化记录只补缺失字段。
             var nextRecordId = records.maxOfOrNull { it.id } ?: 0L
             val backupCreatedAt = root.optLong("createdAt", System.currentTimeMillis()).coerceAtLeast(1L)
-            for (vehicle in vehicles) {
-                val legacy = legacyInitialData[vehicle.id] ?: continue
+            for ((id, _, _, _, _, _, _, fuelGrade, deliveryDate) in vehicles) {
+                val legacy = legacyInitialData[id] ?: continue
                 val existingIndex = records.indexOfFirst {
-                    it.vehicleId == vehicle.id && it.isInitialRecord
+                    it.vehicleId == id && it.isInitialRecord
                 }
                 val legacyFuel = legacy.fuel
 
@@ -411,9 +411,9 @@ object BackupManager {
                 } else if (legacy.odometer != null || legacyFuel != null) {
                     check(nextRecordId < Long.MAX_VALUE) { "备份记录 ID 已达到上限" }
                     nextRecordId += 1L
-                    val deliveryStart = vehicle.deliveryDate?.takeIf { it > 0L }
+                    val deliveryStart = deliveryDate?.takeIf { it > 0L }
                     val firstVisibleFuelTimestamp = records.asSequence()
-                        .filter { it.vehicleId == vehicle.id && !it.isInitialRecord }
+                        .filter { it.vehicleId == id && !it.isInitialRecord }
                         .filter { deliveryStart == null || it.timestamp >= deliveryStart }
                         .minOfOrNull { it.timestamp }
                     val initialTimestamp = firstVisibleFuelTimestamp
@@ -423,9 +423,9 @@ object BackupManager {
                     records.add(
                         FuelRecord(
                             id = nextRecordId,
-                            vehicleId = vehicle.id,
+                            vehicleId = id,
                             timestamp = initialTimestamp,
-                            fuelGrade = vehicle.fuelGrade,
+                            fuelGrade = fuelGrade,
                             odometer = legacy.odometer,
                             volume = 0.0,
                             actualPaidAmount = 0.0,
