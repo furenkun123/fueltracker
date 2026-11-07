@@ -176,11 +176,8 @@ private fun NavigationBarSurface(
     navigationBackdropDetector: NavigationBackdropDetector,
     content: @Composable RowScope.() -> Unit
 ) {
-    val solidColor = if (isLight) {
-        Color.White
-    } else {
-        MiuixTheme.colorScheme.surface
-    }
+    // 浅色模式也使用主题 surface，而不是纯白，缩小玻璃与实色材质的色差。
+    val solidColor = MiuixTheme.colorScheme.surface
 
     val shouldUseGlass = isGlassEnabled &&
             isFloating &&
