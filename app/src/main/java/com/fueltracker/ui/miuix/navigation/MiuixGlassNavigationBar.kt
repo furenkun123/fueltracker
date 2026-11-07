@@ -135,7 +135,7 @@ fun MiuixGlassNavigationBar(
                 )
                 .clip(shape)
                 .onGloballyPositioned { coordinates ->
-                    if (coordinates.isAttached && coordinates.isPlaced) {
+                    if (coordinates.isAttached) {
                         val marginPx = with(density) {
                             24.dp.toPx()
                         }
