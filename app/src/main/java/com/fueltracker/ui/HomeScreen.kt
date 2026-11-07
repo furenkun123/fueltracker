@@ -37,7 +37,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
-import top.yukonga.miuix.kmp.basic.FloatingActionButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.basic.Surface
@@ -75,7 +74,9 @@ import com.fueltracker.ui.miuix.MiuixButton
 import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixFilterChip
 import com.fueltracker.ui.miuix.MiuixTextButton
-import com.fueltracker.ui.components.vehicle.MiuixVehicleCard
+import com.fueltracker.ui.components.MiuixVehicleCard
+import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
+import com.fueltracker.ui.miuix.navigation.NavigationContentRegion
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.StatisticsSummary
@@ -97,7 +98,7 @@ fun HomeScreen(
     vehicle: Vehicle?,
     records: List<FuelRecord>,
     latestConsumption: Double? = null,
-//    averageConsumption: Double? = null,
+    navigationBackdropDetector: NavigationBackdropDetector,
     activeParking: ExpenseRecord? = null,
     onAddVehicle: () -> Unit,
     onAddFuel: () -> Unit,
@@ -229,7 +230,12 @@ fun HomeScreen(
                 }
             } else {
                 item {
-                    MiuixVehicleCard(vehicle)
+                    NavigationContentRegion(
+                        detector = navigationBackdropDetector,
+                        key = "home_vehicle"
+                    ) {
+                        MiuixVehicleCard(vehicle)
+                    }
                 }
 
                 if (activeParking != null) {
@@ -244,16 +250,20 @@ fun HomeScreen(
                 }
 
                 item {
-                    ConsumptionCard(
-                        latestConsumption = resolvedLatestConsumption,
-//                        averageConsumption = averageConsumption,
-                        summary = statsSummary,
-                        selectedRange = selectedRange,
-                        customYear = customYear,
-                        customMonth = customMonth,
-                        onRangeSelected = { selectedRange = it },
-                        onCustomMonthClick = { showYearMonthPicker = true }
-                    )
+                    NavigationContentRegion(
+                        detector = navigationBackdropDetector,
+                        key = "home_consumption"
+                    ) {
+                        ConsumptionCard(
+                            latestConsumption = resolvedLatestConsumption,
+                            summary = statsSummary,
+                            selectedRange = selectedRange,
+                            customYear = customYear,
+                            customMonth = customMonth,
+                            onRangeSelected = { selectedRange = it },
+                            onCustomMonthClick = { showYearMonthPicker = true }
+                        )
+                    }
                 }
 
                 if (costData.size >= 2) {

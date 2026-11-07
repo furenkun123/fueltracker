@@ -42,6 +42,7 @@ import com.fueltracker.ui.miuix.navigation.MiuixAppNavigationBar
 import com.fueltracker.ui.miuix.navigation.AppNavItem
 import com.fueltracker.ui.miuix.MiuixTopBar
 import com.fueltracker.ui.miuix.MiuixTopBarIconButton
+import com.fueltracker.ui.miuix.navigation.NavigationBackdropDetector
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
 import com.fueltracker.viewmodel.ParkingNotificationState
@@ -59,6 +60,9 @@ fun FuelTrackerApp(
     }
 
     val appBackdrop = rememberLayerBackdrop()
+    val navigationBackdropDetector = remember {
+        NavigationBackdropDetector()
+    }
 
     // ---------- 启动弹窗 ----------
     val startState = remember {
@@ -197,8 +201,8 @@ fun FuelTrackerApp(
                                     vehicle = vehicle,
                                     records = records,
                                     latestConsumption = latest,
-//                                    averageConsumption = average,
                                     activeParking = activeParking,
+                                    navigationBackdropDetector = navigationBackdropDetector,
 
                                     onAddVehicle = {
                                         viewModel.navigateToAddVehicle(HOME)
@@ -238,6 +242,7 @@ fun FuelTrackerApp(
                             RECORDS -> {
                                 RecordsScreen(
                                     viewModel = viewModel,
+                                    navigationBackdropDetector = navigationBackdropDetector,
                                     onEdit = { record ->
                                         viewModel.editFuel(
                                             record,
@@ -251,6 +256,7 @@ fun FuelTrackerApp(
                             EXPENSES -> {
                                 ExpenseScreen(
                                     viewModel = viewModel,
+                                    navigationBackdropDetector = navigationBackdropDetector,
                                     selectedCategory = expenseSelectedCategory,
 
                                     onSelectedCategoryChange = {

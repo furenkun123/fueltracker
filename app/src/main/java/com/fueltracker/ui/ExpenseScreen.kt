@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Receipt
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
-import top.yukonga.miuix.kmp.basic.FloatingActionButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.basic.Text
@@ -271,8 +270,7 @@ fun ExpenseScreen(
                             onEdit = {
                                 if (item is ExpenseListItem.Fuel) onEditFuel(item.record)
                                 else onEditExpense((item as ExpenseListItem.Expense).record)
-                            },
-                            onDelete = { deletingItem = item }
+                            }
                         )
                     }
                 }

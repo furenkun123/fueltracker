@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,9 +36,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.ui.miuix.MiuixCard
-import com.fueltracker.ui.miuix.MiuixBottomSheetWrapper
 import com.fueltracker.ui.miuix.MiuixFilterChip
 import com.fueltracker.ui.miuix.MiuixTextButton
+import com.fueltracker.ui.miuix.dialogs.MiuixBottomSheetWrapper
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.ExpenseSummary
 import com.fueltracker.util.MonthTrendPoint
@@ -50,6 +48,8 @@ import com.fueltracker.util.toMoneyText
 import com.fueltracker.util.toPercentText
 import com.fueltracker.util.toPlainMoneyText
 import kotlinx.coroutines.flow.firstOrNull
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Locale
 
 @Composable
@@ -293,7 +293,7 @@ fun ExpenseStructureCard(items: List<StructureItem>, selectedCategory: String?, 
 }
 
 @Composable
-fun ExpenseDetailItemCard(title: String, time: String, amount: Double, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun ExpenseDetailItemCard(title: String, time: String, amount: Double, onEdit: () -> Unit) {
     MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -304,7 +304,6 @@ fun ExpenseDetailItemCard(title: String, time: String, amount: Double, onEdit: (
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     MiuixTextButton("编辑", MiuixTheme.colorScheme.primary, onClick = onEdit)
-                    MiuixTextButton("删除", Color(0xFFFF3B30).copy(alpha = 0.8f), onClick = onDelete)
                 }
             }
             Text(amount.toMoneyText(), fontSize = 22.sp, fontWeight = FontWeight.Bold)

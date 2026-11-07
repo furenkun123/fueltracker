@@ -62,9 +62,13 @@ import com.kyant.backdrop.shadow.Shadow as BackdropShadow
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 
 @Composable
 fun MiuixGlassNavigationBar(
@@ -75,6 +79,7 @@ fun MiuixGlassNavigationBar(
     selectedIndex: Int = 0,
     onSelectedIndexChange: (Int) -> Unit,
     itemCount: Int = 3,
+    navigationBackdropDetector: NavigationBackdropDetector,
     content: @Composable RowScope.() -> Unit
 ) {
     val isLight =
@@ -82,9 +87,9 @@ fun MiuixGlassNavigationBar(
 
     val floatingShadow = if (isLight) {
         ComposeShadow(
-            radius = 10.dp,
+            radius = 16.dp,
             color = Color.Black,
-            alpha = 0.2f
+            alpha = 0.1f
         )
     } else {
         ComposeShadow(
@@ -130,6 +135,18 @@ fun MiuixGlassNavigationBar(
                     }
                 )
                 .clip(shape)
+                .onGloballyPositioned { coordinates ->
+                    if (coordinates.isAttached && coordinates.isPlaced) {
+                        val marginPx = with(LocalDensity.current) {
+                            24.dp.toPx()
+                        }
+
+                        navigationBackdropDetector.updateNavigation(
+                            bounds = coordinates.boundsInWindow(),
+                            marginPx = marginPx
+                        )
+                    }
+                }
         ) {
             NavigationBarSurface(
                 backdrop = backdrop,
@@ -137,6 +154,7 @@ fun MiuixGlassNavigationBar(
                 isLight = isLight,
                 isGlassEnabled = isGlassEnabled,
                 isFloating = isFloating,
+                navigationBackdropDetector = navigationBackdropDetector,
                 selectedIndex = selectedIndex,
                 onSelectedIndexChange = onSelectedIndexChange,
                 itemCount = itemCount,
@@ -158,9 +176,15 @@ private fun NavigationBarSurface(
     itemCount: Int,
     content: @Composable RowScope.() -> Unit
 ) {
-    val solidColor = MiuixTheme.colorScheme.surfaceContainer
+    val solidColor = if (isLight) {
+        Color.White
+    } else {
+        MiuixTheme.colorScheme.surface
+    }
 
-    val glassEnabled = isGlassEnabled && isFloating
+    val glassEnabled = isGlassEnabled &&
+            isFloating &&
+            navigationBackdropDetector.hasNearbyContent
 
     BoxWithConstraints(
         modifier = Modifier
@@ -353,6 +377,10 @@ private fun NavigationBarSurface(
         }
 
         // 第五层：导航内容
+        val horizontalPaddingPx = with(LocalDensity.current) {
+            horizontalPadding.toPx()
+        }
+
         val tabWidthPx = with(LocalDensity.current) {
             tabWidth.toPx()
         }
@@ -393,27 +421,30 @@ private fun NavigationBarSurface(
                     detectHorizontalDragGestures(
                         onDragStart = { position ->
 
-                            // 当前胶囊位置
-                            val currentIndex = if (isDragging) {
-                                dragIndex
-                            } else {
-                                animatedIndex.value
-                            }
+                            // 从手指按下的位置计算起始导航项
+                            val startIndex = (
+                                    (position.x - horizontalPaddingPx) / tabWidthPx
+                                    ).toInt().coerceIn(0, tabCount - 1)
 
-                            val left = currentIndex * tabWidthPx
-
-                            // 仅允许从当前选中胶囊开始拖动
+                            // 仅允许在导航栏内容区域内开始拖动
                             draggingPill =
-                                position.x in left..(left + pillWidthPx) &&
-                                        position.y in pillTopPx..(pillTopPx + pillHeightPx)
+                                position.y in pillTopPx..(pillTopPx + pillHeightPx)
 
                             if (draggingPill) {
                                 lastDragTimeMillis = 0L
                                 smoothedSpeedDpPerSecond = 0f
-                                lastNotifiedIndex = latestSelectedIndex.value
-                                dragIndex = currentIndex
+
+                                // 以手指按下的导航项作为起点
+                                lastNotifiedIndex = startIndex
+                                dragIndex = startIndex.toFloat()
+
                                 dragStretch = 1f
                                 isDragging = true
+
+                                // 如果按下的不是当前页面，立即切换
+                                if (startIndex != latestSelectedIndex.value) {
+                                    selectionCallback.value(startIndex)
+                                }
                             }
                         },
 
@@ -591,8 +622,8 @@ private object MiuixGlassDefaults {
     object Navigation {
 
         // ---------- 底部渐变 ----------
-        val lightBottomOverlay = Color(0xFFD1D1D6).copy(alpha = 0.20f)
-        val darkBottomOverlay = Color.Black.copy(alpha = 0.22f)
+        val lightBottomOverlay = Color.Transparent
+        val darkBottomOverlay = Color.Black.copy(alpha = 0.06f)
 
         // ---------- 顶部反光 ----------
         const val LIGHTHIGHLIGHTALPHA = 0.16f
@@ -651,9 +682,9 @@ private fun Modifier.drawGlassNavigationBackdrop(
         onDrawSurface = {
             drawRect(
                 if (isLight) {
-                    Color.White.copy(alpha = 0.16f)
+                    Color.White.copy(alpha = 0.15f)
                 } else {
-                    Color(0xFF17171B).copy(alpha = 0.14f)
+                    Color(0xFF202028).copy(alpha = 0.07f)
                 }
             )
         }
@@ -780,13 +811,13 @@ private fun Modifier.drawGlassSelectionPill(
         highlight = null,
 
         shadow = {
-            BackdropShadow.Default.copy(alpha = 0.24f)
+            BackdropShadow.Default.copy(alpha = 0.12f)
         },
 
         onDrawSurface = {
             drawRect(
                 Color.White.copy(
-                    alpha = if (isLight) 0.24f else 0.10f
+                    alpha = if (isLight) 0.28f else 0.10f
                 )
             )
         }
