@@ -117,10 +117,6 @@ abstract class AppDatabase : RoomDatabase() {
                         ),
                         initialFuel = COALESCE(
                             initialFuel,
-                            (SELECT CASE WHEN fuelType = '纯电动' THEN NULL ELSE initialFuel END
-                             FROM vehicles WHERE vehicles.id = fuel_records.vehicleId)
-                        ),
-                        remainingFuel = COALESCE(
                             remainingFuel,
                             (SELECT CASE WHEN fuelType = '纯电动' THEN NULL ELSE initialFuel END
                              FROM vehicles WHERE vehicles.id = fuel_records.vehicleId)
@@ -153,7 +149,7 @@ abstract class AppDatabase : RoomDatabase() {
                         NULL,
                         0.0,
                         0.0,
-                        CASE WHEN v.fuelType = '纯电动' THEN NULL ELSE v.initialFuel END,
+                        NULL,
                         0,
                         1,
                         CASE WHEN v.fuelType = '纯电动' THEN NULL ELSE v.initialFuel END,
