@@ -69,7 +69,6 @@ private val RECORD_DATE_FORMAT by lazy { SimpleDateFormat("yyyy-MM-dd HH:mm", Lo
 @Composable
 fun RecordsScreen(
     viewModel: MainViewModel,
-    navigationBackdropDetector: NavigationBackdropDetector,
     onEdit: (FuelRecord) -> Unit
 ) {
     val records by viewModel.records.collectAsState()
@@ -143,17 +142,15 @@ fun RecordsScreen(
                 RecordFilterBar(filterType, selectedYear, selectedMonth, selectedDay, { filterType = it }, { showDatePicker = true })
             }
             item(key = "statistics") {
-                NavigationContentRegion(navigationBackdropDetector, "records_statistics") {
-                    RecordStatistics(displayRecords, vehicle)
-                }
+                RecordStatistics(displayRecords, vehicle)
             }
             item(key = "spacer") { Spacer(modifier = Modifier.height(8.dp)) }
 
             if (displayRecords.isEmpty()) {
                 item(key = "empty_state") { EmptyRecordsState(modifier = Modifier.fillMaxWidth().height(300.dp)) }
             } else {
-                items(displayRecords, key = { it.id }) {
-                        FuelRecordCard(
+                items(displayRecords, key = { it.id }) { record ->
+                    FuelRecordCard(
                             record = record,
                             calculationResult = consumptionMap[record.id],
                             vehicle = vehicle,
