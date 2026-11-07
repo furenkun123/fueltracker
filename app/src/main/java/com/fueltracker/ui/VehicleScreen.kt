@@ -70,7 +70,7 @@ import java.util.Calendar
 import java.util.Locale
 
 // 预设选择列表
-private val FuelTypeOptions = listOf("汽油", "柴油", "插电混动", "油电混动", "增程式", "纯电动")
+private val FuelTypeOptions = listOf("汽油", "柴油", "插电混动", "油电混动", "增程式")
 private val GasolineGradeOptions = listOf("92#", "95#", "98#", "89#", "其他")
 private val DieselGradeOptions = listOf("0# 柴油", "-10# 柴油", "-20# 柴油", "-35# 柴油", "其他")
 
@@ -79,7 +79,6 @@ private fun normalizeEnergyType(raw: String): String = when {
     raw.contains("油电") -> "油电混动"
     raw.contains("增程") -> "增程式"
     raw.contains("柴油") -> "柴油"
-    raw.contains("纯电") -> "纯电动"
     raw.contains("汽油") -> "汽油"
     else -> raw
 }
@@ -139,9 +138,7 @@ fun VehicleScreen(
     val currentFuelGradeOptions = remember(fuelType) { if (fuelType == "柴油") DieselGradeOptions else GasolineGradeOptions }
 
     LaunchedEffect(fuelType) {
-        if (fuelType == "纯电动") {
-            fuelGrade = ""
-        } else if (fuelGrade.isBlank() || fuelGrade !in currentFuelGradeOptions) {
+        if (fuelGrade.isBlank() || fuelGrade !in currentFuelGradeOptions) {
             fuelGrade = if (fuelType == "柴油") "0# 柴油" else "95#"
         }
     }
@@ -155,11 +152,12 @@ fun VehicleScreen(
     val parsedOdometer = initialOdometer.toDoubleOrNull()
     val parsedFuel = initialFuel.toDoubleOrNull()
 
-    val isCapacityValid = fuelType == "纯电动" || (parsedCapacity != null && parsedCapacity.isFinite() && parsedCapacity > 0.0)
+    val isSupportedFuelType = fuelType in FuelTypeOptions
+    val isCapacityValid = parsedCapacity != null && parsedCapacity.isFinite() && parsedCapacity > 0.0
     val isOdometerValid = isEditMode ||
             (parsedOdometer != null && parsedOdometer.isFinite() && parsedOdometer >= 0.0)
 
-    val isFuelValid = isEditMode || fuelType == "纯电动" || (
+    val isFuelValid = isEditMode || (
             parsedFuel != null &&
                     parsedFuel.isFinite() &&
                     parsedFuel >= 0.0 &&
@@ -169,8 +167,8 @@ fun VehicleScreen(
                     if (fuelUnit == "L") parsedFuel <= parsedCapacity else parsedFuel <= 100.0
             )
 
-    val isFuelGradeValid = fuelType == "纯电动" || fuelGrade.isNotBlank()
-    val canSave = brand.isNotBlank() && model.isNotBlank() && fuelType.isNotBlank() &&
+    val isFuelGradeValid = fuelGrade.isNotBlank()
+    val canSave = brand.isNotBlank() && model.isNotBlank() && isSupportedFuelType &&
             isFuelGradeValid && isCapacityValid && isOdometerValid && isFuelValid
 
     if (showCarPicker) {
@@ -308,19 +306,17 @@ fun VehicleScreen(
             // 能源类型
             MiuixListItem("能源类型", fuelType) { showFuelTypePickerSheet = true }
 
-            if (fuelType != "纯电动") {
-                MiuixListItem("燃油标号", fuelGrade.ifBlank { "未设置" }) { showFuelGradePickerSheet = true }
+            MiuixListItem("燃油标号", fuelGrade.ifBlank { "未设置" }) { showFuelGradePickerSheet = true }
 
-                MiuixInputListItem(
-                    title = "油箱容量 (L)",
-                    value = tankCapacity,
-                    onValueChange = { tankCapacity = it },
-                    placeholder = "例如：50",
-                    keyboardType = KeyboardType.Decimal
-                )
-                if (tankCapacity.isNotBlank() && (parsedCapacity == null || parsedCapacity <= 0.0)) {
-                    Text("油箱容量必须大于 0", fontSize = 13.sp, color = MiuixTheme.colorScheme.error, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp))
-                }
+            MiuixInputListItem(
+                title = "油箱容量 (L)",
+                value = tankCapacity,
+                onValueChange = { tankCapacity = it },
+                placeholder = "例如：50",
+                keyboardType = KeyboardType.Decimal
+            )
+            if (tankCapacity.isNotBlank() && (parsedCapacity == null || parsedCapacity <= 0.0)) {
+                Text("油箱容量必须大于 0", fontSize = 13.sp, color = MiuixTheme.colorScheme.error, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp))
             }
 
             MiuixListItem("交车日期", formattedDeliveryDate) { showDatePickerSheet = true }
@@ -341,33 +337,31 @@ fun VehicleScreen(
                     Text("当前里程必须是有效的非负数", fontSize = 13.sp, color = MiuixTheme.colorScheme.error, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp))
                 }
 
-                if (fuelType != "纯电动") {
-                    MiuixFuelInputListItem(
-                        title = "当前剩余油量",
-                        value = initialFuel,
-                        onValueChange = { initialFuel = it },
-                        unit = fuelUnit,
-                        onUnitToggle = {
-                            val capacity = parsedCapacity
-                            val value = parsedFuel
-                            if (initialFuel.isNotBlank()) {
-                                initialFuel = if (value != null && capacity != null && capacity > 0.0) {
-                                    val converted = if (fuelUnit == "L") value / capacity * 100.0 else value / 100.0 * capacity
-                                    String.format(Locale.US, "%.2f", converted)
-                                } else ""
-                            }
-                            fuelUnit = if (fuelUnit == "L") "%" else "L"
-                        },
-                        placeholder = "必填，可填写 0"
+                MiuixFuelInputListItem(
+                    title = "当前剩余油量",
+                    value = initialFuel,
+                    onValueChange = { initialFuel = it },
+                    unit = fuelUnit,
+                    onUnitToggle = {
+                        val capacity = parsedCapacity
+                        val value = parsedFuel
+                        if (initialFuel.isNotBlank()) {
+                            initialFuel = if (value != null && capacity != null && capacity > 0.0) {
+                                val converted = if (fuelUnit == "L") value / capacity * 100.0 else value / 100.0 * capacity
+                                String.format(Locale.US, "%.2f", converted)
+                            } else ""
+                        }
+                        fuelUnit = if (fuelUnit == "L") "%" else "L"
+                    },
+                    placeholder = "必填，可填写 0"
+                )
+                if (initialFuel.isNotBlank() && !isFuelValid) {
+                    Text(
+                        text = if (fuelUnit == "L") "剩余油量不能超过油箱容量" else "百分比必须在 0～100 之间",
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 16.dp, bottom = 12.dp)
                     )
-                    if (initialFuel.isNotBlank() && !isFuelValid) {
-                        Text(
-                            text = if (fuelUnit == "L") "剩余油量不能超过油箱容量" else "百分比必须在 0～100 之间",
-                            fontSize = 13.sp,
-                            color = MiuixTheme.colorScheme.error,
-                            modifier = Modifier.padding(start = 16.dp, bottom = 12.dp)
-                        )
-                    }
                 }
             }
         }
@@ -382,12 +376,8 @@ fun VehicleScreen(
                 val parsedYear = year.removeSuffix("年").toIntOrNull() ?: Calendar.getInstance().get(Calendar.YEAR)
                 val finalCapacity = parsedCapacity ?: (vehicle?.tankCapacity ?: 0.0)
                 val finalOdometer = parsedOdometer ?: 0.0
-                val finalFuel = if (fuelType == "纯电动") {
-                    null
-                } else {
-                    val inputFuel = parsedFuel ?: 0.0
-                    if (fuelUnit == "%") (inputFuel / 100.0) * finalCapacity else inputFuel
-                }
+                val inputFuel = parsedFuel ?: 0.0
+                val finalFuel = if (fuelUnit == "%") (inputFuel / 100.0) * finalCapacity else inputFuel
 
                 val baseVehicle = (vehicle ?: Vehicle(brand="", series="", model="", year=0, fuelType="", fuelGrade="", tankCapacity=0.0)).copy(
                     brand = brand.trim(), series = series.trim(), model = model.trim(),
