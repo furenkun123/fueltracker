@@ -1,5 +1,5 @@
 
-package com.fueltracker.ui.miui
+package com.fueltracker.ui.miuix
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,8 +41,9 @@ import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.vibrancy
 
+
 @Composable
-fun MiuiTopBar(
+fun MiuixTopBar(
     backdrop: Backdrop,
     modifier: Modifier = Modifier,
     navigationIcon: (@Composable () -> Unit)? = null,
@@ -57,7 +58,7 @@ fun MiuiTopBar(
     val totalHeight =
         statusBarHeight + if (showActionArea) actionAreaHeight else 0.dp
 
-    val barColor = MaterialTheme.colorScheme.background
+    val barColor = MiuixTheme.colorScheme.background
 
     Box(
         modifier = modifier
@@ -171,15 +172,15 @@ fun MiuiTopBar(
 }
 
 @Composable
-fun MiuiTopBarIconButton(
+fun MiuixTopBarIconButton(
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
     containerSize: Dp = 46.dp,
     iconSize: Dp = 24.dp,
-    iconTint: Color = MaterialTheme.colorScheme.onSurface,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant
+    iconTint: Color = MiuixTheme.colorScheme.onSurface,
+    containerColor: Color = MiuixTheme.colorScheme.surfaceVariant
 ) {
     Box(
         modifier = modifier
@@ -199,7 +200,7 @@ fun MiuiTopBarIconButton(
 }
 
 @Composable
-fun MiuiBackButton(
+fun MiuixBackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -213,7 +214,7 @@ fun MiuiBackButton(
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
             contentDescription = "返回",
-            tint = MaterialTheme.colorScheme.onBackground,
+            tint = MiuixTheme.colorScheme.onBackground,
             modifier = Modifier.size(22.dp)
         )
     }

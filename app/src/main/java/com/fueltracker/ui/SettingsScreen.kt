@@ -63,14 +63,14 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -82,6 +82,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -95,13 +96,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.fueltracker.BuildConfig
 import com.fueltracker.data.Vehicle
-import com.fueltracker.ui.components.InstructionsDialog
-import com.fueltracker.ui.components.MiuiConfirmDialog
-import com.fueltracker.ui.components.PrivacyDialog
-import com.fueltracker.ui.components.UpdateHistoryDialog
-import com.fueltracker.ui.miui.MiuiBackButton
-import com.fueltracker.ui.miui.MiuiCard
-import com.fueltracker.ui.miui.MiuiSwitch
+import com.fueltracker.ui.miuix.MiuixInstructionsDialog
+import com.fueltracker.ui.miuix.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.MiuixPrivacyDialog
+import com.fueltracker.ui.miuix.MiuixUpdateHistoryDialog
+import com.fueltracker.ui.miuix.MiuixBackButton
+import com.fueltracker.ui.miuix.MiuixCard
+import com.fueltracker.ui.miuix.MiuixSwitch
 import com.fueltracker.ui.theme.ThemeMode
 import com.fueltracker.ui.theme.ThemePreferences
 import com.fueltracker.util.BackupManager
@@ -216,7 +217,7 @@ fun SettingsScreen(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MiuixTheme.colorScheme.background),
         contentPadding = PaddingValues(
             // 👇 顶部加上状态栏高度，让内容避开状态栏
             top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 16.dp,
@@ -234,7 +235,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(bottom = 8.dp)
             ) {
-                MiuiBackButton(onClick = onBack)
+                MiuixBackButton(onClick = onBack)
 
                 Spacer(Modifier.width(8.dp))
 
@@ -242,7 +243,7 @@ fun SettingsScreen(
                     text = "设置与数据",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = MiuixTheme.colorScheme.onBackground
                 )
             }
         }
@@ -259,28 +260,26 @@ fun SettingsScreen(
                             text = "车辆管理",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground // 👈 强制使用与背景相反的颜色
+                            color = MiuixTheme.colorScheme.onBackground // 👈 强制使用与背景相反的颜色
                         )
                         TextButton(
+                            text = "＋ 添加车辆",
                             onClick = onAddVehicle,
                             enabled = !viewModel.isBackupOperationRunning,
-                            // 👈 可选：为了让按钮在禁用时更清晰，可以显式设置颜色（如果是启用状态，用 Primary 就行）
                             colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.primary,
-                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                color = Color.Transparent,
+                                textColor = MiuixTheme.colorScheme.primary,
+                                disabledTextColor = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f)
                             )
-                        ) {
-                            Text(
-                                text = "＋ 添加车辆",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium // 加一点字重，更好看
-                            )
-                        }
+                        )
                     }
                     if (vehicles.isEmpty()) {
-                        MiuiCardLocal {
+                        MiuixCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            cornerRadius = 16.dp
+                        ) {
                             Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                                Text("暂无车辆信息，请添加车辆", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("暂无车辆信息，请添加车辆", color = MiuixTheme.colorScheme.onSurfaceSecondary)
                             }
                         }
                     }
@@ -311,7 +310,7 @@ fun SettingsScreen(
                         useCircleBackground = true,
                         enabled = !viewModel.isBackupOperationRunning, onClick = { exportLauncher.launch(BackupManager.generateFileName()) }
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+                    HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
 
                     SettingsRow(
                         icon = Icons.Default.FileDownload, title = "恢复本地备份", subtitle = "覆盖当前记录",
@@ -362,7 +361,7 @@ fun SettingsScreen(
                     }
 
                     if (viewModel.isBackupOperationRunning) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+                        HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
                         ProcessingRow()
                     }
                 }
@@ -391,7 +390,7 @@ fun SettingsScreen(
                         Icon(
                             Icons.Default.CallToAction,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MiuixTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(Modifier.width(12.dp))
@@ -400,10 +399,10 @@ fun SettingsScreen(
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 if (viewModel.isFloatingBottomBar) "当前为悬浮胶囊样式" else "当前为经典固定贴底样式",
-                                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                                fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary
                             )
                         }
-                        MiuiSwitch(
+                        MiuixSwitch(
                             checked = viewModel.isFloatingBottomBar,
                             onCheckedChange = { viewModel.toggleFloatingBottomBar() }
                         )
@@ -412,7 +411,7 @@ fun SettingsScreen(
                     // 👇 2. 只有开启悬浮底栏时，才显示磨砂效果开关
                     if (viewModel.isFloatingBottomBar) {
                         HorizontalDivider(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            color = MiuixTheme.colorScheme.surfaceVariant,
                             thickness = 0.6.dp,
                             modifier = Modifier.padding(start = 16.dp)
                         )
@@ -427,7 +426,7 @@ fun SettingsScreen(
                             Icon(
                                 Icons.Default.BlurOn,
                                 null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = MiuixTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(Modifier.width(12.dp))
@@ -437,10 +436,10 @@ fun SettingsScreen(
                                 Text(
                                     if (viewModel.isGlassEffectEnabled) "已开启，底栏使用磨砂效果" else "已关闭，底栏使用纯色背景",
                                     fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MiuixTheme.colorScheme.onSurfaceSecondary
                                 )
                             }
-                            MiuiSwitch(
+                            MiuixSwitch(
                                 checked = viewModel.isGlassEffectEnabled,
                                 onCheckedChange = { viewModel.toggleGlassEffect() }
                             )
@@ -448,7 +447,7 @@ fun SettingsScreen(
                     }
 
                     // 👇 3. 这里的底部分割线，用来隔开下面的主题模式选项
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+                    HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
                     // 👇 2. 第二行开始：深色/浅色模式选项
                     ThemeMode.entries.forEach { mode ->
                         val selected = currentThemeMode == mode
@@ -476,20 +475,20 @@ fun SettingsScreen(
                                     imageVector = icon,
                                     contentDescription = null,
                                     // 选中的时候图标变主题色，未选中时变灰色
-                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceSecondary,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     mode.displayName,
                                     fontSize = 14.sp,
-                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    color = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface
                                 )
                             }
 
                             // 右侧：打钩
                             if (selected) {
-                                Icon(Icons.Default.Check, "已选中", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Check, "已选中", tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                             } else {
                                 Spacer(Modifier.size(18.dp))
                             }
@@ -497,7 +496,7 @@ fun SettingsScreen(
 
                         // 分割线保持不变
                         if (mode != ThemeMode.entries.last()) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp, modifier = Modifier.padding(start = 16.dp))
+                            HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.6.dp, modifier = Modifier.padding(start = 16.dp))
                         }
                     }
                 }
@@ -519,7 +518,7 @@ fun SettingsScreen(
                             icon = Icons.AutoMirrored.Filled.MenuBook, trailingIcon = null,
                             enabled = !viewModel.isBackupOperationRunning, onClick = { showInstructions = true }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+                        HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
 
                         SettingsRow(
                             title = "查看更新", subtitle = "跳转网盘查看下载",
@@ -527,7 +526,7 @@ fun SettingsScreen(
                             enabled = !viewModel.isBackupOperationRunning,
                             onClick = { openExternalPage(context, "https://yun.139.com/shareweb/#/w/i/2xTrJEeQhKJ01", "无法打开网盘链接") }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+                        HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
 
                         SettingsRow(
                             title = "GitHub 仓库", subtitle = "查看Github",
@@ -541,14 +540,14 @@ fun SettingsScreen(
                                 )
                             }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+                        HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
 
                         SettingsRow(
                             title = "更新历史", subtitle = "查看历次版本更新内容",
                             icon = Icons.Default.History, trailingIcon = null,
                             enabled = !viewModel.isBackupOperationRunning, onClick = { showUpdateHistory = true }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+                        HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
 
                         // 通知权限（特殊排版，保留原生 Row）
                         Row(
@@ -565,20 +564,20 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                Icon(Icons.Default.Notifications, null, tint = if (notificationsEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Notifications, null, tint = if (notificationsEnabled) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Column {
                                     Text("通知权限", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                    Text(if (notificationsEnabled) "已开启，记停车时会显示位置提醒" else "已关闭，点击前往系统设置开启", fontSize = 12.sp, color = if (notificationsEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
+                                    Text(if (notificationsEnabled) "已开启，记停车时会显示位置提醒" else "已关闭，点击前往系统设置开启", fontSize = 12.sp, color = if (notificationsEnabled) MiuixTheme.colorScheme.onSurfaceSecondary else MiuixTheme.colorScheme.error)
                                 }
                             }
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+                        HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
 
                         // 版本号
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("版本号", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            Text("v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text("v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -586,7 +585,10 @@ fun SettingsScreen(
 
             // 5. 隐私声明入口
             item(key = "section_privacy") {
-                MiuiCardLocal {
+                MiuixCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = 16.dp
+                ) {
                     SettingsRow(
                         icon = Icons.Default.Security, title = "隐私声明", subtitle = "了解应用信息收集情况",
                         useCircleBackground = true,
@@ -605,7 +607,7 @@ fun SettingsScreen(
 
     // --- 各种确认与弹窗 ---
     vehicles.firstOrNull { it.id == vehicleToDeleteId }?.let { vehicle ->
-        MiuiConfirmDialog(
+        MiuixConfirmDialog(
             title = "确认删除车辆？",
             message = buildString {
                 append("删除“${vehicle.brand} ${vehicle.model}”将同步删除该车辆下的所有加油记录，且不可恢复。")
@@ -618,7 +620,7 @@ fun SettingsScreen(
     }
 
     selectedRestoreUri?.let { uri ->
-        MiuiConfirmDialog(
+        MiuixConfirmDialog(
             title = "确认恢复备份？",
             message = "恢复备份将覆盖当前的所有车辆和加油记录，此操作无法撤销。是否继续？",
             confirmText = "覆盖并恢复",
@@ -635,9 +637,9 @@ fun SettingsScreen(
         )
     }
 
-    if (showPrivacyDialog) PrivacyDialog { showPrivacyDialog = false }
-    if (showUpdateHistory) UpdateHistoryDialog { showUpdateHistory = false }
-    if (showInstructions) InstructionsDialog { showInstructions = false }
+    if (showPrivacyDialog) MiuixPrivacyDialog { showPrivacyDialog = false }
+    if (showUpdateHistory) MiuixUpdateHistoryDialog { showUpdateHistory = false }
+    if (showInstructions) MiuixInstructionsDialog { showInstructions = false }
 }
 
 // ============================================================
@@ -663,33 +665,41 @@ private fun ExpandableSettingsGroup(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     if (!isNested) {
-                        Box(Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Box(Modifier.size(36.dp).clip(CircleShape).background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                            Icon(icon, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         }
                         Spacer(Modifier.width(12.dp))
                     } else {
-                        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Icon(icon, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(12.dp))
                     }
                     Column {
                         Text(title, fontSize = if (isNested) 14.sp else 15.sp, fontWeight = if (isNested) FontWeight.Medium else FontWeight.SemiBold)
                         Spacer(Modifier.height(2.dp))
-                        Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(subtitle, fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
                     }
                 }
-                Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, "展开", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, "展开", tint = MiuixTheme.colorScheme.onSurfaceSecondary)
             }
             AnimatedVisibility(expanded, enter = ExpandSpec + FadeInSpec, exit = ShrinkSpec + FadeOutSpec) {
                 Column {
-                    if (!isNested) HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
+                    if (!isNested) HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.6.dp)
                     content()
                 }
             }
         }
     }
 
-    if (isNested) innerContent()
-    else MiuiCardLocal { innerContent() }
+    if (isNested) {
+        innerContent()
+    } else {
+        MiuixCard(
+            modifier = Modifier.fillMaxWidth(),
+            cornerRadius = 16.dp
+        ) {
+            innerContent()
+        }
+    }
 }
 
 @Composable
@@ -711,22 +721,22 @@ private fun SettingsRow(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
             if (icon != null) {
                 if (useCircleBackground) {
-                    Box(Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Box(Modifier.size(36.dp).clip(CircleShape).background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                        Icon(icon, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     }
                 } else {
-                    Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(if (indent) 18.dp else 20.dp))
+                    Icon(icon, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(if (indent) 18.dp else 20.dp))
                 }
                 Spacer(Modifier.width(if (indent) 10.dp else 12.dp))
             }
             Column {
                 Text(title, fontSize = if (indent) 14.sp else 15.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(2.dp))
-                Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(subtitle, fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
             }
         }
         if (trailingIcon != null) {
-            Icon(trailingIcon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Icon(trailingIcon, null, tint = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -736,36 +746,35 @@ private fun SettingsRow(
 // ============================================================
 
 @Composable
-private fun MiuiCardLocal(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    MiuiCard(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) { content() }
-}
-
-@Composable
 private fun VehicleItemCard(vehicle: Vehicle, onSelect: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
-    MiuiCardLocal(modifier = Modifier.clickable(onClick = onSelect)) {
+    MiuixCard(
+        onClick = onSelect,
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = 16.dp
+    ) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(38.dp).clip(CircleShape).background(if (vehicle.isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.size(38.dp).clip(CircleShape).background(if (vehicle.isCurrent) MiuixTheme.colorScheme.primary.copy(alpha = 0.12f) else MiuixTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.DirectionsCar, null, tint = if (vehicle.isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.DirectionsCar, null, tint = if (vehicle.isCurrent) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.size(20.dp))
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(listOf(vehicle.brand, vehicle.series, vehicle.model).filter { it.isNotBlank() }.joinToString(" "), fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("${vehicle.year}款 | ${vehicle.fuelType} (${vehicle.fuelGrade}) | 油箱 ${vehicle.tankCapacity}L", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${vehicle.year}款 | ${vehicle.fuelType} (${vehicle.fuelGrade}) | 油箱 ${vehicle.tankCapacity}L", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
             }
             Spacer(modifier = Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (vehicle.isCurrent) {
-                    Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                        Text("当前使用", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    Surface(shape = RoundedCornerShape(4.dp), color = MiuixTheme.colorScheme.primaryContainer) {
+                        Text("当前使用", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "编辑", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp)) }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.DeleteOutline, "删除", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.9f), modifier = Modifier.size(16.dp)) }
+                    IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "编辑", tint = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.size(16.dp)) }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.DeleteOutline, "删除", tint = MiuixTheme.colorScheme.error.copy(alpha = 0.9f), modifier = Modifier.size(16.dp)) }
                 }
             }
         }
@@ -775,7 +784,7 @@ private fun VehicleItemCard(vehicle: Vehicle, onSelect: () -> Unit, onEdit: () -
 @Composable
 private fun ProcessingRow() {
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        Text("正在处理数据，请稍候…", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("正在处理数据，请稍候…", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
     }
 }
 

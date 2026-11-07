@@ -23,13 +23,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import top.yukonga.miuix.kmp.basic.DropdownImpl
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.ListPopupColumn
+import top.yukonga.miuix.kmp.basic.PopupPositionProvider
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.window.WindowListPopup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,15 +50,16 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CarBrand
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.data.Vehicle
-import com.fueltracker.ui.components.MiuiBottomSheetWrapper
+import com.fueltracker.ui.miuix.MiuixBottomSheetWrapper
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
-import com.fueltracker.ui.miui.MiuiBackButton
-import com.fueltracker.ui.miui.MiuiButton
-import com.fueltracker.ui.miui.MiuiClickableItem
-import com.fueltracker.ui.miui.MiuiGroupCard
-import com.fueltracker.ui.miui.MiuiInputItem
-import com.fueltracker.ui.miui.MiuiSectionHeader
+import com.fueltracker.ui.miuix.MiuixBackButton
+import com.fueltracker.ui.miuix.MiuixButton
+import com.fueltracker.ui.miuix.MiuixGroupCard
+import com.fueltracker.ui.miuix.MiuixSectionHeader
+import com.fueltracker.ui.miuix.MiuixTextButton
+import com.fueltracker.ui.miuix.MiuixClickableItem
+import com.fueltracker.ui.miuix.MiuixInputItem
 import com.fueltracker.viewmodel.MainViewModel
 import java.util.Calendar
 import java.util.Locale
@@ -102,7 +104,7 @@ fun VehicleScreen(
 
 
     // 👇 双保险：直接判断当前背景的亮度，决定文字用黑还是白
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
     val textColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
     val dividerColor = if (isLight) Color(0xFFE0E0E0) else Color(0xFF3A3A3C)
 
@@ -189,7 +191,7 @@ fun VehicleScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MiuixTheme.colorScheme.background)
             .statusBarsPadding()
             .imePadding()
             .navigationBarsPadding()
@@ -200,7 +202,7 @@ fun VehicleScreen(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            MiuiBackButton(onClick = onBack)
+            MiuixBackButton(onClick = onBack)
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = if (isEditMode) "编辑车辆信息" else "添加新车辆",
@@ -210,10 +212,10 @@ fun VehicleScreen(
             )
         }
 
-        MiuiSectionHeader(title = "车辆详细信息")
+        MiuixSectionHeader(title = "车辆详细信息")
 
-        MiuiGroupCard {
-            MiuiClickableItem("品牌", brand.ifBlank { "选择品牌" }) {
+        MiuixGroupCard {
+            MiuixClickableItem("品牌", brand.ifBlank { "选择品牌" }) {
                 pickerStartLevel = PickerLevel.BRAND
                 showCarPicker = true
             }
@@ -221,7 +223,7 @@ fun VehicleScreen(
             HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
             Box(modifier = Modifier.fillMaxWidth()) {
-                MiuiClickableItem("车系", series.ifBlank { "选择车系" }) {
+                MiuixClickableItem("车系", series.ifBlank { "选择车系" }) {
                     pickerStartLevel = if (brand.isBlank()) PickerLevel.BRAND else PickerLevel.SERIES
                     showCarPicker = true
                 }
@@ -235,9 +237,25 @@ fun VehicleScreen(
                                 interactionSource = remember { MutableInteractionSource() }, indication = null
                             ) { seriesMenuExpanded = true }
                         )
-                        DropdownMenu(seriesMenuExpanded, onDismissRequest = { seriesMenuExpanded = false }) {
-                            currentBrandSeries.forEach { s ->
-                                DropdownMenuItem(text = { Text(s, color = textColor) }, onClick = { series = s; seriesMenuExpanded = false })
+                        WindowListPopup(
+                            show = seriesMenuExpanded,
+                            alignment = PopupPositionProvider.Align.End,
+                            enableWindowDim = false,
+                            onDismissRequest = { seriesMenuExpanded = false }
+                        ) {
+                            ListPopupColumn {
+                                currentBrandSeries.forEachIndexed { index, option ->
+                                    DropdownImpl(
+                                        text = option,
+                                        optionSize = currentBrandSeries.size,
+                                        isSelected = series == option,
+                                        index = index,
+                                        onSelectedIndexChange = {
+                                            series = currentBrandSeries[it]
+                                            seriesMenuExpanded = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -245,7 +263,7 @@ fun VehicleScreen(
             }
             HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
-            MiuiClickableItem("车型", model.ifBlank { "选择车型" }) {
+            MiuixClickableItem("车型", model.ifBlank { "选择车型" }) {
                 pickerStartLevel = when {
                     brand.isBlank() -> PickerLevel.BRAND
                     series.isBlank() -> PickerLevel.SERIES
@@ -255,7 +273,7 @@ fun VehicleScreen(
             }
             HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
-            MiuiClickableItem("年款", year) {
+            MiuixClickableItem("年款", year) {
                 pickerStartLevel = when {
                     brand.isBlank() -> PickerLevel.BRAND
                     series.isBlank() -> PickerLevel.SERIES
@@ -266,36 +284,36 @@ fun VehicleScreen(
             }
             HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
-            MiuiClickableItem("能源类型", fuelType) { showFuelTypePickerSheet = true }
+            MiuixClickableItem("能源类型", fuelType) { showFuelTypePickerSheet = true }
             HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
             if (fuelType != "纯电动") {
-                MiuiClickableItem("燃油标号", fuelGrade.ifBlank { "未设置" }) { showFuelGradePickerSheet = true }
+                MiuixClickableItem("燃油标号", fuelGrade.ifBlank { "未设置" }) { showFuelGradePickerSheet = true }
                 HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
-                MiuiInputItem("油箱容量 (L)", tankCapacity, { tankCapacity = it }, "例如：50", KeyboardType.Decimal)
+                MiuixInputItem("油箱容量 (L)", tankCapacity, { tankCapacity = it }, "例如：50", KeyboardType.Decimal)
                 // 👇 新增：油箱错误提示
                 if (tankCapacity.isNotBlank() && (parsedCapacity == null || parsedCapacity <= 0.0)) {
                     Text(
                         text = "油箱容量必须大于 0",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.error,
+                        color = MiuixTheme.colorScheme.error,
                         modifier = Modifier.padding(start = 20.dp, top = 4.dp, bottom = 8.dp)
                     )
                 }
                 HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
             }
 
-            MiuiClickableItem("提车日期", formattedDeliveryDate) { showDatePickerSheet = true }
+            MiuixClickableItem("提车日期", formattedDeliveryDate) { showDatePickerSheet = true }
             HorizontalDivider(color = dividerColor, thickness = 0.8.dp)
 
-            MiuiInputItem("提车里程 (km)", initialOdometer, { initialOdometer = it }, "例如：20", KeyboardType.Decimal)
+            MiuixInputItem("提车里程 (km)", initialOdometer, { initialOdometer = it }, "例如：20", KeyboardType.Decimal)
             // 👇 新增：里程错误提示
             if (initialOdometer.isNotBlank() && (parsedOdometer == null || parsedOdometer < 0.0)) {
                 Text(
                     text = "提车里程不能为负数",
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MiuixTheme.colorScheme.error,
                     modifier = Modifier.padding(start = 20.dp, top = 4.dp, bottom = 8.dp)
                 )
             }
@@ -303,7 +321,7 @@ fun VehicleScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        MiuiButton(
+        MiuixButton(
             text = if (isEditMode) "保存修改" else "确认添加",
             enabled = canSave && !isSaving,  // 👈 增加防抖
             onClick = {
@@ -346,7 +364,7 @@ fun VehicleScreen(
 
     // 使用统一的底部滚轮弹窗
     if (showFuelTypePickerSheet) {
-        MiuiSingleWheelPickerSheet(
+        MiuixSingleWheelPickerSheet(
             title = "选择能源类型",
             options = FuelTypeOptions,
             currentValue = fuelType,
@@ -355,7 +373,7 @@ fun VehicleScreen(
         )
     }
     if (showFuelGradePickerSheet) {
-        MiuiSingleWheelPickerSheet(
+        MiuixSingleWheelPickerSheet(
             title = "选择燃油标号",
             options = currentFuelGradeOptions,
             currentValue = fuelGrade,
@@ -364,7 +382,7 @@ fun VehicleScreen(
         )
     }
     if (showDatePickerSheet) {
-        MiuiDateWheelPickerBottomSheet(
+        MiuixDateWheelPickerBottomSheet(
             initialMillis = deliveryDateMillis,
             onDismiss = { showDatePickerSheet = false },
             onClear = { deliveryDateMillis = null; showDatePickerSheet = false },
@@ -374,7 +392,7 @@ fun VehicleScreen(
 }
 
 @Composable
-private fun MiuiSingleWheelPickerSheet(
+private fun MiuixSingleWheelPickerSheet(
     title: String,
     options: List<String>,
     currentValue: String,
@@ -382,13 +400,13 @@ private fun MiuiSingleWheelPickerSheet(
     onConfirm: (String) -> Unit
 ) {
     var selectedValue by remember { mutableStateOf(currentValue.ifBlank { options.firstOrNull() ?: "" }) }
-    MiuiBottomSheetWrapper(title = title, onDismiss = onDismiss, onConfirm = { onConfirm(selectedValue) }) {
+    MiuixBottomSheetWrapper(title = title, onDismiss = onDismiss, onConfirm = { onConfirm(selectedValue) }) {
         WheelList(selectedValue = selectedValue, items = options, modifier = Modifier.fillMaxWidth(), visibleCount = 5, style = WheelStyle.WithBackground, onChange = { selectedValue = it })
     }
 }
 
 @Composable
-private fun MiuiDateWheelPickerBottomSheet(
+private fun MiuixDateWheelPickerBottomSheet(
     initialMillis: Long?,
     onDismiss: () -> Unit,
     onClear: () -> Unit,
@@ -402,12 +420,12 @@ private fun MiuiDateWheelPickerBottomSheet(
 
     LaunchedEffect(maxDays) { if (day > maxDays) day = maxDays }
 
-    MiuiBottomSheetWrapper(title = "选择提车日期", onDismiss = onDismiss, onConfirm = {
+    MiuixBottomSheetWrapper(title = "选择提车日期", onDismiss = onDismiss, onConfirm = {
         val result = Calendar.getInstance().apply { clear(); set(year, month - 1, day) }
         onConfirm(result.timeInMillis)
     }) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = onClear) { Text("不选择（设为空）", color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
+            MiuixTextButton("不选择（设为空）", MiuixTheme.colorScheme.error, onClick = onClear)
         }
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             WheelList(selectedValue = year, items = (2005..Calendar.getInstance().get(Calendar.YEAR) + 1).toList().reversed(), itemLabel = { "${it}年" }, modifier = Modifier.weight(1f), style = WheelStyle.Plain, onChange = { year = it })

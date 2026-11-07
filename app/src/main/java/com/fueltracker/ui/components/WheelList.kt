@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -112,8 +112,8 @@ fun <T> WheelList(
                     .height(itemHeight)
                     .background(
                         color = if (style == WheelStyle.DatePicker)
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
-                        else MaterialTheme.colorScheme.surfaceVariant,
+                            MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+                        else MiuixTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(10.dp)
                     )
             )
@@ -146,9 +146,9 @@ fun <T> WheelList(
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         color = when {
                             isSelected && style != WheelStyle.Plain ->
-                                MaterialTheme.colorScheme.onSurface
-                            isSelected -> MaterialTheme.colorScheme.primary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                MiuixTheme.colorScheme.onSurface
+                            isSelected -> MiuixTheme.colorScheme.primary
+                            else -> MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.6f)
                         }
                     )
                 }

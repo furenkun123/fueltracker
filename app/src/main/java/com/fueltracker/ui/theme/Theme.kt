@@ -1,10 +1,10 @@
 package com.fueltracker.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.darkColorScheme
+import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 private val LightColors = lightColorScheme(
     primary            = Blue600,
@@ -19,7 +19,7 @@ private val LightColors = lightColorScheme(
     onSurface          = TextPrimary,
 
     surfaceVariant     = SurfaceVariantLight,
-    onSurfaceVariant   = TextSecondary,
+    onSurfaceSecondary = TextSecondary,
 
     outline            = OutlineLight,
     error              = ErrorLight,
@@ -39,7 +39,7 @@ private val DarkColors = darkColorScheme(
     onSurface          = TextPrimaryDark,
 
     surfaceVariant     = SurfaceVariantDark,
-    onSurfaceVariant   = TextSecondaryDark,
+    onSurfaceSecondary = TextSecondaryDark,
 
     outline            = OutlineDark,
     error              = ErrorDark,
@@ -60,9 +60,9 @@ fun FuelTrackerTheme(
 
     val colors = if (isDark) DarkColors else LightColors
 
-    MaterialTheme(
-        colorScheme = colors,
-        typography = AppTypography,
+    MiuixTheme(
+        colors = colors,
+        textStyles = AppTextStyles,
         content = content
     )
 }

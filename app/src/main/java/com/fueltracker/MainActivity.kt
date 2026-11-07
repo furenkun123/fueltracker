@@ -14,10 +14,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 // 根据应用实际主题判断系统栏图标颜色
                 val isDarkTheme =
-                    MaterialTheme.colorScheme.background.luminance() < 0.5f
+                    MiuixTheme.colorScheme.background.luminance() < 0.5f
 
                 SideEffect {
                     WindowCompat.getInsetsController(
@@ -94,14 +94,14 @@ class MainActivity : ComponentActivity() {
                         ) {
                             Text(
                                 text = "初始化失败",
-                                style = MaterialTheme.typography.titleLarge
+                                style = MiuixTheme.textStyles.title4
                             )
 
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Text(
                                 text = state.message,
-                                color = MaterialTheme.colorScheme.error
+                                color = MiuixTheme.colorScheme.error
                             )
 
                             Spacer(modifier = Modifier.height(24.dp))

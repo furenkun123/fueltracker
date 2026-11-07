@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -28,13 +28,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,8 +55,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CarBrand
 import com.fueltracker.data.CarDatabase
-import com.fueltracker.ui.miui.MiuiBackButton
-import com.fueltracker.ui.miui.MiuiSearchTextField
+import com.fueltracker.ui.miuix.MiuixBackButton
+import com.fueltracker.ui.miuix.MiuixButton
+import com.fueltracker.ui.miuix.MiuixTextField
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -125,12 +125,12 @@ fun BrandSelectorScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MiuixTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                CircularProgressIndicator()
             }
         } else {
             Row(Modifier.fillMaxSize()) {
@@ -139,7 +139,7 @@ fun BrandSelectorScreen(
 
                         // 1. 标题
                         item(key = "top_bar") {
-                            val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+                            val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
                             val titleColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
 
                             Row(
@@ -148,7 +148,7 @@ fun BrandSelectorScreen(
                                     .padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                MiuiBackButton(onClick = onBack)
+                                MiuixBackButton(onClick = onBack)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = "选择品牌",
@@ -164,7 +164,7 @@ fun BrandSelectorScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(MaterialTheme.colorScheme.background)
+                                    .background(MiuixTheme.colorScheme.background)
                             ) {
                                 BrandSearchBox(
                                     value = searchText,
@@ -200,7 +200,7 @@ fun BrandSelectorScreen(
                                     Box(
                                         Modifier
                                             .fillMaxWidth()
-                                            .background(MaterialTheme.colorScheme.background)
+                                            .background(MiuixTheme.colorScheme.background)
                                             // 👈 强制左边缘为 20dp，上下留出合适的空隙
                                             .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp)
                                     ) {
@@ -208,11 +208,11 @@ fun BrandSelectorScreen(
                                             text = letter,
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
+                                            color = MiuixTheme.colorScheme.primary
                                         )
                                     }
                                     HorizontalDivider(
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                        color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                                         thickness = 0.8.dp,
                                         modifier = Modifier.padding(start = 20.dp)
                                     )
@@ -253,7 +253,7 @@ private fun BrandSearchBox(
     onValueChange: (String) -> Unit,
     onSearchAction: () -> Unit
 ) {
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
     val searchBoxBg = if (isLight) Color.Black.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.12f)
 
     Box(
@@ -267,25 +267,37 @@ private fun BrandSearchBox(
         contentAlignment = Alignment.CenterStart
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Search, null, tint = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            MiuiSearchTextField(
+
+            // 👇 替换为无边框的 BasicTextField
+            androidx.compose.foundation.text.BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
-                placeholder = "搜索汽车品牌...",
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Search
+                modifier = Modifier.weight(1f),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontSize = 14.sp,
+                    color = MiuixTheme.colorScheme.onSurface
                 ),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        onSearchAction()
+                singleLine = true,
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MiuixTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearchAction() }),
+                decorationBox = { innerTextField ->
+                    if (value.isEmpty()) {
+                        Text(
+                            text = "搜索汽车品牌...",
+                            fontSize = 14.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary
+                        )
                     }
-                ),
-                modifier = Modifier.weight(1f)
+                    innerTextField()
+                }
             )
+
             if (value.isNotEmpty()) {
                 IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Clear, "清除", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Clear, "清除", tint = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -304,7 +316,7 @@ private fun EmptyBrandState(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp) // 控制外边距，紧贴搜索框
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface) // 用卡片色托底
+            .background(MiuixTheme.colorScheme.surface) // 用卡片色托底
             .padding(vertical = 32.dp, horizontal = 16.dp), // 内部上下留白
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -313,7 +325,7 @@ private fun EmptyBrandState(
         Icon(
             imageVector = Icons.Default.SearchOff, // 或者用 Icons.Outlined.SearchOff
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            tint = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f),
             modifier = Modifier.size(48.dp)
         )
 
@@ -321,30 +333,24 @@ private fun EmptyBrandState(
         Text(
             text = if (searchText.isBlank()) "输入关键字搜索品牌" else "未找到与 \"$searchText\" 相关的品牌",
             fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MiuixTheme.colorScheme.onSurfaceSecondary,
             textAlign = TextAlign.Center
         )
 
         if (searchText.isNotBlank()) {
             // 👇 4. 按钮更紧凑
-            Button(
+            MiuixButton(
+                text = "使用 \"$searchText\" 作为品牌",
                 onClick = { onManualInput(searchText.trim()) },
-                shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
-            ) {
-                Text(
-                    text = "使用 \"$searchText\" 作为品牌",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+                modifier = Modifier.widthIn(max = 320.dp)
+            )
         }
     }
 }
 
 @Composable
 private fun BrandRow(brand: CarBrand, isSelected: Boolean, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+    Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.background)) {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -355,13 +361,13 @@ private fun BrandRow(brand: CarBrand, isSelected: Boolean, onClick: () -> Unit) 
             Text(
                 text = brand.brand,
                 fontSize = 16.sp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                color = if (isSelected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
             )
         }
         // 👇 修复：使用 onSurface 加透明度，保证在任何背景色下都能清晰看见分割线
         HorizontalDivider(
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
             thickness = 0.8.dp,
             // 起点严格锁定在 20dp
             modifier = Modifier.padding(start = 20.dp)
@@ -377,7 +383,7 @@ private fun AlphabetIndexBar(letters: List<String>, onLetterClick: (String) -> U
     ) {
         letters.forEach { letter ->
             Text(
-                text = letter, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = letter, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onSurfaceSecondary,
                 modifier = Modifier.clip(CircleShape).clickable { onLetterClick(letter) }.padding(vertical = 2.dp, horizontal = 4.dp)
             )
         }

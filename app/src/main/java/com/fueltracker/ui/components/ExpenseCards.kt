@@ -17,8 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,9 +37,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fueltracker.ui.miui.MiuiCard
-import com.fueltracker.ui.miui.MiuiFilterChip
-import com.fueltracker.ui.miui.MiuiTextButton
+import com.fueltracker.ui.miuix.MiuixCard
+import com.fueltracker.ui.miuix.MiuixBottomSheetWrapper
+import com.fueltracker.ui.miuix.MiuixFilterChip
+import com.fueltracker.ui.miuix.MiuixTextButton
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.ExpenseSummary
 import com.fueltracker.util.MonthTrendPoint
@@ -59,22 +60,22 @@ fun SummaryCard(
     onRangeSelected: (ExpenseRange) -> Unit,
     onCustomClick: () -> Unit
 ) {
-    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                MiuiFilterChip("全部", selectedRange == ExpenseRange.ALL) { onRangeSelected(ExpenseRange.ALL) }
-                MiuiFilterChip("本月", selectedRange == ExpenseRange.MONTH) { onRangeSelected(ExpenseRange.MONTH) }
-                MiuiFilterChip("今年", selectedRange == ExpenseRange.YEAR) { onRangeSelected(ExpenseRange.YEAR) }
-                MiuiFilterChip(if (selectedRange == ExpenseRange.CUSTOM_MONTH) rangeLabel else "选年月", selectedRange == ExpenseRange.CUSTOM_MONTH, onCustomClick)
+                MiuixFilterChip("全部", selectedRange == ExpenseRange.ALL) { onRangeSelected(ExpenseRange.ALL) }
+                MiuixFilterChip("本月", selectedRange == ExpenseRange.MONTH) { onRangeSelected(ExpenseRange.MONTH) }
+                MiuixFilterChip("今年", selectedRange == ExpenseRange.YEAR) { onRangeSelected(ExpenseRange.YEAR) }
+                MiuixFilterChip(if (selectedRange == ExpenseRange.CUSTOM_MONTH) rangeLabel else "选年月", selectedRange == ExpenseRange.CUSTOM_MONTH, onCustomClick)
             }
-            Text("${summary.rangeLabel}支出", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("${summary.rangeLabel}支出", fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("¥", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
                 Text(summary.totalAmount.toPlainMoneyText(), fontSize = 32.sp, fontWeight = FontWeight.Bold)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                Column { Text("笔数", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${summary.count} 笔", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
-                if (summary.showDaily) Column { Text("日均", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(summary.dailyAverage.toMoneyText(), fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+                Column { Text("笔数", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary); Text("${summary.count} 笔", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+                if (summary.showDaily) Column { Text("日均", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary); Text(summary.dailyAverage.toMoneyText(), fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
             }
         }
     }
@@ -87,9 +88,9 @@ fun ExpenseTrendCard(
     selectedYear: Int?,
     onYearSelected: (Int?) -> Unit
 ) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MiuixTheme.colorScheme.primary
+    val onSurfaceColor = MiuixTheme.colorScheme.onSurface
+    val onSurfaceVariantColor = MiuixTheme.colorScheme.onSurfaceSecondary
     val textMeasurer = rememberTextMeasurer()
 
     // 弹窗与临时选中状态
@@ -98,7 +99,7 @@ fun ExpenseTrendCard(
 
     val selectedYearText = if (selectedYear == null) "全部年份" else "${selectedYear}年"
 
-    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.padding(16.dp)) {
             // 标题行
             Row(
@@ -111,7 +112,7 @@ fun ExpenseTrendCard(
                     fontSize = 13.sp, fontWeight = FontWeight.SemiBold
                 )
 
-                MiuiFilterChip(
+                MiuixFilterChip(
                     text = "$selectedYearText ▼",
                     selected = true,
                     onClick = {
@@ -243,7 +244,7 @@ fun ExpenseTrendCard(
     if (showYearPicker) {
         val yearOptions = listOf<Int?>(null) + years
 
-        MiuiBottomSheetWrapper(
+        MiuixBottomSheetWrapper(
             title = "选择年份",
             onDismiss = { showYearPicker = false },
             onConfirm = {
@@ -266,24 +267,24 @@ fun ExpenseTrendCard(
 
 @Composable
 fun ExpenseStructureCard(items: List<StructureItem>, selectedCategory: String?, onCategoryClick: (String) -> Unit) {
-    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("费用结构", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Text(if (selectedCategory == null) "点击筛选" else "已筛选 $selectedCategory", fontSize = 11.sp, color = if (selectedCategory == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
+                Text(if (selectedCategory == null) "点击筛选" else "已筛选 $selectedCategory", fontSize = 11.sp, color = if (selectedCategory == null) MiuixTheme.colorScheme.onSurfaceSecondary else MiuixTheme.colorScheme.primary)
             }
             items.forEach { item ->
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onCategoryClick(item.name) }.padding(vertical = 6.dp, horizontal = 4.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(item.name, fontSize = 14.sp, fontWeight = if (item.name == selectedCategory) FontWeight.Bold else FontWeight.Normal, color = if (item.name == selectedCategory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        Text(item.name, fontSize = 14.sp, fontWeight = if (item.name == selectedCategory) FontWeight.Bold else FontWeight.Normal, color = if (item.name == selectedCategory) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(item.amount.toMoneyText(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                            Text(item.ratio.toPercentText(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(36.dp))
+                            Text(item.ratio.toPercentText(), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.width(36.dp))
                         }
                     }
                     Spacer(Modifier.height(4.dp))
-                    Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                        Box(Modifier.fillMaxWidth(item.ratio.coerceIn(0f, 1f)).fillMaxHeight().background(if (item.name == selectedCategory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)))
+                    Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(MiuixTheme.colorScheme.surfaceVariant)) {
+                        Box(Modifier.fillMaxWidth(item.ratio.coerceIn(0f, 1f)).fillMaxHeight().background(if (item.name == selectedCategory) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.primary.copy(alpha = 0.85f)))
                     }
                 }
             }
@@ -293,17 +294,17 @@ fun ExpenseStructureCard(items: List<StructureItem>, selectedCategory: String?, 
 
 @Composable
 fun ExpenseDetailItemCard(title: String, time: String, amount: Double, onEdit: () -> Unit, onDelete: () -> Unit) {
-    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(2.dp))
-                    Text(time, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(time, fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    MiuiTextButton("编辑", MaterialTheme.colorScheme.primary, onEdit)
-                    MiuiTextButton("删除", Color(0xFFFF3B30).copy(alpha = 0.8f), onDelete)
+                    MiuixTextButton("编辑", MiuixTheme.colorScheme.primary, onClick = onEdit)
+                    MiuixTextButton("删除", Color(0xFFFF3B30).copy(alpha = 0.8f), onClick = onDelete)
                 }
             }
             Text(amount.toMoneyText(), fontSize = 22.sp, fontWeight = FontWeight.Bold)

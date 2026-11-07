@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,15 +21,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,14 +47,14 @@ import androidx.compose.ui.window.DialogProperties
 import com.fueltracker.data.DEFAULT_EXPENSE_CATEGORIES
 import com.fueltracker.data.ExpenseCategoryStore
 import com.fueltracker.data.ExpenseRecord
-import com.fueltracker.ui.components.MiuiConfirmDialog
-import com.fueltracker.ui.components.MiuiDatePickerDialog
-import com.fueltracker.ui.miui.MiuiBackButton
-import com.fueltracker.ui.miui.MiuiButton
-import com.fueltracker.ui.miui.MiuiChip
-import com.fueltracker.ui.miui.MiuiFieldLabel
-import com.fueltracker.ui.miui.MiuiFormCard
-import com.fueltracker.ui.miui.MiuiTextField
+import com.fueltracker.ui.miuix.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.MiuixDatePickerDialog
+import com.fueltracker.ui.miuix.MiuixBackButton
+import com.fueltracker.ui.miuix.MiuixButton
+import com.fueltracker.ui.miuix.MiuixCard
+import com.fueltracker.ui.miuix.MiuixChip
+import com.fueltracker.ui.miuix.MiuixFormCard
+import com.fueltracker.ui.miuix.MiuixTextField
 import com.fueltracker.util.toDateTimeText
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -102,7 +96,7 @@ fun ExpenseEditScreen(
     val amount = amountText.toDoubleOrNull()
     val canSave = amount != null && amount > 0 && !isSaving
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
+    Scaffold(containerColor = MiuixTheme.colorScheme.background) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -121,21 +115,21 @@ fun ExpenseEditScreen(
                     .height(42.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                MiuiBackButton(onClick = onBack)
+                MiuixBackButton(onClick = onBack)
 
                 Spacer(Modifier.width(10.dp))
                 Text(
                     text = if (isEditMode) "编辑费用记录" else "记费用",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = MiuixTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
             // 分类
-            MiuiFormCard {
+            MiuixFormCard {
                 Text("分类", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
                 FlowRow(
@@ -156,13 +150,13 @@ fun ExpenseEditScreen(
                 }
                 if (customCategories.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
-                    Text("提示：长按自定义分类可编辑或删除", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("提示：长按自定义分类可编辑或删除", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
                 }
             }
 
             // 金额
-            MiuiFormCard {
-                MiuiTextField(
+            MiuixFormCard {
+                MiuixTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
                     label = "金额",
@@ -173,24 +167,24 @@ fun ExpenseEditScreen(
             }
 
             // 时间
-            MiuiFormCard {
+            MiuixFormCard {
                 Column {
-                    MiuiFieldLabel("时间", isRequired = true)
+                    Text("时间 *", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onSurface)
                     Spacer(Modifier.height(6.dp))
                     Box(
                         modifier = Modifier.fillMaxWidth().height(56.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
+                            .background(MiuixTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
                             .clickable { showDatePicker = true }.padding(horizontal = 14.dp),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        Text(timestamp.toDateTimeText(), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(timestamp.toDateTimeText(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onSurface)
                     }
                 }
             }
 
             // 备注
-            MiuiFormCard {
-                MiuiTextField(
+            MiuixFormCard {
+                MiuixTextField(
                     value = note,
                     onValueChange = { note = it },
                     label = "备注（可选）"
@@ -198,7 +192,7 @@ fun ExpenseEditScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            MiuiButton(
+            MiuixButton(
                 text = if (isEditMode) "保存修改" else "保存",
                 enabled = canSave,
                 onClick = {
@@ -219,7 +213,7 @@ fun ExpenseEditScreen(
 
 
     if (showDatePicker) {
-        MiuiDatePickerDialog(
+        MiuixDatePickerDialog(
             initialTimestamp = timestamp,
             title = "选择时间",
             onSelected = { timestamp = it; showDatePicker = false },
@@ -283,15 +277,15 @@ private fun CategoryChip(
     onLongClick: (() -> Unit)? = null
 ) {
     val bgColor = if (selected) {
-        MaterialTheme.colorScheme.primary
+        MiuixTheme.colorScheme.primary
     } else {
-        MaterialTheme.colorScheme.surfaceVariant
+        MiuixTheme.colorScheme.surfaceVariant
     }
 
     val textColor = when {
-        selected -> MaterialTheme.colorScheme.onPrimary
-        isAction -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.onSurface
+        selected -> MiuixTheme.colorScheme.onPrimary
+        isAction -> MiuixTheme.colorScheme.primary
+        else -> MiuixTheme.colorScheme.onSurface
     }
 
     Box(
@@ -305,7 +299,7 @@ private fun CategoryChip(
                 onLongClick = if (isCustom) onLongClick else null
             )
     ) {
-        MiuiChip(
+        MiuixChip(
             text = text,
             selected = selected,
             backgroundColor = bgColor,
@@ -331,10 +325,10 @@ private fun EditCategoryDialog(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val trimmed = name.trim()
     val isDuplicate = trimmed.isNotEmpty() && trimmed != currentName && trimmed in existingNames
+    val isValid = trimmed.isNotEmpty() && trimmed != currentName && !isDuplicate
 
     if (showDeleteConfirm) {
-        // 👈 核心优化：直接复用公共的 MiuiConfirmDialog
-        MiuiConfirmDialog(
+        MiuixConfirmDialog(
             title = "删除分类",
             message = "确定删除分类「$currentName」吗？\n\n已有记录不会丢失，仍保留原分类标签。",
             confirmText = "删除",
@@ -343,21 +337,19 @@ private fun EditCategoryDialog(
         )
     } else {
         Dialog(onDismissRequest = onDismiss) {
-            Card(
+            MiuixCard(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                cornerRadius = 20.dp
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                     Text(
-                        "编辑分类",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                        "编辑分类", fontSize = 17.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        color = MiuixTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.height(16.dp))
 
-                    MiuiTextField(
+                    MiuixTextField(
                         value = name,
                         onValueChange = { name = it },
                         label = "分类名"
@@ -366,29 +358,35 @@ private fun EditCategoryDialog(
                     Spacer(Modifier.height(16.dp))
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(
-                            onClick = { showDeleteConfirm = true },
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(22.dp),
-                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                            contentPadding = PaddingValues(0.dp)
-                        ) { Text("删除", fontSize = 14.sp, color = MaterialTheme.colorScheme.onErrorContainer) }
+                        // 删除按钮
+                        Box(
+                            modifier = Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(22.dp))
+                                .background(MiuixTheme.colorScheme.errorContainer)
+                                .clickable { showDeleteConfirm = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("删除", fontSize = 14.sp, color = MiuixTheme.colorScheme.onErrorContainer)
+                        }
 
-                        TextButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(22.dp),
-                            colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                            contentPadding = PaddingValues(0.dp)
-                        ) { Text("取消", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface) }
+                        // 取消按钮
+                        Box(
+                            modifier = Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(22.dp))
+                                .background(MiuixTheme.colorScheme.surfaceVariant)
+                                .clickable(onClick = onDismiss),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("取消", fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurface)
+                        }
 
-                        Button(
-                            onClick = { onSave(name) },
-                            enabled = trimmed.isNotEmpty() && trimmed != currentName && !isDuplicate,
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(22.dp),
-                            contentPadding = PaddingValues(0.dp)
-                        ) { Text("保存", fontSize = 14.sp) }
+                        // 保存按钮
+                        Box(
+                            modifier = Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(22.dp))
+                                .background(if (isValid) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.primary.copy(alpha = 0.4f))
+                                .clickable(enabled = isValid) { onSave(name) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("保存", fontSize = 14.sp, color = MiuixTheme.colorScheme.onPrimary)
+                        }
                     }
                 }
             }
@@ -402,19 +400,45 @@ private fun MiuixInputDialog(
     confirmText: String, confirmEnabled: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(24.dp)) {
+        MiuixCard(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            cornerRadius = 24.dp
+        ) {
             Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Text(
+                    title, fontSize = 17.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    color = MiuixTheme.colorScheme.onSurface
+                )
                 Spacer(Modifier.height(16.dp))
-                MiuiTextField(
+
+                MiuixTextField(
                     value = value,
                     onValueChange = onValueChange,
                     placeholder = placeholder
                 )
+
                 Spacer(Modifier.height(16.dp))
+
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(24.dp)) { Text("取消", color = MaterialTheme.colorScheme.onSurface) }
-                    Button(onClick = onConfirm, enabled = confirmEnabled, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(24.dp)) { Text(confirmText) }
+                    // 取消
+                    Box(
+                        modifier = Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(24.dp))
+                            .background(MiuixTheme.colorScheme.surfaceVariant)
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("取消", color = MiuixTheme.colorScheme.onSurface)
+                    }
+                    // 确定
+                    Box(
+                        modifier = Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(24.dp))
+                            .background(if (confirmEnabled) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.primary.copy(alpha = 0.4f))
+                            .clickable(enabled = confirmEnabled, onClick = onConfirm),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(confirmText, color = MiuixTheme.colorScheme.onPrimary)
+                    }
                 }
             }
         }

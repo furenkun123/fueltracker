@@ -26,11 +26,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import top.yukonga.miuix.kmp.basic.FloatingActionButton
+import top.yukonga.miuix.kmp.basic.FloatingActionButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -53,11 +53,11 @@ import com.fueltracker.ui.components.ExpenseDetailItemCard
 import com.fueltracker.ui.components.ExpenseStructureCard
 import com.fueltracker.ui.components.ExpenseTrendCard
 import com.fueltracker.ui.components.LazyColumnScrollbar
-import com.fueltracker.ui.components.MiuiConfirmDialog
-import com.fueltracker.ui.components.MiuiYearMonthSheet
+import com.fueltracker.ui.miuix.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.MiuixYearMonthSheet
 import com.fueltracker.ui.components.SummaryCard
 import com.fueltracker.ui.components.scrollToHideFab
-import com.fueltracker.ui.miui.MiuiCard
+import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.buildMonthTrend
 import com.fueltracker.util.buildStructureData
@@ -211,7 +211,7 @@ fun ExpenseScreen(
                         Text(
                             "还没有费用记录\n点右下角 ＋ 添加",
                             fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary
                         )
                     }
                 }
@@ -239,10 +239,10 @@ fun ExpenseScreen(
 
                 item("list_header") {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (selectedCategory == null) "明细" else "明细 · $selectedCategory", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (selectedCategory == null) "明细" else "明细 · $selectedCategory", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MiuixTheme.colorScheme.onSurfaceSecondary)
                         if (selectedCategory != null) {
                             Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable { onSelectedCategoryChange(null) }.padding(8.dp)) {
-                                Text("清除", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                                Text("清除", fontSize = 12.sp, color = MiuixTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -250,8 +250,8 @@ fun ExpenseScreen(
 
                 if (filteredItems.isEmpty()) {
                     item("list_empty") {
-                        MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                            Text("该范围内没有记录", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp))
+                        MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                            Text("该范围内没有记录", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.padding(20.dp))
                         }
                     }
                 } else {
@@ -299,22 +299,16 @@ fun ExpenseScreen(
             FloatingActionButton(
                 onClick = onAddExpense,
                 containerColor = Color(0xFFFF9500),
-                contentColor = Color.White,
                 shape = CircleShape,
-                elevation = FloatingActionButtonDefaults.elevation(
-                    defaultElevation = 0.dp,
-                    pressedElevation = 0.dp,
-                    focusedElevation = 0.dp,
-                    hoveredElevation = 0.dp
-                )
+                shadowElevation = 0.dp
             ) {
-                Icon(Icons.Default.Receipt, "记费用")
+                Icon(Icons.Default.Receipt, "记费用", tint = Color.White)
             }
         }
     }
 
     if (showYearMonthPicker) {
-        MiuiYearMonthSheet(customYear, customMonth, availableYears, { showYearMonthPicker = false }) { y, m ->
+        MiuixYearMonthSheet(customYear, customMonth, availableYears, { showYearMonthPicker = false }) { y, m ->
             customYear = y; customMonth = m; selectedRange = ExpenseRange.CUSTOM_MONTH; showYearMonthPicker = false
         }
     }
@@ -328,7 +322,7 @@ fun ExpenseScreen(
             "确定删除这条 ${item.title} ${item.amount.toMoneyText()} 的记录吗？"
         }
 
-        MiuiConfirmDialog(
+        MiuixConfirmDialog(
             title = title,
             message = message,
             confirmText = "删除",

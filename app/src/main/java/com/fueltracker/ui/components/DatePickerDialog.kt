@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +19,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import java.util.Calendar
 
 // ============================================================
@@ -64,8 +71,8 @@ private fun RowScope.CalendarDayCell(
         Box(
             modifier = Modifier
                 .size(34.dp).clip(CircleShape)
-                .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                .then(if (isToday && !isSelected) Modifier.border(1.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier),
+                .background(if (isSelected) MiuixTheme.colorScheme.primary else Color.Transparent)
+                .then(if (isToday && !isSelected) Modifier.border(1.dp, MiuixTheme.colorScheme.primary, CircleShape) else Modifier),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -73,10 +80,10 @@ private fun RowScope.CalendarDayCell(
                 fontSize = 14.sp,
                 fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
                 color = when {
-                    isSelected -> MaterialTheme.colorScheme.onPrimary
-                    !cell.inCurrentMonth -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                    isToday -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.onSurface
+                    isSelected -> MiuixTheme.colorScheme.onPrimary
+                    !cell.inCurrentMonth -> MiuixTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    isToday -> MiuixTheme.colorScheme.primary
+                    else -> MiuixTheme.colorScheme.onSurface
                 }
             )
         }
@@ -108,14 +115,14 @@ private fun MiuiCalendar(
         // 顶部：切换月份按钮与标题
         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onPrevMonth, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "上个月", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "上个月", tint = MiuixTheme.colorScheme.onSurfaceSecondary)
             }
             Text(
-                text = "${displayYear}年${displayMonth}月", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
+                text = "${displayYear}年${displayMonth}月", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onTitleClick() }.padding(horizontal = 12.dp, vertical = 6.dp)
             )
             IconButton(onClick = onNextMonth, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "下个月", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "下个月", tint = MiuixTheme.colorScheme.onSurfaceSecondary)
             }
         }
 
@@ -123,7 +130,7 @@ private fun MiuiCalendar(
         Row(modifier = Modifier.fillMaxWidth()) {
             listOf("日", "一", "二", "三", "四", "五", "六").forEach { w ->
                 Box(modifier = Modifier.weight(1f).height(28.dp), contentAlignment = Alignment.Center) {
-                    Text(w, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(w, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MiuixTheme.colorScheme.onSurfaceSecondary)
                 }
             }
         }
@@ -165,7 +172,12 @@ private fun MiuiYearMonthPickerDialog(
     val years = remember(minYear, maxYear) { (minYear..maxYear).toList() }
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(Modifier.fillMaxWidth().padding(horizontal = 24.dp), shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(8.dp)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = MiuixTheme.colorScheme.surface,
+            shadowElevation = 8.dp
+        ) {
             Column(Modifier.fillMaxWidth().padding(20.dp)) {
                 Text("选择年月", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
                 Spacer(Modifier.height(12.dp))
@@ -178,12 +190,26 @@ private fun MiuiYearMonthPickerDialog(
                 Spacer(Modifier.height(16.dp))
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(22.dp), colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                        Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                    TextButton(onClick = { onConfirm(year, month) }, modifier = Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(22.dp), colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary)) {
-                        Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onPrimary)
-                    }
+                    TextButton(
+                        text = "取消",
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        cornerRadius = 22.dp,
+                        colors = ButtonDefaults.textButtonColors(
+                            color = MiuixTheme.colorScheme.surfaceVariant,
+                            textColor = MiuixTheme.colorScheme.onSurface
+                        )
+                    )
+                    TextButton(
+                        text = "确定",
+                        onClick = { onConfirm(year, month) },
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        cornerRadius = 22.dp,
+                        colors = ButtonDefaults.textButtonColors(
+                            color = MiuixTheme.colorScheme.primary,
+                            textColor = MiuixTheme.colorScheme.onPrimary
+                        )
+                    )
                 }
             }
         }
@@ -194,7 +220,6 @@ private fun MiuiYearMonthPickerDialog(
 // 主入口
 // ============================================================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiuiDatePickerDialog(
     initialTimestamp: Long,
@@ -218,28 +243,39 @@ fun MiuiDatePickerDialog(
     var minute by remember { mutableIntStateOf(initialCalendar.get(Calendar.MINUTE)) }
     var showYearMonthDialog by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = {
-            Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-            }
-        }
+    WindowBottomSheet(
+        show = true,
+        title = title,
+        startAction = {
+            TextButton(
+                text = "取消",
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(
+                    color = Color.Transparent,
+                    textColor = MiuixTheme.colorScheme.onSurfaceSecondary
+                )
+            )
+        },
+        endAction = {
+            TextButton(
+                text = "确定",
+                onClick = {
+                    val cal = Calendar.getInstance().apply {
+                        clear()
+                        set(selectedYear, selectedMonth - 1, selectedDay, hour, minute, 0)
+                    }
+                    onSelected(cal.timeInMillis)
+                },
+                colors = ButtonDefaults.textButtonColors(
+                    color = Color.Transparent,
+                    textColor = MiuixTheme.colorScheme.primary
+                )
+            )
+        },
+        onDismissRequest = onDismiss,
+        backgroundColor = MiuixTheme.colorScheme.surface
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
-            // 顶栏
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onDismiss) { Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                TextButton(onClick = {
-                    val cal = Calendar.getInstance().apply { clear(); set(selectedYear, selectedMonth - 1, selectedDay, hour, minute, 0) }
-                    onSelected(cal.timeInMillis)
-                }) { Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
-            }
-
-            Spacer(Modifier.height(2.dp))
-
             // 日历
             MiuiCalendar(
                 displayYear = displayYear, displayMonth = displayMonth,

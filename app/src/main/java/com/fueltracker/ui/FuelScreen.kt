@@ -3,6 +3,7 @@ package com.fueltracker.ui
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,21 +20,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.SwapHoriz
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -53,13 +45,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.fueltracker.data.FuelRecord
-import com.fueltracker.ui.components.MiuiDatePickerDialog
+import com.fueltracker.ui.miuix.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.MiuixDatePickerDialog
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
-import com.fueltracker.ui.miui.MiuiBackButton
-import com.fueltracker.ui.miui.MiuiCard
-import com.fueltracker.ui.miui.MiuiTextField
+import com.fueltracker.ui.miuix.MiuixBackButton
+import com.fueltracker.ui.miuix.MiuixCard
+import com.fueltracker.ui.miuix.MiuixFieldLabel
+import com.fueltracker.ui.miuix.MiuixSwitch
+import com.fueltracker.ui.miuix.MiuixTextField
 import com.fueltracker.viewmodel.MainViewModel
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -79,7 +78,8 @@ fun FuelScreen(
     viewModel: MainViewModel,
     record: FuelRecord? = null,
     onBack: () -> Unit,
-    onSaved: () -> Unit
+    onSaved: () -> Unit,
+    onDelete: (() -> Unit)? = null
 ) {
     val isEditMode = record != null
     val vehicle by viewModel.currentVehicle.collectAsState()
@@ -89,6 +89,7 @@ fun FuelScreen(
     val isVehicleMatched =
         currentVehicle == null || !isEditMode || record.vehicleId == currentVehicle.id
     val tankCapacity = currentVehicle?.tankCapacity ?: 0.0
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
@@ -148,6 +149,7 @@ fun FuelScreen(
     val unitPriceValue by remember(unitPrice) { derivedStateOf { unitPrice.toValidDouble() } }
     val totalAmountValue by remember(totalAmount) { derivedStateOf { totalAmount.toValidDouble(allowZero = true) } }
     val discountValue by remember(discount) { derivedStateOf { if (discount.isBlank()) 0.0 else discount.toValidDouble(allowZero = true) } }
+    val effectiveTotalAmount = totalAmountValue ?: if (discount.isBlank()) amountValue else null
 
     val remainingFuelRawValue by remember { derivedStateOf { remainingFuel.toValidDouble(allowZero = true) } }
     val remainingFuelValue: Double? by remember(tankCapacity) {
@@ -178,20 +180,19 @@ fun FuelScreen(
     val isMissedValid = !hasMissedRecord || (missedOdometerValue != null && missedVolumeValue != null)
     val isMissedOdometerRangeValid = !hasMissedRecord || odometerValue != null && missedOdometerValue != null && missedOdometerValue!! < odometerValue!!
 
-    val isTotalAmountValid = totalAmountValue != null && totalAmountValue!! > 0.0
-    val isDiscountValid = discount.isBlank() || (discountValue != null && totalAmountValue != null && discountValue!! <= totalAmountValue!!)
+    val isTotalAmountValid = effectiveTotalAmount != null && effectiveTotalAmount > 0.0
+    val isDiscountValid = discount.isBlank() || (discountValue != null && effectiveTotalAmount != null && discountValue!! <= effectiveTotalAmount)
 
     // 金额与乘积一致性
-    val isAmountConsistent = amountValue != null && totalAmountValue != null && discountValue != null && abs((totalAmountValue!! - discountValue!!) - amountValue!!) <= 0.02
-    val isProductConsistent = volumeValue != null && unitPriceValue != null && totalAmountValue != null && abs((volumeValue!! * unitPriceValue!!) - totalAmountValue!!) <= 0.05
-
+    val isAmountConsistent = amountValue != null && effectiveTotalAmount != null && discountValue != null && abs((effectiveTotalAmount - discountValue!!) - amountValue!!) <= 0.02
+    val isProductConsistent = volumeValue != null && unitPriceValue != null && effectiveTotalAmount != null && abs((volumeValue!! * unitPriceValue!!) - effectiveTotalAmount) <= 0.05
     // 加满状态与剩余油量必须一致
     val isFullConsistent = !isFull || remainingFuel.isBlank() || abs((remainingFuelValue ?: 0.0) - tankCapacity) < 0.01
 
     // 统一错误信息
     val errorMessages = buildList {
         if (!isVehicleMatched) add("⛔ 记录所属车辆与当前车辆不一致，禁止保存")
-        if (totalAmount.isBlank()) add("请输入原价") else if (!isTotalAmountValid) add("原价必须大于 0")
+        if (totalAmount.isBlank() && amount.isBlank()) add("请输入原价或实付") else if (!isTotalAmountValid) add("原价必须大于 0")
         if (volume.isBlank()) add("请输入加油量") else if (!isVolumeValid) add(if (isVolumeExceedsCapacity) "加油量超出油箱容量(${tankCapacity}L)" else "加油量无效")
         if (unitPrice.isBlank()) add("请输入单价") else if (unitPriceValue == null) add("单价无效")
         if (amount.isBlank()) add("请输入实付金额") else if (amountValue == null) add("实付金额无效")
@@ -289,11 +290,11 @@ fun FuelScreen(
         remainingFuelUsePercent = toPercent
     }
 
-    // 👇 完全对标 ParkingScreen 的根布局
+    // 根布局
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MiuixTheme.colorScheme.surface)
             .imePadding()
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
@@ -313,68 +314,84 @@ fun FuelScreen(
                 CircularProgressIndicator()
             }
         } else {
-            // 👇 1. 标题与返回键
+            // 1. 标题与返回键
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
             ) {
-                MiuiBackButton(onClick = onBack)
+                MiuixBackButton(onClick = onBack)
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = if (isEditMode) "编辑加油记录" else "记加油",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = MiuixTheme.colorScheme.onSurface
                 )
             }
 
             // 车辆信息卡片
-            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 20.dp) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("${currentVehicle.brand} ${currentVehicle.series}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("${currentVehicle.brand} ${currentVehicle.series}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MiuixTheme.colorScheme.onSurface)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(currentVehicle.model, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("油箱容量 ${currentVehicle.tankCapacity} L", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(currentVehicle.model, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
+                        Text("油箱容量 ${currentVehicle.tankCapacity} L", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
                     }
                 }
             }
 
             // 油品标号卡片
-            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            MiuixCard(
+                onClick = { showFuelGradePicker = true },
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 20.dp
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().clickable { showFuelGradePicker = true }.padding(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("油品标号 *", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                    Text(fuelGrade, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    MiuixFieldLabel(
+                        text = "油品标号",
+                        isRequired = true
+                    )
+                    Text(fuelGrade, fontSize = 15.sp, color = MiuixTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
             }
 
             // 输入区域卡片
-            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 20.dp) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp) // 增加垂直间距，看起来不拥挤
                 ) {
+                    // 1. 时间与公里数
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
-                            Text("加油时间 *", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(6.dp))
+                        Box(modifier = Modifier.weight(1f)) {
+                            MiuixTextField(
+                                value = dateFormatter.format(Date(timestamp)),
+                                onValueChange = {},
+                                label = "加油时间",
+                                isRequired = true,
+                                readOnly = true,
+                                textColor = MiuixTheme.colorScheme.primary, //把时间文本设为蓝色
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            // 透明点击层，用于呼出时间滚轮
                             Box(
-                                modifier = Modifier.fillMaxWidth().height(56.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
-                                    .clickable { showDatePicker = true }
-                                    .padding(horizontal = 14.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Text(dateFormatter.format(Date(timestamp)), fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                            }
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) { showDatePicker = true }
+                            )
                         }
-                        MiuiTextField(
+
+                        MiuixTextField(
                             value = odometer,
                             onValueChange = { odometer = it },
                             label = "当前公里数",
@@ -384,8 +401,9 @@ fun FuelScreen(
                         )
                     }
 
+                    // 2. 加油量与单价
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        MiuiTextField(
+                        MiuixTextField(
                             value = volume,
                             onValueChange = { onVolumeChange(it) },
                             label = "本次加油量",
@@ -393,10 +411,10 @@ fun FuelScreen(
                             isRequired = true,
                             suffix = "L",
                             isError = isVolumeExceedsCapacity,
-                            errorMessage = "超出容量(${tankCapacity}L)",
+                            errorMessage = "超出容量",
                             keyboardType = KeyboardType.Decimal
                         )
-                        MiuiTextField(
+                        MiuixTextField(
                             value = unitPrice,
                             onValueChange = { onUnitPriceChange(it) },
                             label = "单价",
@@ -407,8 +425,9 @@ fun FuelScreen(
                         )
                     }
 
+                    // 3. 原价与优惠
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        MiuiTextField(
+                        MiuixTextField(
                             value = totalAmount,
                             onValueChange = { onTotalAmountChange(it) },
                             label = "原价",
@@ -417,7 +436,7 @@ fun FuelScreen(
                             suffix = "元",
                             keyboardType = KeyboardType.Decimal
                         )
-                        MiuiTextField(
+                        MiuixTextField(
                             value = discount,
                             onValueChange = { onDiscountChange(it) },
                             label = "优惠金额",
@@ -427,8 +446,9 @@ fun FuelScreen(
                         )
                     }
 
+                    // 4. 实付与剩余
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        MiuiTextField(
+                        MiuixTextField(
                             value = amount,
                             onValueChange = { onAmountChange(it) },
                             label = "实际支付",
@@ -442,29 +462,42 @@ fun FuelScreen(
                             "≈ ${formatVolume(remainingFuelValue!!)} L"
                         } else null
 
-                        MiuiTextField(
+                        MiuixTextField(
                             value = remainingFuel,
                             onValueChange = { remainingFuel = it },
                             label = "加油后剩余",
                             modifier = Modifier.weight(1f),
                             enabled = !isFull,
+                            // 截图里输入框右侧显示的是单位，根据你之前的逻辑，百分比时这里显示 L
                             suffix = if (remainingFuelUsePercent) "%" else "L",
                             keyboardType = KeyboardType.Decimal,
                             isError = remainingFuel.isNotBlank() && !isRemainingFuelInputValid,
-                            errorMessage = if (remainingFuelUsePercent) "百分比需在 0~100 之间" else "剩余油量超出容量",
+                            errorMessage = "格式有误",
                             labelTrailing = {
                                 if (tankCapacity > 0.0) {
                                     Row(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(50))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+                                            .background(MiuixTheme.colorScheme.surfaceVariant)
                                             .clickable { switchRemainingUnit(!remainingFuelUsePercent) }
-                                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                                            .padding(horizontal = 8.dp, vertical = 2.dp), // 紧凑的药丸
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
-                                        Icon(Icons.Rounded.SwapHoriz, "切换单位", modifier = Modifier.size(13.dp), tint = MaterialTheme.colorScheme.primary)
-                                        Text(if (remainingFuelUsePercent) "L" else "%", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                                        // 这里的图标如果在引入 M3 时报错，可以用 Text("↔") 替代
+                                        Icon(
+                                            Icons.Rounded.SwapHoriz,
+                                            "切换单位",
+                                            modifier = Modifier.size(13.dp),
+                                            tint = MiuixTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = if (remainingFuelUsePercent) "L" else "%",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MiuixTheme.colorScheme.primary,
+                                            maxLines = 1
+                                        )
                                     }
                                 }
                             },
@@ -483,32 +516,32 @@ fun FuelScreen(
                 Text(
                     text = "计算结果：$fuelGrade · ${formatVolume(vVal)} L × ${formatMoney(pVal)} 元/L ≈ $displayTotal 元，实付 $displayedAmount 元",
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
                     modifier = Modifier.padding(start = 4.dp)
                 )
                 if (!isProductConsistent) {
                     Text(
                         "提示：加油量 × 单价 与 原价不一致，请检查输入",
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.error,
+                        color = MiuixTheme.colorScheme.error,
                         modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                     )
                 }
             }
 
-            // 统一错误提示（修复了 forEach 的 @Composable 报错）
+            // 统一错误提示
             if (errorMessages.isNotEmpty()) {
                 Column(Modifier.padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (msg in errorMessages) {
-                        Text(msg, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                        Text(msg, color = MiuixTheme.colorScheme.error, fontSize = 12.sp)
                     }
                 }
             }
 
-            // 勾选项
-            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            // 勾选项（将 Checkbox 替换为 Miuix Switch）
+            MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 20.dp) {
                 Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                    MiuixCheckRow(isFull, "本次已加满") { checked ->
+                    MiuixSwitchRow(isFull, "本次已加满") { checked ->
                         isFull = checked
                         if (checked) {
                             val fullText = if (remainingFuelUsePercent) "100" else formatVolume(tankCapacity)
@@ -518,7 +551,7 @@ fun FuelScreen(
                             if (remainingFuel == fullText) remainingFuel = ""
                         }
                     }
-                    MiuixCheckRow(hasMissedRecord, "上次加油忘记记录 (漏记)") { checked ->
+                    MiuixSwitchRow(hasMissedRecord, "上次加油忘记记录 (漏记)") { checked ->
                         hasMissedRecord = checked
                         if (!checked) {
                             missedOdometer = ""; missedVolume = ""
@@ -526,7 +559,7 @@ fun FuelScreen(
                     }
                     if (hasMissedRecord) {
                         Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MiuiTextField(
+                            MiuixTextField(
                                 value = missedOdometer,
                                 onValueChange = { missedOdometer = it },
                                 label = "漏记期间大概行驶里程",
@@ -534,7 +567,7 @@ fun FuelScreen(
                                 suffix = "km",
                                 keyboardType = KeyboardType.Decimal
                             )
-                            MiuiTextField(
+                            MiuixTextField(
                                 value = missedVolume,
                                 onValueChange = { missedVolume = it },
                                 label = "漏记期间大概加油量",
@@ -548,8 +581,8 @@ fun FuelScreen(
             }
 
             // 备注
-            MiuiCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-                MiuiTextField(
+            MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 20.dp) {
+                MiuixTextField(
                     value = note,
                     onValueChange = { note = it },
                     modifier = Modifier.padding(12.dp),
@@ -557,83 +590,136 @@ fun FuelScreen(
                 )
             }
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // 保存按钮
-            Button(
-                onClick = {
-                    if (isSaving) return@Button
-                    if (!isFormValid) {
-                        Toast.makeText(context, "请检查表单错误", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-
-                    val vol = volumeValue!!
-                    val amt = amountValue!!
-                    val price = unitPriceValue!!
-                    val total = totalAmountValue!!
-                    val disc = if (discount.isBlank()) null else discountValue
-                    val remain = remainingFuelValue
-
-                    isSaving = true
-                    val recordToSave = record?.copy(
-                        timestamp = timestamp,
-                        fuelGrade = fuelGrade,
-                        odometer = odometerValue,
-                        volume = vol,
-                        totalAmount = total,
-                        discount = disc,
-                        actualPaidAmount = amt,
-                        unitPrice = price,
-                        remainingFuel = remain,
-                        isFull = isFull,
-                        hasMissedRecord = hasMissedRecord,
-                        missedOdometer = missedOdometerValue,
-                        missedVolume = missedVolumeValue,
-                        note = note.trim()
-                    ) ?: FuelRecord(
-                        vehicleId = currentVehicle.id,
-                        timestamp = timestamp,
-                        fuelGrade = fuelGrade,
-                        odometer = odometerValue,
-                        volume = vol,
-                        totalAmount = total,
-                        discount = disc,
-                        actualPaidAmount = amt,
-                        unitPrice = price,
-                        remainingFuel = remain,
-                        isFull = isFull,
-                        hasMissedRecord = hasMissedRecord,
-                        missedOdometer = missedOdometerValue,
-                        missedVolume = missedVolumeValue,
-                        note = note.trim()
-                    )
-
-                    val onResult: (Result<Unit>) -> Unit = { result ->
-                        isSaving = false
-                        if (result.isSuccess) onSaved() else Toast.makeText(context, "保存失败：${result.exceptionOrNull()?.message ?: "未知错误"}", Toast.LENGTH_LONG).show()
-                    }
-
-                    try {
-                        if (isEditMode) viewModel.updateFuelRecord(recordToSave, onResult)
-                        else viewModel.addFuelRecord(recordToSave, onResult)
-                    } catch (e: Exception) {
-                        isSaving = false
-                        Toast.makeText(context, "系统异常：${e.message}", Toast.LENGTH_LONG).show()
-                    }
-                },
-                enabled = isFormValid && !isSaving,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                )
+            // ✅ 等宽按钮布局
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
             ) {
-                Text(if (isEditMode) "保存修改" else "保存加油记录", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Row(
+                    modifier = Modifier
+                        .widthIn(max = 400.dp) // ✅ 依然限制最大宽度防大屏拉伸
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    // ✅ 自动在两个按钮之间留出 16dp 的空白
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 删除按钮（编辑模式显示）
+                    if (isEditMode && onDelete != null) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f) // ✅ 和保存按钮平分剩余宽度
+                                .height(50.dp) // ✅ 固定高度
+                                .clip(RoundedCornerShape(25.dp))
+                                .background(MiuixTheme.colorScheme.error.copy(alpha = 0.1f))
+                                .clickable { showDeleteDialog = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "删除",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MiuixTheme.colorScheme.error
+                            )
+                        }
+                    }
+
+                    // 保存按钮
+                    Box(
+                        modifier = Modifier
+                            .weight(1f) // ✅ 平分宽度（若没有删除按钮，则自动占满全宽）
+                            .height(50.dp) // ✅ 固定高度
+                            .clip(RoundedCornerShape(25.dp))
+                            .background(if (isFormValid && !isSaving) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.primary.copy(alpha = 0.4f))
+                            .clickable(enabled = isFormValid && !isSaving) {
+                                // ... 内部保存逻辑保持原样 ...
+                                if (!isFormValid) {
+                                    Toast.makeText(context, "请检查表单错误", Toast.LENGTH_SHORT).show()
+                                    return@clickable
+                                }
+
+                                val vol = volumeValue!!
+                                val amt = amountValue!!
+                                val price = unitPriceValue!!
+                                val disc = if (discount.isBlank()) null else discountValue
+                                val remain = remainingFuelValue
+
+                                isSaving = true
+                                val recordToSave = record?.copy(
+                                    timestamp = timestamp,
+                                    fuelGrade = fuelGrade,
+                                    odometer = odometerValue,
+                                    volume = vol,
+                                    totalAmount = effectiveTotalAmount,
+                                    discount = disc,
+                                    actualPaidAmount = amt,
+                                    unitPrice = price,
+                                    remainingFuel = remain,
+                                    isFull = isFull,
+                                    hasMissedRecord = hasMissedRecord,
+                                    missedOdometer = missedOdometerValue,
+                                    missedVolume = missedVolumeValue,
+                                    note = note.trim()
+                                ) ?: FuelRecord(
+                                    vehicleId = currentVehicle.id,
+                                    timestamp = timestamp,
+                                    fuelGrade = fuelGrade,
+                                    odometer = odometerValue,
+                                    volume = vol,
+                                    totalAmount = effectiveTotalAmount,
+                                    discount = disc,
+                                    actualPaidAmount = amt,
+                                    unitPrice = price,
+                                    remainingFuel = remain,
+                                    isFull = isFull,
+                                    hasMissedRecord = hasMissedRecord,
+                                    missedOdometer = missedOdometerValue,
+                                    missedVolume = missedVolumeValue,
+                                    note = note.trim()
+                                )
+
+                                val onResult: (Result<Unit>) -> Unit = { result ->
+                                    isSaving = false
+                                    if (result.isSuccess) onSaved() else Toast.makeText(context, "保存失败：${result.exceptionOrNull()?.message ?: "未知错误"}", Toast.LENGTH_LONG).show()
+                                }
+
+                                try {
+                                    if (isEditMode) viewModel.updateFuelRecord(recordToSave, onResult)
+                                    else viewModel.addFuelRecord(recordToSave, onResult)
+                                } catch (e: Exception) {
+                                    isSaving = false
+                                    Toast.makeText(context, "系统异常：${e.message}", Toast.LENGTH_LONG).show()
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isEditMode) "保存修改" else "保存加油记录",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MiuixTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    // ✅ 删除确认弹窗
+    if (showDeleteDialog && onDelete != null) {
+        MiuixConfirmDialog(
+            title = "删除记录",
+            message = "确定删除该条加油记录吗？删除后相关油耗计算将重新推导。",
+            confirmText = "删除",
+            onConfirm = {
+                showDeleteDialog = false
+                onDelete()
+            },
+            onDismiss = { showDeleteDialog = false }
+        )
     }
 
     if (showFuelGradePicker) {
@@ -644,7 +730,7 @@ fun FuelScreen(
             { showFuelGradePicker = false })
     }
     if (showDatePicker) {
-        MiuiDatePickerDialog(
+        MiuixDatePickerDialog(
             initialTimestamp = timestamp,
             title = "选择加油时间",
             onSelected = { selectedTimestamp ->
@@ -656,23 +742,24 @@ fun FuelScreen(
     }
 }
 
+// ✅ 勾选框替换为 Miuix Switch
 @Composable
-private fun MiuixCheckRow(checked: Boolean, text: String, onChecked: (Boolean) -> Unit) {
+private fun MiuixSwitchRow(checked: Boolean, text: String, onCheckedChange: (Boolean) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable { onChecked(!checked) }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Checkbox(
+        Text(text, fontSize = 15.sp, color = MiuixTheme.colorScheme.onSurface)
+        MiuixSwitch(
             checked = checked,
-            onCheckedChange = null,
-            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+            onCheckedChange = { onCheckedChange(it) }
         )
-        Spacer(Modifier.width(8.dp))
-        Text(text, fontSize = 14.sp)
     }
 }
 
+// ✅ 弹窗去 M3 化
 @Composable
 private fun HyperFuelGradePickerDialog(
     currentValue: String,
@@ -682,10 +769,9 @@ private fun HyperFuelGradePickerDialog(
 ) {
     var selectedGrade by remember { mutableStateOf(currentValue) }
     Dialog(onDismissRequest = onDismiss) {
-        Card(
+        MiuixCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            elevation = CardDefaults.cardElevation(8.dp)
+            cornerRadius = 24.dp
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                 Row(
@@ -693,9 +779,9 @@ private fun HyperFuelGradePickerDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("取消", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.clickable { onDismiss() }.padding(8.dp))
-                    Text("选择油品标号", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onSelected(selectedGrade) }.padding(8.dp))
+                    Text("取消", fontSize = 15.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.clickable { onDismiss() }.padding(8.dp))
+                    Text("选择油品标号", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onSurface)
+                    Text("确定", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.primary, modifier = Modifier.clickable { onSelected(selectedGrade) }.padding(8.dp))
                 }
                 WheelList(
                     selectedValue = selectedGrade,

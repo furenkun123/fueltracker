@@ -26,16 +26,8 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,21 +39,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CATEGORY_PARKING
 import com.fueltracker.data.ExpenseRecord
-import com.fueltracker.ui.miui.MiuiBackButton
-import com.fueltracker.ui.miui.MiuiChip
-import com.fueltracker.ui.miui.MiuiFormCard
+import com.fueltracker.ui.miuix.MiuixBackButton
+import com.fueltracker.ui.miuix.MiuixButton
+import com.fueltracker.ui.miuix.MiuixChip
+import com.fueltracker.ui.miuix.MiuixFormCard
+import com.fueltracker.ui.miuix.MiuixTextField
 import com.fueltracker.util.LocationHelper
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 // 扩展函数：简化判空和去空格
 private fun String?.toCleanString(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
@@ -128,11 +124,10 @@ fun ParkingScreen(
 
     val amount = amountText.toDoubleOrNull() ?: 0.0
 
-    // 👇 移除 Scaffold 和 TopAppBar，改用 LazyColumn 支撑页面
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MiuixTheme.colorScheme.background)
             .imePadding()
             .navigationBarsPadding(),
         contentPadding = PaddingValues(
@@ -143,7 +138,7 @@ fun ParkingScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 👇 1. 标题与返回键作为第一个 item
+        // 1. 标题与返回键作为第一个 item
         item(key = "parking_title") {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -151,30 +146,27 @@ fun ParkingScreen(
                     .fillMaxWidth()
                     .padding(bottom = 8.dp)
             ) {
-                // 👇 去掉背景圆底，只保留 IconButton 的点击波纹
-                MiuiBackButton(onClick = onBack)
-
+                MiuixBackButton(onClick = onBack)
                 Spacer(modifier = Modifier.width(8.dp))
-
                 Text(
                     text = if (isEditMode) "编辑停车" else "记停车",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = MiuixTheme.colorScheme.onBackground
                 )
             }
         }
 
-        // 👇 2. 位置选择卡片
+        // 2. 位置选择卡片
         item {
-            MiuiFormCard {
+            MiuixFormCard {
                 ParkingInputField(
                     value = locationName, onValueChange = { locationName = it },
                     label = "位置", placeholder = "如：万达广场",
                     trailingIcon = {
                         Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).clickable(enabled = !isLocating) { startLocate() }, contentAlignment = Alignment.Center) {
                             if (isLocating) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                            else Icon(Icons.Default.LocationOn, "定位", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                            else Icon(Icons.Default.LocationOn, "定位", tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                         }
                     }
                 )
@@ -193,20 +185,20 @@ fun ParkingScreen(
                             Icon(
                                 imageVector = Icons.Default.LocationOn,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = MiuixTheme.colorScheme.primary,
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 text = "定位结果（点击填入）",
                                 fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = MiuixTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Medium
                             )
                         }
                         Text(
                             text = "清除",
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .clickable { locationCandidate = null }
@@ -220,7 +212,7 @@ fun ParkingScreen(
                             locationCandidate = null
                         }
                     ) {
-                        MiuiChip(
+                        MiuixChip(
                             text = candidate,
                             cornerRadius = 20.dp,
                             paddingH = 14.dp,
@@ -239,7 +231,7 @@ fun ParkingScreen(
                     Text(
                         text = "最近使用",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
                     Spacer(Modifier.height(6.dp))
                     FlowRow(
@@ -253,7 +245,7 @@ fun ParkingScreen(
                                     .clip(RoundedCornerShape(20.dp))
                                     .clickable { locationName = loc }
                             ) {
-                                MiuiChip(
+                                MiuixChip(
                                     text = loc,
                                     cornerRadius = 20.dp,
                                     paddingH = 14.dp,
@@ -267,7 +259,7 @@ fun ParkingScreen(
             }
         }
 
-        // 👇 3. 楼层与区域
+        // 3. 楼层与区域
         item {
             ParkingOptionSection(
                 title = "楼层", options = listOf("B1", "B2", "B3", "B4", "LG1", "LG2", "P1", "P2"),
@@ -282,31 +274,33 @@ fun ParkingScreen(
             )
         }
 
-        // 👇 4. 车位号与金额、备注
+        // 4. 车位号与金额、备注
         item {
-            MiuiFormCard {
+            MiuixFormCard {
                 ParkingInputField(spotNumber, { spotNumber = it }, "车位号", "如：135")
             }
         }
 
         item {
-            MiuiFormCard {
+            MiuixFormCard {
                 ParkingInputField(amountText, { amountText = it }, "停车费（可选）", "如：5.00", "元", KeyboardType.Decimal)
             }
         }
 
         item {
-            MiuiFormCard {
+            MiuixFormCard {
                 ParkingInputField(note, { note = it }, "备注（可选）", "如：电梯口旁边")
             }
         }
 
-        // 👇 5. 保存按钮
+        // 5. 保存按钮
         item {
             Spacer(Modifier.height(8.dp))
-            Button(
+            MiuixButton(
+                text = if (isEditMode) "保存修改" else "保存停车",
+                enabled = !isSaving,
                 onClick = {
-                    if (isSaving) return@Button
+                    if (isSaving) return@MiuixButton
                     isSaving = true
 
                     val cleanLoc = locationName.toCleanString()
@@ -318,7 +312,7 @@ fun ParkingScreen(
                         category = CATEGORY_PARKING, amount = amount,
                         locationName = cleanLoc, floor = cleanFloor, area = cleanArea,
                         spotNumber = cleanSpot, note = note.trim(),
-                                notificationIgnored = false
+                        notificationIgnored = false
                     ) ?: ExpenseRecord(
                         vehicleId = 0, timestamp = System.currentTimeMillis(), category = CATEGORY_PARKING, amount = amount,
                         locationName = cleanLoc, floor = cleanFloor, area = cleanArea, spotNumber = cleanSpot,
@@ -328,8 +322,6 @@ fun ParkingScreen(
                     val onResult: (Result<Unit>) -> Unit = { result ->
                         isSaving = false
                         if (result.isSuccess) {
-                            // 通知由 MainViewModel.parkingNotificationState 统一驱动，
-                            // 此处不手动 show/cancel
                             onSaved()
                         } else {
                             Toast.makeText(
@@ -340,31 +332,35 @@ fun ParkingScreen(
                         }
                     }
                     if (isEditMode) viewModel.updateExpense(newRecord, onResult) else viewModel.addExpense(newRecord, onResult)
-                },
-                enabled = !isSaving,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp)
-            ) {
-                Text(if (isEditMode) "保存修改" else "保存停车", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
+                }
+            )
         }
     }
 }
 
-
 @Composable
-private fun ParkingOptionSection(title: String, options: List<String>, currentValue: String, onValueChange: (String) -> Unit, placeholder: String) {
-    MiuiFormCard {
+private fun ParkingOptionSection(
+    title: String,
+    options: List<String>,
+    currentValue: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String
+) {
+    MiuixFormCard {
         Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(10.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             options.forEach { option ->
                 Box(
                     modifier = Modifier.clickable {
                         onValueChange(if (currentValue == option) "" else option)
                     }
                 ) {
-                    MiuiChip(
+                    MiuixChip(
                         text = option,
                         selected = currentValue == option
                     )
@@ -378,27 +374,27 @@ private fun ParkingOptionSection(title: String, options: List<String>, currentVa
 
 @Composable
 private fun ParkingInputField(
-    value: String, onValueChange: (String) -> Unit, label: String,
-    placeholder: String = "", suffix: String? = null,
-    keyboardType: KeyboardType = KeyboardType.Text, trailingIcon: (@Composable () -> Unit)? = null
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String = "",
+    suffix: String? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    trailingIcon: (@Composable () -> Unit)? = null
 ) {
     Column {
         if (label.isNotEmpty()) {
             Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
         }
-        OutlinedTextField(
-            value = value, onValueChange = onValueChange, modifier = Modifier.fillMaxWidth(), singleLine = true,
-            placeholder = { if (placeholder.isNotEmpty()) Text(placeholder, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            shape = RoundedCornerShape(14.dp),
-            textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
-            suffix = { suffix?.let { Text(it, fontSize = 14.sp) } },
-            trailingIcon = trailingIcon,
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Transparent, cursorColor = MaterialTheme.colorScheme.primary
-            )
+        MiuixTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = placeholder,
+            suffix = suffix,
+            keyboardType = keyboardType,
+            trailingIcon = trailingIcon
         )
     }
 }

@@ -24,10 +24,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LocalGasStation
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,19 +39,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
 import com.fueltracker.ui.components.LazyColumnScrollbar
-import com.fueltracker.ui.components.MiuiBottomSheetWrapper
-import com.fueltracker.ui.components.MiuiConfirmDialog
+import com.fueltracker.ui.miuix.MiuixBottomSheetWrapper
+import com.fueltracker.ui.miuix.MiuixConfirmDialog
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
 import com.fueltracker.ui.components.scrollToHideFab
-import com.fueltracker.ui.miui.MiuiCard
-import com.fueltracker.ui.miui.MiuiFilterChip
-import com.fueltracker.ui.miui.MiuiTextButton
+import com.fueltracker.ui.miuix.MiuixCard
+import com.fueltracker.ui.miuix.MiuixChip
+import com.fueltracker.ui.miuix.MiuixFilterChip
+import com.fueltracker.ui.miuix.MiuixTextButton
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.IntervalConfidence
@@ -152,7 +153,6 @@ fun RecordsScreen(
                         record = record,
                         calculationResult = consumptionMap[record.id],
                         vehicle = vehicle,
-                        onDelete = { viewModel.deleteRecord(record) },
                         onEdit = { onEdit(record) }
                     )
                 }
@@ -180,9 +180,9 @@ fun RecordsScreen(
 @Composable
 private fun StatCell(title: String, value: String, isHighlight: Boolean = false) {
     Column {
-        Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+        Text(title, color = MiuixTheme.colorScheme.onSurfaceSecondary, fontSize = 11.sp)
         Spacer(modifier = Modifier.height(2.dp))
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (isHighlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (isHighlight) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface)
     }
 }
 
@@ -194,7 +194,7 @@ private fun RecordStatistics(displayRecords: List<FuelRecord>, vehicle: Vehicle?
         if (displayRecords.isEmpty()) null else FuelCalculator.calculateSummary(allRecords = displayRecords, vehicle = vehicle).averageConsumption
     }
 
-    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
@@ -216,9 +216,9 @@ private fun RecordFilterBar(filterType: String, year: Int, month: Int, day: Int,
     val customText = remember(year, month, day) { if (day == 0) "${year}.${month}月 ▼" else "${year}.${month}.${day} ▼" }
 
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        MiuiFilterChip("全部", filterType == "全部") { onFilterChange("全部") }
-        MiuiFilterChip("本月", filterType == "本月") { onFilterChange("本月") }
-        MiuiFilterChip(customText, filterType == "按时间", onMonthClick)
+        MiuixFilterChip("全部", filterType == "全部") { onFilterChange("全部") }
+        MiuixFilterChip("本月", filterType == "本月") { onFilterChange("本月") }
+        MiuixFilterChip(customText, filterType == "按时间", onMonthClick)
     }
 }
 
@@ -231,24 +231,27 @@ private fun FuelRecordCard(
     record: FuelRecord,
     calculationResult: ConsumptionResult?,
     vehicle: Vehicle?,
-    onDelete: () -> Unit,
     onEdit: () -> Unit
 ) {
-    var showDeleteDialog by remember { mutableStateOf(false) }
     val timeText = remember(record.timestamp) { RECORD_DATE_FORMAT.format(Date(record.timestamp)) }
 
-    // 判断逻辑：勾选了加满，但填写的剩余油量和油箱容积相差超过 0.1L
     val isRemainingFuelAnomaly = vehicle != null &&
             vehicle.tankCapacity > 0.0 &&
             record.isFull &&
             record.remainingFuel != null &&
             abs(record.remainingFuel - vehicle.tankCapacity) > 0.1
 
-    MiuiCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+    MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth() // ✅ 确保内层撑满卡片
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // 1. 顶部：时间、标签、编辑
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 FlowRow(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f), // ✅ 限制左侧标签区宽度，防止挤压编辑按钮
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -256,95 +259,122 @@ private fun FuelRecordCard(
                         timeText,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
                         modifier = Modifier.padding(top = 2.dp)
                     )
-                    if (record.fuelGrade.isNotBlank()) TagChip(
-                        record.fuelGrade,
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.primaryContainer
-                    )
-                    if (record.isFull) TagChip("加满", Color(0xFF34C759), Color(0xFFE8F8EC))
-                    if (record.hasMissedRecord) TagChip("含漏记", Color(0xFFFF9500), Color(0xFFFFF4E5))
-
-                    // 新增异常提示标签
-                    if (isRemainingFuelAnomaly) {
-                        TagChip("油量异常", Color(0xFFFF3B30), Color(0xFFFFE5E5))
-                    }
-
+                    if (record.fuelGrade.isNotBlank()) TagChip(record.fuelGrade, MiuixTheme.colorScheme.primary, MiuixTheme.colorScheme.primary.copy(alpha = 0.1f))
+                    if (record.isFull) TagChip("加满", Color(0xFF34C759), Color(0xFF34C759).copy(alpha = 0.15f))
+                    if (record.hasMissedRecord) TagChip("含漏记", Color(0xFFFF9500), Color(0xFFFF9500).copy(alpha = 0.15f))
+                    if (isRemainingFuelAnomaly) TagChip("油量异常", Color(0xFFFF3B30), Color(0xFFFF3B30).copy(alpha = 0.15f))
                     when {
-                        calculationResult?.isOutlier == true -> TagChip("偏离值", Color(0xFFFF3B30), Color(0xFFFFE5E5))
+                        calculationResult?.isOutlier == true -> TagChip("偏离值", Color(0xFFFF3B30), Color(0xFFFF3B30).copy(alpha = 0.15f))
                         calculationResult?.quality?.confidence == IntervalConfidence.LOW || calculationResult?.quality?.confidence == IntervalConfidence.UNRELIABLE ->
-                            TagChip("预估值", Color(0xFFFF9500), Color(0xFFFFF4E5))
+                            TagChip("预估值", Color(0xFFFF9500), Color(0xFFFF9500).copy(alpha = 0.15f))
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    MiuiTextButton("编辑", MaterialTheme.colorScheme.primary, onEdit)
-                    MiuiTextButton("删除", Color(0xFFFF3B30).copy(alpha = 0.8f)) { showDeleteDialog = true }
-                }
+
+                MiuixTextButton(
+                    text = "编辑",
+                    color = MiuixTheme.colorScheme.primary,
+                    onClick = onEdit,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    fontSize = 13.sp
+                )
             }
 
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column {
+            // 2. 金额与油耗
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // ✅ 左侧加上 weight(1f) 和 maxLines，彻底杜绝长文本把布局撑破
+                Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text("¥", fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
                         Text("%.2f".format(record.actualPaidAmount), fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     }
-                    Text("%.2f L · 单价 %.2f元/L".format(record.volume, record.unitPrice), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = "%.2f L · 单价 %.2f元/L".format(record.volume, record.unitPrice),
+                        fontSize = 12.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
+
+                Spacer(modifier = Modifier.width(12.dp)) // 左右增加一点间距
 
                 Column(horizontalAlignment = Alignment.End) {
                     if (calculationResult != null && calculationResult.distance > 0) {
-                        Text("%.2f L/100km".format(calculationResult.consumption), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (calculationResult.isOutlier) Color(0xFFFF3B30) else MaterialTheme.colorScheme.primary)
-                        Text(if (calculationResult.isEstimated) "估算行驶 %.0f km".format(calculationResult.distance) else "行驶 %.0f km".format(calculationResult.distance), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = "%.2f L/100km".format(calculationResult.consumption),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (calculationResult.isOutlier) Color(0xFFFF3B30) else MiuixTheme.colorScheme.primary,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = if (calculationResult.isEstimated) "估算行驶 %.0f km".format(calculationResult.distance) else "行驶 %.0f km".format(calculationResult.distance),
+                            fontSize = 12.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                            maxLines = 1
+                        )
                     } else {
-                        Text(record.odometer?.takeIf { it > 0 }?.let { "%.0f km".format(it) } ?: "未记录里程", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            text = record.odometer?.takeIf { it > 0 }?.let { "%.0f km".format(it) } ?: "未记录里程",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
                     }
                 }
             }
 
+            // 3. 底部额外信息
             val hasExtraInfo = (record.odometer ?: 0.0) > 0 || record.remainingFuel != null || record.hasMissedRecord || record.note.isNotBlank()
             if (hasExtraInfo) {
-                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    if ((record.odometer ?: 0.0) > 0) Text("仪表盘里程: ${record.odometer!!.toInt()} km", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                    // 剩余油量文本标红
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(MiuixTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if ((record.odometer ?: 0.0) > 0) {
+                        Text("仪表盘里程: ${record.odometer!!.toInt()} km", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
+                    }
                     record.remainingFuel?.takeIf { it.isFinite() }?.let {
                         Text(
                             text = "加油后剩余: %.2f L".format(it),
                             fontSize = 11.sp,
-                            color = if (isRemainingFuelAnomaly) Color(0xFFFF3B30) else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isRemainingFuelAnomaly) Color(0xFFFF3B30) else MiuixTheme.colorScheme.onSurfaceSecondary
                         )
                     }
-
-                    if (record.hasMissedRecord) Text("漏记数据: 约 ${record.missedOdometer ?: 0.0} km / ${record.missedVolume ?: 0.0} L", fontSize = 11.sp, color = Color(0xFFFF9500))
-                    if (record.note.isNotBlank()) Text("备注: ${record.note}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                    if (record.hasMissedRecord) {
+                        Text("漏记数据: 约 ${record.missedOdometer ?: 0.0} km / ${record.missedVolume ?: 0.0} L", fontSize = 11.sp, color = Color(0xFFFF9500))
+                    }
+                    if (record.note.isNotBlank()) {
+                        Text("备注: ${record.note}", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                    }
                 }
             }
         }
-    }
-
-    if (showDeleteDialog) {
-        MiuiConfirmDialog(
-            title = "删除记录",
-            message = "确定删除该条加油记录吗？删除后相关油耗计算将重新推导。",
-            confirmText = "删除",
-            onConfirm = {
-                showDeleteDialog = false
-                onDelete()
-            },
-            onDismiss = {
-                showDeleteDialog = false
-            }
-        )
     }
 }
 
 @Composable
 private fun TagChip(text: String, color: Color, bgColor: Color) {
-    Surface(color = bgColor, shape = RoundedCornerShape(4.dp)) {
-        Text(text, modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp), fontSize = 10.sp, fontWeight = FontWeight.Medium, color = color)
-    }
+    MiuixChip(
+        text = text,
+        backgroundColor = bgColor,
+        contentColor = color,
+        cornerRadius = 6.dp,
+        paddingH = 6.dp,
+        paddingV = 2.dp,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Medium
+    )
 }
 
 // =================================================
@@ -365,7 +395,7 @@ private fun DatePicker3WheelSheet(initialYear: Int, initialMonth: Int, initialDa
         if (tempDay > maxDays) tempDay = maxDays
     }
 
-    MiuiBottomSheetWrapper(
+    MiuixBottomSheetWrapper(
         title = "选择日期",
         onDismiss = onDismiss,
         onConfirm = { onSelect(tempYear, tempMonth, tempDay) }
@@ -386,12 +416,12 @@ private fun DatePicker3WheelSheet(initialYear: Int, initialMonth: Int, initialDa
 @Composable
 private fun EmptyRecordsState(modifier: Modifier = Modifier) {
     Column(modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.height(64.dp).width(64.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Outlined.LocalGasStation, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.height(32.dp).width(32.dp))
+        Box(Modifier.height(64.dp).width(64.dp).background(MiuixTheme.colorScheme.surfaceVariant, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.LocalGasStation, null, tint = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.height(32.dp).width(32.dp))
         }
         Spacer(modifier = Modifier.height(12.dp))
         Text("暂无加油记录", fontSize = 16.sp, fontWeight = FontWeight.Medium)
         Spacer(modifier = Modifier.height(4.dp))
-        Text("点击首页“记加油”添加新记录", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("点击首页“记加油”添加新记录", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
     }
 }

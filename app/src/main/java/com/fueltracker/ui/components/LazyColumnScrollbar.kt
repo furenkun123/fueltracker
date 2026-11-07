@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.MaterialTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -38,7 +38,7 @@ private val EstimatedItemHeight = 160.dp
 fun LazyColumnScrollbar(
     listState: LazyListState,
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+    color: Color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.4f),
     width: Dp = 6.dp,
     minHeight: Dp = 40.dp
 ) {

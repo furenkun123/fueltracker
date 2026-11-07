@@ -1,5 +1,6 @@
 package com.fueltracker.ui
 
+import android.R.attr.subtitle
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,13 +27,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,11 +51,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.CarDatabase
 import com.fueltracker.data.Trim
-import com.fueltracker.ui.miui.MiuiBackButton
-import com.fueltracker.ui.miui.MiuiSearchTextField
+import com.fueltracker.ui.miuix.MiuixBackButton
+import com.fueltracker.ui.miuix.MiuixSearchTextField
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+// ✅ 引入 Miuix 主题
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val TAG = "PickerScreen"
 
@@ -89,7 +88,6 @@ fun YearSelectorScreen(brand: String, series: String, onBack: () -> Unit, onSele
         itemKey = { it }, itemSearchText = { it },
         row = { year, onClick -> PickerRow(text = year, onClick = onClick) },
         onBack = onBack, onSelected = onSelected, onManualInput = onManualInput
-        // 👆 删除了 showSearch = false，现在它也会拥有搜索框和联动逻辑
     )
 }
 
@@ -141,7 +139,6 @@ private fun <T> PickerListScreen(
         if (query.isEmpty()) all else all.filter { itemSearchText(it).contains(query, ignoreCase = true) }
     }
 
-    // 👇 核心联动逻辑：如果有搜索框，点击键盘搜索键且没结果时，直接触发手动输入
     val onSearchAction = {
         if (filtered.isEmpty() && search.isNotBlank()) {
             onManualInput(search.trim())
@@ -153,8 +150,6 @@ private fun <T> PickerListScreen(
         searchPlaceholder, loading, loadError, showSearch, onSearchAction
     ) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
-
-            // 👇 如果【没有】搜索框（比如选年款），保留原本的手动输入卡片
             if (!showSearch) {
                 item(key = "manual_header") {
                     ManualInputCard(manualTitle, manualPlaceholder, loadKey, onManualInput)
@@ -169,7 +164,6 @@ private fun <T> PickerListScreen(
             } else {
                 if (loadError == null) {
                     if (search.isNotBlank()) {
-                        // 👇 如果【有】搜索框，且搜索为空，出现“使用xxx”的按钮
                         item(key = "manual_fallback") {
                             EmptyPickerState(search, "未找到与 \"$search\" 相关的$presetLabel") {
                                 onManualInput(search.trim())
@@ -201,35 +195,29 @@ private fun PickerScaffold(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MiuixTheme.colorScheme.surface)
             .statusBarsPadding()
             .imePadding()
     ) {
-        // 标题与返回键齐平
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            MiuiBackButton(onClick = onBack)
-
+            MiuixBackButton(onClick = onBack)
             Spacer(Modifier.width(12.dp))
-
-            val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-            val titleColor = if (isLight) Color(0xFF1F1F1F) else Color(0xFFE6E6E6)
-            val subTitleColor = if (isLight) Color(0xFF1F1F1F).copy(alpha = 0.6f) else Color(0xFFE6E6E6).copy(alpha = 0.6f)
 
             Column {
                 Text(
                     text = title,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = titleColor
+                    color = MiuixTheme.colorScheme.onSurface
                 )
                 if (subtitle.isNotBlank()) {
                     Text(
                         text = subtitle,
                         fontSize = 10.sp,
-                        color = subTitleColor,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -242,12 +230,20 @@ private fun PickerScaffold(
         }
 
         if (errorMessage != null && !loading) {
-            Text(errorMessage, fontSize = 12.sp, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+            Text(
+                errorMessage,
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (loading) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                // ✅ 替换为 Miuix 风格的加载圈
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    top.yukonga.miuix.kmp.basic.CircularProgressIndicator()
+                }
             } else {
                 content()
             }
@@ -255,13 +251,12 @@ private fun PickerScaffold(
     }
 }
 
-
-
 @Composable
 private fun PickerItemWrapper(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+    Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.surface)) {
         Box(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp)) { content() }
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.8.dp, modifier = Modifier.padding(start = 20.dp))
+        // ✅ 替换 M3 的 HorizontalDivider
+        Box(Modifier.fillMaxWidth().padding(start = 20.dp).height(0.8.dp).background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f)))
     }
 }
 
@@ -270,19 +265,18 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
     val keyboard = LocalSoftwareKeyboardController.current
     var value by remember(resetKey) { mutableStateOf("") }
     val trimmedValue = value.trim()
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val inputBg = if (isLight) Color.Black.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.12f)
+    Text(text = title, color = MiuixTheme.colorScheme.onSurface)
 
     fun submit() {
         if (trimmedValue.isEmpty()) return
         onConfirm(trimmedValue); value = ""; keyboard?.hide()
     }
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).padding(12.dp)) {
-        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(12.dp)).background(MiuixTheme.colorScheme.surfaceVariant).padding(12.dp)) {
+        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.primary)
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            MiuiSearchTextField(
+            MiuixSearchTextField(
                 value = value,
                 onValueChange = { value = it },
                 placeholder = placeholder,
@@ -292,13 +286,22 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
                     .weight(1f)
                     .height(38.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(inputBg)
+                    .background(MiuixTheme.colorScheme.surfaceVariant)
                     .padding(horizontal = 10.dp),
                 placeholderEllipsis = true
             )
             Spacer(Modifier.width(8.dp))
-            Button(onClick = { submit() }, enabled = trimmedValue.isNotEmpty(), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 12.dp), modifier = Modifier.height(38.dp)) {
-                Text("确定", fontSize = 13.sp)
+            // ✅ 替换 M3 的 Button
+            Box(
+                modifier = Modifier
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (trimmedValue.isNotEmpty()) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.primary.copy(alpha = 0.4f))
+                    .clickable(enabled = trimmedValue.isNotEmpty()) { submit() }
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("确定", fontSize = 13.sp, color = MiuixTheme.colorScheme.onPrimary)
             }
         }
     }
@@ -307,14 +310,13 @@ private fun ManualInputCard(title: String, placeholder: String, resetKey: Any?, 
 @Composable
 private fun PickerSearchBox(value: String, onValueChange: (String) -> Unit, placeholder: String, onSearchAction: () -> Unit) {
     val keyboard = LocalSoftwareKeyboardController.current
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val bg = if (isLight) Color.Black.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.12f)
+    val bg = MiuixTheme.colorScheme.surfaceVariant
 
     Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(42.dp).clip(RoundedCornerShape(21.dp)).background(bg).padding(horizontal = 12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Search, null, tint = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            MiuiSearchTextField(
+            MiuixSearchTextField(
                 value = value,
                 onValueChange = onValueChange,
                 placeholder = placeholder,
@@ -326,51 +328,26 @@ private fun PickerSearchBox(value: String, onValueChange: (String) -> Unit, plac
                 modifier = Modifier.weight(1f),
                 placeholderEllipsis = true
             )
-            if (value.isNotEmpty()) IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Clear, "清除", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp)) }
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Clear, "清除", tint = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.size(16.dp))
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun PresetHeader(text: String) = Text(text, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
+private fun PresetHeader(text: String) = Text(text, fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
 
 @Composable
 private fun NoMatchText(text: String) {
-    // 👇 统一改为卡片式的提示
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(vertical = 32.dp, horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Default.SearchOff, // 如果你没导入这个图标，记得 Alt+Enter
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.size(48.dp)
-        )
-        Text(
-            text = text,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-// 👇 统一的搜索空状态与手动输入联动组件
-@Composable
-private fun EmptyPickerState(searchText: String, hint: String, onManualInput: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp) // 紧贴搜索框下方
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MiuixTheme.colorScheme.surfaceVariant)
             .padding(vertical = 32.dp, horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -378,27 +355,58 @@ private fun EmptyPickerState(searchText: String, hint: String, onManualInput: ()
         Icon(
             imageVector = Icons.Default.SearchOff,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            tint = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f),
+            modifier = Modifier.size(48.dp)
+        )
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun EmptyPickerState(searchText: String, hint: String, onManualInput: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MiuixTheme.colorScheme.surfaceVariant)
+            .padding(vertical = 32.dp, horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.SearchOff,
+            contentDescription = null,
+            tint = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f),
             modifier = Modifier.size(48.dp)
         )
 
         Text(
             text = hint,
             fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MiuixTheme.colorScheme.onSurfaceSecondary,
             textAlign = TextAlign.Center
         )
 
-        // 按钮样式与品牌页保持一致
-        Button(
-            onClick = onManualInput,
-            shape = RoundedCornerShape(12.dp),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
+        // ✅ 替换 M3 的 Button
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(MiuixTheme.colorScheme.primary)
+                .clickable(onClick = onManualInput)
+                .padding(horizontal = 24.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
         ) {
             Text(
                 text = "使用 \"$searchText\" 作为结果",
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onPrimary
             )
         }
     }
@@ -406,7 +414,7 @@ private fun EmptyPickerState(searchText: String, hint: String, onManualInput: ()
 
 @Composable
 private fun PickerRow(text: String, onClick: () -> Unit) {
-    PickerItemWrapper(onClick) { Text(text, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface) }
+    PickerItemWrapper(onClick) { Text(text, fontSize = 16.sp, color = MiuixTheme.colorScheme.onSurface) }
 }
 
 private fun String?.displayOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() && it != "-" && it != "--" && !it.equals("N/A", true) && it != "未知" }
@@ -418,10 +426,10 @@ private fun TrimRow(trim: Trim, onClick: () -> Unit) {
 
     PickerItemWrapper(onClick) {
         Column {
-            Text(trim.name, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(trim.name, fontSize = 15.sp, color = MiuixTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (info.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                Text(info, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(info, fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }

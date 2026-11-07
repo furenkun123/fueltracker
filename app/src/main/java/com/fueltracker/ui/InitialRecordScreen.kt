@@ -16,11 +16,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,11 +35,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fueltracker.ui.components.MiuiConfirmDialog
-import com.fueltracker.ui.miui.MiuiButton
-import com.fueltracker.ui.miui.MiuiGroupCard
-import com.fueltracker.ui.miui.MiuiInputItem
-import com.fueltracker.ui.miui.MiuiSectionHeader
+import com.fueltracker.ui.miuix.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.MiuixButton
+import com.fueltracker.ui.miuix.MiuixGroupCard
+import com.fueltracker.ui.miuix.MiuixSectionHeader
+import com.fueltracker.ui.miuix.MiuixInputItem
 import com.fueltracker.viewmodel.MainViewModel
 
 @Composable
@@ -58,7 +58,7 @@ fun InitialRecordScreen(
 
     if (currentVehicle == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            CircularProgressIndicator()
         }
         return
     }
@@ -84,7 +84,7 @@ fun InitialRecordScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MiuixTheme.colorScheme.background,
 
         ) { paddingValues ->
         Column(
@@ -106,20 +106,20 @@ fun InitialRecordScreen(
                     text = "车辆初始信息",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = MiuixTheme.colorScheme.onBackground
                 )
 
                 // 跳过按钮包围背景
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .background(MiuixTheme.colorScheme.surfaceVariant)
                         .clickable { showSkipConfirm = true }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
                         text = "跳过",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
                         fontSize = 13.sp
                     )
                 }
@@ -127,8 +127,8 @@ fun InitialRecordScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            MiuiSectionHeader(title = "当前车辆信息")
-            MiuiGroupCard {
+            MiuixSectionHeader(title = "当前车辆信息")
+            MiuixGroupCard {
                 Column(modifier = Modifier.padding(vertical = 14.dp)) {
                     Text(
                         text = "${currentVehicle.brand} ${currentVehicle.series} ${currentVehicle.model}".trim(),
@@ -137,25 +137,25 @@ fun InitialRecordScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("油箱容量：${currentVehicle.tankCapacity} L", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("燃油标号：${currentVehicle.fuelGrade}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("油箱容量：${currentVehicle.tankCapacity} L", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
+                        Text("燃油标号：${currentVehicle.fuelGrade}", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            MiuiSectionHeader(title = "录入初始状态")
-            MiuiGroupCard {
-                MiuiInputItem(
+            MiuixSectionHeader(title = "录入初始状态")
+            MiuixGroupCard {
+                MiuixInputItem(
                     label = "当前公里数 (km)",
                     value = odometer,
                     onValueChange = { odometer = it },
                     placeholder = "必填，例如：20",
                     keyboardType = KeyboardType.Decimal
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.8.dp)
-                MiuiInputItem(
+                HorizontalDivider(color = MiuixTheme.colorScheme.surfaceVariant, thickness = 0.8.dp)
+                MiuixInputItem(
                     label = "当前剩余油量 (L)",
                     value = currentFuel,
                     onValueChange = { currentFuel = it },
@@ -168,14 +168,14 @@ fun InitialRecordScreen(
                 Text(
                     text = "剩余油量不能超过油箱容量 ${currentVehicle.tankCapacity} L",
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MiuixTheme.colorScheme.error,
                     modifier = Modifier.padding(start = 20.dp, top = 6.dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            MiuiButton(
+            MiuixButton(
                 text = "开始记录",
                 enabled = canSave && !isSaving,
                 onClick = {
@@ -200,12 +200,12 @@ fun InitialRecordScreen(
     }
 
     if (showSkipConfirm) {
-        MiuiConfirmDialog(
+        MiuixConfirmDialog(
             title = "确定要跳过吗？",
             message = "没有初始里程，系统将无法计算这辆车前几次的油耗。您可以在后续添加加油记录时补充里程信息。",
             confirmText = "仍要跳过",
             dismissText = "去填写",
-            confirmColor = MaterialTheme.colorScheme.error,
+            confirmColor = MiuixTheme.colorScheme.error,
             onConfirm = {
                 showSkipConfirm = false
                 onBack()

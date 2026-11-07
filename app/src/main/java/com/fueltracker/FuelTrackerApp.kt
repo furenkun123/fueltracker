@@ -1,4 +1,3 @@
-
 package com.fueltracker
 
 import androidx.activity.compose.BackHandler
@@ -12,8 +11,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -26,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.fueltracker.AppScreen.*
 import com.fueltracker.notif.ParkingNotification
 import com.fueltracker.ui.ExpenseEditScreen
 import com.fueltracker.ui.ExpenseScreen
@@ -36,12 +36,12 @@ import com.fueltracker.ui.ParkingScreen
 import com.fueltracker.ui.RecordsScreen
 import com.fueltracker.ui.SettingsScreen
 import com.fueltracker.ui.VehicleScreen
-import com.fueltracker.ui.components.PrivacyDialog
-import com.fueltracker.ui.components.UpdateLogDialog
-import com.fueltracker.ui.miui.MiuiNavigationBar
-import com.fueltracker.ui.miui.MiuiNavigationItem
-import com.fueltracker.ui.miui.MiuiTopBar
-import com.fueltracker.ui.miui.MiuiTopBarIconButton
+import com.fueltracker.ui.miuix.MiuixPrivacyDialog
+import com.fueltracker.ui.miuix.MiuixUpdateLogDialog
+import com.fueltracker.ui.miuix.MiuixAppNavigationBar
+import com.fueltracker.ui.miuix.MiuixNavItem
+import com.fueltracker.ui.miuix.MiuixTopBar
+import com.fueltracker.ui.miuix.MiuixTopBarIconButton
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
 import com.fueltracker.viewmodel.ParkingNotificationState
@@ -102,52 +102,51 @@ fun FuelTrackerApp(
 
     // ---------- 页面配置 ----------
     val showBottomBar =
-        screen == AppScreen.HOME ||
-                screen == AppScreen.RECORDS ||
-                screen == AppScreen.EXPENSES
+        screen == HOME ||
+                screen == RECORDS ||
+                screen == EXPENSES
 
     val isGlassEnabled = viewModel.isGlassEffectEnabled
 
-    // ---------- 返回键处理 ----------
     // ---------- 统一返回逻辑 ----------
     val handleBack: () -> Unit = {
         when (screen) {
-            AppScreen.RECORDS,
-            AppScreen.SETTINGS,
-            AppScreen.EXPENSES,
-            AppScreen.INITIAL_RECORD,
-            AppScreen.ADD_FUEL,
-            AppScreen.ADD_PARKING,
-            AppScreen.EDIT_PARKING ->
-                viewModel.navigateTo(AppScreen.HOME)
+            RECORDS,
+            SETTINGS,
+            EXPENSES,
+            INITIAL_RECORD,
+            ADD_FUEL,
+            ADD_PARKING,
+            EDIT_PARKING ->
+                viewModel.navigateTo(HOME)
 
-            AppScreen.ADD_VEHICLE ->
+            ADD_VEHICLE ->
                 viewModel.navigateTo(addVehicleOrigin)
 
-            AppScreen.EDIT_FUEL -> {
+            EDIT_FUEL -> {
                 viewModel.clearEditingStates()
                 viewModel.navigateTo(editFuelOrigin)
             }
 
-            AppScreen.EDIT_VEHICLE -> {
+            EDIT_VEHICLE -> {
                 viewModel.clearEditingStates()
-                viewModel.navigateTo(AppScreen.SETTINGS)
+                viewModel.navigateTo(SETTINGS)
             }
 
-            AppScreen.ADD_EXPENSE ->
-                viewModel.navigateTo(AppScreen.EXPENSES)
+            ADD_EXPENSE ->
+                viewModel.navigateTo(EXPENSES)
 
-            AppScreen.EDIT_EXPENSE -> {
+            EDIT_EXPENSE -> {
                 viewModel.clearEditingStates()
-                viewModel.navigateTo(AppScreen.EXPENSES)
+                viewModel.navigateTo(EXPENSES)
             }
 
-            AppScreen.HOME -> Unit
+            HOME -> Unit
         }
     }
 
     BackHandler(
-        enabled = screen != AppScreen.HOME,
+        enabled = screen != HOME,
         onBack = handleBack
     )
 
@@ -160,7 +159,7 @@ fun FuelTrackerApp(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(MiuixTheme.colorScheme.background)
                 .layerBackdrop(appBackdrop)
         ) {
             if (showBottomBar) {
@@ -169,7 +168,6 @@ fun FuelTrackerApp(
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onBackground,
                     contentWindowInsets = WindowInsets(0, 0, 0, 0)
                 ) { padding ->
 
@@ -181,7 +179,7 @@ fun FuelTrackerApp(
                         when (screen) {
 
                             // ---------- 首页 ----------
-                            AppScreen.HOME -> {
+                            HOME -> {
                                 val vehicle by
                                 viewModel.currentVehicle.collectAsState()
 
@@ -199,39 +197,35 @@ fun FuelTrackerApp(
                                     vehicle = vehicle,
                                     records = records,
                                     latestConsumption = latest,
-                                    averageConsumption = average,
+//                                    averageConsumption = average,
                                     activeParking = activeParking,
 
                                     onAddVehicle = {
-                                        viewModel.navigateToAddVehicle(
-                                            AppScreen.HOME
-                                        )
+                                        viewModel.navigateToAddVehicle(HOME)
                                     },
 
                                     onAddFuel = {
-                                        viewModel.navigateTo(AppScreen.ADD_FUEL)
+                                        viewModel.navigateTo(ADD_FUEL)
                                     },
 
                                     onAddParking = {
-                                        viewModel.navigateTo(AppScreen.ADD_PARKING)
+                                        viewModel.navigateTo(ADD_PARKING)
                                     },
 
                                     onEditParking = { parking ->
                                         viewModel.editExpenseRecord(
                                             parking,
-                                            AppScreen.EDIT_PARKING,
-                                            AppScreen.HOME
+                                            EDIT_PARKING,
+                                            HOME
                                         )
                                     },
 
                                     onClearParking = {
                                         viewModel.clearActiveParking()
-
                                     },
 
                                     onIgnoreParking = {
                                         viewModel.ignoreActiveParkingNotification()
-
                                     },
 
                                     onCollapseProgressChange = {
@@ -241,20 +235,20 @@ fun FuelTrackerApp(
                             }
 
                             // ---------- 加油记录 ----------
-                            AppScreen.RECORDS -> {
+                            RECORDS -> {
                                 RecordsScreen(
                                     viewModel = viewModel,
                                     onEdit = { record ->
                                         viewModel.editFuel(
                                             record,
-                                            AppScreen.RECORDS
+                                            RECORDS
                                         )
                                     }
                                 )
                             }
 
                             // ---------- 费用列表 ----------
-                            AppScreen.EXPENSES -> {
+                            EXPENSES -> {
                                 ExpenseScreen(
                                     viewModel = viewModel,
                                     selectedCategory = expenseSelectedCategory,
@@ -264,24 +258,23 @@ fun FuelTrackerApp(
                                     },
 
                                     onAddExpense = {
-                                        viewModel.navigateTo(AppScreen.ADD_EXPENSE)
+                                        viewModel.navigateTo(ADD_EXPENSE)
                                     },
 
                                     onEditExpense = { record ->
                                         viewModel.editExpenseRecord(
                                             record,
-                                            AppScreen.EDIT_EXPENSE,
-                                            AppScreen.EXPENSES
+                                            EDIT_EXPENSE,
+                                            EXPENSES
                                         )
                                     },
 
                                     onEditFuel = { record ->
                                         viewModel.editFuel(
                                             record,
-                                            AppScreen.EXPENSES
+                                            EXPENSES
                                         )
                                     }
-
                                 )
                             }
 
@@ -294,7 +287,7 @@ fun FuelTrackerApp(
                 when (screen) {
 
                     // ---------- 添加车辆 ----------
-                    AppScreen.ADD_VEHICLE -> {
+                    ADD_VEHICLE -> {
                         VehicleScreen(
                             viewModel = viewModel,
                             vehicle = null,
@@ -302,40 +295,40 @@ fun FuelTrackerApp(
                                 viewModel.navigateTo(addVehicleOrigin)
                             },
                             onSaved = {
-                                viewModel.navigateTo(AppScreen.INITIAL_RECORD)
+                                viewModel.navigateTo(INITIAL_RECORD)
                             }
                         )
                     }
 
                     // ---------- 初始记录 ----------
-                    AppScreen.INITIAL_RECORD -> {
+                    INITIAL_RECORD -> {
                         InitialRecordScreen(
                             viewModel = viewModel,
                             onCompleted = {
-                                viewModel.navigateTo(AppScreen.HOME)
+                                viewModel.navigateTo(HOME)
                             },
                             onBack = {
-                                viewModel.navigateTo(AppScreen.HOME)
+                                viewModel.navigateTo(HOME)
                             }
                         )
                     }
 
                     // ---------- 添加加油记录 ----------
-                    AppScreen.ADD_FUEL -> {
+                    ADD_FUEL -> {
                         FuelScreen(
                             viewModel = viewModel,
                             record = null,
                             onBack = {
-                                viewModel.navigateTo(AppScreen.HOME)
+                                viewModel.navigateTo(HOME)
                             },
                             onSaved = {
-                                viewModel.navigateTo(AppScreen.HOME)
+                                viewModel.navigateTo(HOME)
                             }
                         )
                     }
 
                     // ---------- 编辑加油记录 ----------
-                    AppScreen.EDIT_FUEL -> {
+                    EDIT_FUEL -> {
                         if (editingRecord == null) {
                             viewModel.navigateTo(editFuelOrigin)
                         } else {
@@ -349,33 +342,38 @@ fun FuelTrackerApp(
                                 onSaved = {
                                     viewModel.clearEditingStates()
                                     viewModel.navigateTo(editFuelOrigin)
+                                },
+                                onDelete = {
+                                    viewModel.deleteRecord(editingRecord)
+                                    viewModel.clearEditingStates()
+                                    viewModel.navigateTo(editFuelOrigin)
                                 }
                             )
                         }
                     }
 
                     // ---------- 编辑车辆 ----------
-                    AppScreen.EDIT_VEHICLE -> {
+                    EDIT_VEHICLE -> {
                         if (editingVehicle == null) {
-                            viewModel.navigateTo(AppScreen.SETTINGS)
+                            viewModel.navigateTo(SETTINGS)
                         } else {
                             VehicleScreen(
                                 viewModel = viewModel,
                                 vehicle = editingVehicle,
                                 onBack = {
                                     viewModel.clearEditingStates()
-                                    viewModel.navigateTo(AppScreen.SETTINGS)
+                                    viewModel.navigateTo(SETTINGS)
                                 },
                                 onSaved = {
                                     viewModel.clearEditingStates()
-                                    viewModel.navigateTo(AppScreen.SETTINGS)
+                                    viewModel.navigateTo(SETTINGS)
                                 }
                             )
                         }
                     }
 
                     // ---------- 设置 ----------
-                    AppScreen.SETTINGS -> {
+                    SETTINGS -> {
                         val vehicles by
                         viewModel.vehicles.collectAsState(initial = emptyList())
 
@@ -392,7 +390,7 @@ fun FuelTrackerApp(
                             },
 
                             onAddVehicle = {
-                                viewModel.navigateToAddVehicle(AppScreen.SETTINGS)
+                                viewModel.navigateToAddVehicle(SETTINGS)
                             },
 
                             onEditVehicle = { vehicle ->
@@ -400,73 +398,73 @@ fun FuelTrackerApp(
                             },
 
                             onBack = {
-                                viewModel.navigateTo(AppScreen.HOME)
+                                viewModel.navigateTo(HOME)
                             }
                         )
                     }
 
                     // ---------- 添加停车记录 ----------
-                    AppScreen.ADD_PARKING -> {
+                    ADD_PARKING -> {
                         ParkingScreen(
                             viewModel = viewModel,
                             onBack = {
-                                viewModel.navigateTo(AppScreen.HOME)
+                                viewModel.navigateTo(HOME)
                             },
                             onSaved = {
-                                viewModel.navigateTo(AppScreen.HOME)
+                                viewModel.navigateTo(HOME)
                             }
                         )
                     }
 
                     // ---------- 编辑停车记录 ----------
-                    AppScreen.EDIT_PARKING -> {
+                    EDIT_PARKING -> {
                         if (editingExpense == null) {
-                            viewModel.navigateTo(AppScreen.HOME)
+                            viewModel.navigateTo(HOME)
                         } else {
                             ParkingScreen(
                                 viewModel = viewModel,
                                 record = editingExpense,
                                 onBack = {
                                     viewModel.clearEditingStates()
-                                    viewModel.navigateTo(AppScreen.HOME)
+                                    viewModel.navigateTo(HOME)
                                 },
                                 onSaved = {
                                     viewModel.clearEditingStates()
-                                    viewModel.navigateTo(AppScreen.HOME)
+                                    viewModel.navigateTo(HOME)
                                 }
                             )
                         }
                     }
 
                     // ---------- 添加费用 ----------
-                    AppScreen.ADD_EXPENSE -> {
+                    ADD_EXPENSE -> {
                         ExpenseEditScreen(
                             viewModel = viewModel,
                             record = null,
                             onBack = {
-                                viewModel.navigateTo(AppScreen.EXPENSES)
+                                viewModel.navigateTo(EXPENSES)
                             },
                             onSaved = {
-                                viewModel.navigateTo(AppScreen.EXPENSES)
+                                viewModel.navigateTo(EXPENSES)
                             },
                         )
                     }
 
                     // ---------- 编辑费用 ----------
-                    AppScreen.EDIT_EXPENSE -> {
+                    EDIT_EXPENSE -> {
                         if (editingExpense == null) {
-                            viewModel.navigateTo(AppScreen.EXPENSES)
+                            viewModel.navigateTo(EXPENSES)
                         } else {
                             ExpenseEditScreen(
                                 viewModel = viewModel,
                                 record = editingExpense,
                                 onBack = {
                                     viewModel.clearEditingStates()
-                                    viewModel.navigateTo(AppScreen.EXPENSES)
+                                    viewModel.navigateTo(EXPENSES)
                                 },
                                 onSaved = {
                                     viewModel.clearEditingStates()
-                                    viewModel.navigateTo(AppScreen.EXPENSES)
+                                    viewModel.navigateTo(EXPENSES)
                                 },
                             )
                         }
@@ -475,23 +473,23 @@ fun FuelTrackerApp(
                 }
             }
         }
-        MiuiTopBar(
+
+        MiuixTopBar(
             backdrop = appBackdrop,
             isGlassEnabled = isGlassEnabled,
 
             // 只有主页面显示设置按钮
-            showActionArea = screen == AppScreen.HOME,
-
+            showActionArea = screen == HOME,
 
             navigationIcon = null,
 
-            action = if (screen == AppScreen.HOME) {
+            action = if (screen == HOME) {
                 {
-                    MiuiTopBarIconButton(
+                    MiuixTopBarIconButton(
                         icon = Icons.Default.Settings,
                         contentDescription = "设置",
                         onClick = {
-                            viewModel.navigateTo(AppScreen.SETTINGS)
+                            viewModel.navigateTo(SETTINGS)
                         }
                     )
                 }
@@ -502,50 +500,41 @@ fun FuelTrackerApp(
 
         // ---------- 悬浮底部导航栏 ----------
         if (showBottomBar) {
-            MiuiNavigationBar(
+            MiuixAppNavigationBar(
                 selectedIndex = when (screen) {
-                    AppScreen.HOME -> 0
-                    AppScreen.RECORDS -> 1
-                    AppScreen.EXPENSES -> 2
+                    HOME -> 0
+                    RECORDS -> 1
+                    EXPENSES -> 2
                 },
                 modifier = Modifier.align(Alignment.BottomCenter),
                 backdrop = appBackdrop,
                 isGlassEnabled = isGlassEnabled,
-                isFloating = viewModel.isFloatingBottomBar
-            ) {
-                MiuiNavigationItem(
-                    selected = screen == AppScreen.HOME,
-                    onClick = {
-                        viewModel.navigateTo(AppScreen.HOME)
-                    },
-                    icon = Icons.Default.Home,
-                    label = "首页"
-                )
+                isFloating = viewModel.isFloatingBottomBar,
 
-                MiuiNavigationItem(
-                    selected = screen == AppScreen.RECORDS,
-                    onClick = {
-                        viewModel.navigateTo(AppScreen.RECORDS)
-                    },
-                    icon = Icons.Default.LocalGasStation,
-                    label = "记录"
-                )
+                onSelectedIndexChange = { index ->
+                    val targetScreen = when (index) {
+                        0 -> HOME
+                        1 -> RECORDS
+                        2 -> EXPENSES
+                        else -> HOME
+                    }
 
-                MiuiNavigationItem(
-                    selected = screen == AppScreen.EXPENSES,
-                    onClick = {
-                        viewModel.navigateTo(AppScreen.EXPENSES)
-                    },
-                    icon = Icons.Default.Receipt,
-                    label = "费用"
+                    if (screen != targetScreen) {
+                        viewModel.navigateTo(targetScreen)
+                    }
+                },
+                items = listOf(
+                    MiuixNavItem(Icons.Default.Home, "首页"),
+                    MiuixNavItem(Icons.Default.LocalGasStation, "记录"),
+                    MiuixNavItem(Icons.Default.Receipt, "费用")
                 )
-            }
+            )
         }
     }
 
     // ---------- 首次安装：隐私声明 ----------
     if (showPrivacyOnStart) {
-        PrivacyDialog(
+        MiuixPrivacyDialog(
             onDismiss = {
                 showPrivacyOnStart = false
                 UpdateLogManager.markShown(
@@ -564,7 +553,7 @@ fun FuelTrackerApp(
                 .orEmpty()
 
         if (entries.isNotEmpty()) {
-            UpdateLogDialog(
+            MiuixUpdateLogDialog(
                 entries = entries,
                 onDismiss = {
                     showUpdateLog = false

@@ -21,14 +21,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -64,7 +62,7 @@ fun ScrollableSettingsDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
+            color = MiuixTheme.colorScheme.surface,
             modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp).padding(horizontal = 16.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
@@ -72,7 +70,7 @@ fun ScrollableSettingsDialog(
                     text = title,
                     fontSize = if (centeredTitle) 18.sp else 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MiuixTheme.colorScheme.onSurface,
                     textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -84,13 +82,15 @@ fun ScrollableSettingsDialog(
                 )
                 Spacer(Modifier.height(20.dp))
                 TextButton(
+                    text = buttonText,
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text(buttonText, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onPrimary)
-                }
+                    cornerRadius = 24.dp,
+                    colors = ButtonDefaults.textButtonColors(
+                        color = MiuixTheme.colorScheme.primary,
+                        textColor = MiuixTheme.colorScheme.onPrimary
+                    )
+                )
             }
         }
     }
@@ -129,9 +129,9 @@ fun PrivacyDialog(onDismiss: () -> Unit) {
 @Composable
 private fun PrivacySection(title: String, body: String) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(4.dp))
-        Text(body, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 20.sp)
+        Text(body, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary, lineHeight = 20.sp)
     }
 }
 
@@ -161,10 +161,10 @@ fun InstructionsDialog(onDismiss: () -> Unit) {
 @Composable
 private fun MiuiInstructionItem(index: Int, text: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-        Box(modifier = Modifier.size(22.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-            Text("$index", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Box(modifier = Modifier.size(22.dp).clip(CircleShape).background(MiuixTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+            Text("$index", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onPrimaryContainer)
         }
-        Text(text, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface, lineHeight = 21.sp, modifier = Modifier.weight(1f))
+        Text(text, fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurface, lineHeight = 21.sp, modifier = Modifier.weight(1f))
     }
 }
 
@@ -183,7 +183,7 @@ fun UpdateLogDialog(
     ) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
+            color = MiuixTheme.colorScheme.surface,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 48.dp)
@@ -197,7 +197,7 @@ fun UpdateLogDialog(
                     text = "更新内容",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MiuixTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(16.dp))
                 LazyColumn(
@@ -210,20 +210,15 @@ fun UpdateLogDialog(
                 }
                 Spacer(Modifier.height(16.dp))
                 TextButton(
+                    text = "我知道了",
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
+                    cornerRadius = 24.dp,
                     colors = ButtonDefaults.textButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                        color = MiuixTheme.colorScheme.primary,
+                        textColor = MiuixTheme.colorScheme.onPrimary
                     )
-                ) {
-                    Text(
-                        text = "我知道了",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
+                )
             }
         }
     }
@@ -257,7 +252,7 @@ private fun UpdateLogEntryItem(entry: UpdateLogManager.UpdateLogEntry) {
             text = "v${entry.versionName}",
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            color = MiuixTheme.colorScheme.primary
         )
         entry.items.forEach { line ->
             Row(
@@ -269,12 +264,12 @@ private fun UpdateLogEntryItem(entry: UpdateLogManager.UpdateLogEntry) {
                         .padding(top = 8.dp)
                         .size(4.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSurfaceVariant)
+                        .background(MiuixTheme.colorScheme.onSurfaceSecondary)
                 )
                 Text(
                     text = line,
                     fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MiuixTheme.colorScheme.onSurface,
                     lineHeight = 21.sp,
                     modifier = Modifier.weight(1f)
                 )
@@ -282,7 +277,6 @@ private fun UpdateLogEntryItem(entry: UpdateLogManager.UpdateLogEntry) {
         }
     }
 }
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiuiConfirmDialog(
     title: String,
@@ -293,36 +287,31 @@ fun MiuiConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val effectiveConfirmColor = confirmColor ?: MaterialTheme.colorScheme.error
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val effectiveConfirmColor = confirmColor ?: MiuixTheme.colorScheme.error
     var actionTriggered by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
+    WindowBottomSheet(
+        show = true,
+        title = title,
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = {
-            Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
-                Box(modifier = Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-            }
-        }
+        backgroundColor = MiuixTheme.colorScheme.surface
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp)) {
-            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(message, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 22.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Text(message, fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary, lineHeight = 22.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(28.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(
+                    text = dismissText,
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Text(dismissText, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                }
+                    cornerRadius = 24.dp,
+                    colors = ButtonDefaults.textButtonColors(
+                        color = MiuixTheme.colorScheme.surfaceVariant,
+                        textColor = MiuixTheme.colorScheme.onSurface
+                    )
+                )
                 TextButton(
+                    text = confirmText,
                     onClick = {
                         if (actionTriggered) return@TextButton
                         actionTriggered = true
@@ -330,30 +319,49 @@ fun MiuiConfirmDialog(
                     },
                     enabled = !actionTriggered,
                     modifier = Modifier.weight(1f).height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.textButtonColors(containerColor = effectiveConfirmColor.copy(alpha = 0.12f))
-                ) {
-                    Text(confirmText, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = effectiveConfirmColor)
-                }
+                    cornerRadius = 24.dp,
+                    colors = ButtonDefaults.textButtonColors(
+                        color = effectiveConfirmColor.copy(alpha = 0.12f),
+                        textColor = effectiveConfirmColor
+                    )
+                )
             }
         }
     }
 }
 
 @SuppressLint("DefaultLocale")
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiuiYearMonthSheet(initialYear: Int, initialMonth: Int, availableYears: List<Int>, onDismiss: () -> Unit, onConfirm: (Int, Int) -> Unit) {
     var year by remember { mutableIntStateOf(initialYear) }
     var month by remember { mutableIntStateOf(initialMonth) }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = MaterialTheme.colorScheme.surface) {
+    WindowBottomSheet(
+        show = true,
+        title = "选择年月",
+        startAction = {
+            TextButton(
+                text = "取消",
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(
+                    color = Color.Transparent,
+                    textColor = MiuixTheme.colorScheme.onSurfaceSecondary
+                )
+            )
+        },
+        endAction = {
+            TextButton(
+                text = "确定",
+                onClick = { onConfirm(year, month) },
+                colors = ButtonDefaults.textButtonColors(
+                    color = Color.Transparent,
+                    textColor = MiuixTheme.colorScheme.primary
+                )
+            )
+        },
+        onDismissRequest = onDismiss,
+        backgroundColor = MiuixTheme.colorScheme.surface
+    ) {
         Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("取消", Modifier.clickable(onClick = onDismiss).padding(8.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("选择年月", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text("确定", Modifier.clickable { onConfirm(year, month) }.padding(8.dp), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 WheelList(selectedValue = year, items = availableYears, visibleCount = 3, modifier = Modifier.weight(1.4f), style = WheelStyle.WithBackground, itemLabel = { "${it}年" }, onChange = { year = it })
                 WheelList(selectedValue = month, items = (0..12).toList(), visibleCount = 3, modifier = Modifier.weight(1f), style = WheelStyle.WithBackground, itemLabel = { if (it == 0) "全年" else String.format("%02d 月", it) }, onChange = { month = it })
@@ -361,7 +369,6 @@ fun MiuiYearMonthSheet(initialYear: Int, initialMonth: Int, availableYears: List
         }
     }
 }
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiuiBottomSheetWrapper(
     title: String,
@@ -370,24 +377,33 @@ fun MiuiBottomSheetWrapper(
     confirmText: String = "确定",
     content: @Composable () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss, sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = {
-            Box(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-            }
-        }
+    WindowBottomSheet(
+        show = true,
+        title = title,
+        startAction = {
+            TextButton(
+                text = "取消",
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(
+                    color = Color.Transparent,
+                    textColor = MiuixTheme.colorScheme.onSurfaceSecondary
+                )
+            )
+        },
+        endAction = {
+            TextButton(
+                text = confirmText,
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(
+                    color = Color.Transparent,
+                    textColor = MiuixTheme.colorScheme.primary
+                )
+            )
+        },
+        onDismissRequest = onDismiss,
+        backgroundColor = MiuixTheme.colorScheme.surface
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("取消", Modifier.clickable(onClick = onDismiss).padding(8.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text(confirmText, Modifier.clickable { onConfirm() }.padding(8.dp), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(Modifier.height(12.dp))
             content()
         }
     }
