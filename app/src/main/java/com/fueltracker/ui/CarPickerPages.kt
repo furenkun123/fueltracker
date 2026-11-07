@@ -153,8 +153,8 @@ private fun <T> PickerListScreen(
     }
 
     PickerScaffold(
-        title, onBack, search, { search = it },
-        searchPlaceholder, loading, loadError, showSearch, onSearchAction, listState
+        loading = loading,
+        errorMessage = loadError
     ) {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             // 标题作为列表首项，和首页标题一样随列表自然滚出。
@@ -172,6 +172,18 @@ private fun <T> PickerListScreen(
                         color = MiuixTheme.colorScheme.onBackground,
                         maxLines = 1
                     )
+                }
+            }
+
+            if (showSearch) {
+                stickyHeader(key = "picker_search") {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(MiuixTheme.colorScheme.background)
+                    ) {
+                        PickerSearchBox(search, { search = it }, searchPlaceholder, onSearchAction)
+                    }
                 }
             }
 
@@ -205,16 +217,8 @@ private fun <T> PickerListScreen(
 
 @Composable
 private fun PickerScaffold(
-    title: String,
-    onBack: () -> Unit,
-    search: String,
-    onSearchChange: (String) -> Unit,
-    placeholder: String,
     loading: Boolean,
     errorMessage: String?,
-    showSearch: Boolean,
-    onSearchAction: () -> Unit,
-    listState: androidx.compose.foundation.lazy.LazyListState,
     content: @Composable () -> Unit
 ) {
     Column(
@@ -224,10 +228,6 @@ private fun PickerScaffold(
             .statusBarsPadding()
             .imePadding()
     ) {
-        if (showSearch) {
-            PickerSearchBox(search, onSearchChange, placeholder, onSearchAction)
-        }
-
         if (errorMessage != null && !loading) {
             Text(
                 errorMessage,
