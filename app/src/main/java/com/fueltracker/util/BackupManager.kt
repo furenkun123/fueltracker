@@ -70,12 +70,25 @@ object BackupManager {
             }
         }
 
-        records.filter { it.isInitialRecord }
-            .groupBy { it.vehicleId }
-            .values
-            .forEach { initialRecords ->
-                require(initialRecords.size <= 1) { "同一辆车不能存在多条初始化记录" }
+        val initialRecordsByVehicle = records.filter { it.isInitialRecord }.groupBy { it.vehicleId }
+        require(initialRecordsByVehicle.values.all { it.size == 1 }) {
+            "同一辆车不能存在多条初始化记录"
+        }
+        val vehiclesById = vehicles.associateBy { it.id }
+        for ((vehicleId, initialRecords) in initialRecordsByVehicle) {
+            val owner = vehiclesById[vehicleId] ?: throw IllegalStateException("初始化记录引用了不存在的车辆")
+            val initial = initialRecords.single()
+            require(initial.odometer != null) { "数据库中的车辆初始化记录缺少当前里程，无法备份" }
+            if (owner.fuelType != "纯电动") {
+                val initialFuel = initial.initialFuel ?: initial.remainingFuel
+                require(initialFuel != null && initialFuel <= owner.tankCapacity + 1e-6) {
+                    "数据库中的车辆初始化油量缺失或超过油箱容量，无法备份"
+                }
             }
+        }
+        require(vehicles.all { initialRecordsByVehicle.containsKey(it.id) }) {
+            "数据库存在缺少初始化记录的车辆，无法备份"
+        }
 
         records.forEach { record ->
             require(record.timestamp > 0L) { "数据库存在无效加油时间，无法备份" }
@@ -272,6 +285,8 @@ object BackupManager {
                 // v1/v2 备份把初始数据保存在 Vehicle；v3 起统一保存在 FuelRecord。
                 val legacyOdometer = json.getNullableDouble("initialOdometer")
                 val legacyFuel = json.getNullableDouble("initialFuel")
+                requireNullableFiniteNonNegative(legacyOdometer, "旧备份车辆初始里程")
+                requireNullableFiniteNonNegative(legacyFuel, "旧备份车辆初始油量")
                 if (legacyOdometer != null || legacyFuel != null) {
                     legacyInitialData[id] = LegacyInitialData(legacyOdometer, legacyFuel)
                 }
@@ -403,8 +418,7 @@ object BackupManager {
                     val existing = records[existingIndex]
                     records[existingIndex] = existing.copy(
                         odometer = existing.odometer ?: legacy.odometer,
-                        initialFuel = existing.initialFuel ?: legacyFuel,
-                        remainingFuel = existing.remainingFuel ?: legacyFuel
+                        initialFuel = existing.initialFuel ?: existing.remainingFuel ?: legacyFuel
                     )
                 } else if (legacy.odometer != null || legacyFuel != null) {
                     check(nextRecordId < Long.MAX_VALUE) { "备份记录 ID 已达到上限" }
@@ -426,7 +440,6 @@ object BackupManager {
                             volume = 0.0,
                             actualPaidAmount = 0.0,
                             unitPrice = 0.0,
-                            remainingFuel = legacyFuel,
                             isInitialRecord = true,
                             initialFuel = legacyFuel,
                             note = "由旧备份转换的车辆初始化记录"
@@ -435,12 +448,24 @@ object BackupManager {
                 }
             }
             requireUniqueIds(records.map { it.id }, "加油记录")
-            records.filter { it.isInitialRecord }
-                .groupBy { it.vehicleId }
-                .values
-                .forEach { initialRecords ->
-                    require(initialRecords.size == 1) { "备份文件损坏：同一辆车存在多条初始化记录" }
+            val initialRecordsByVehicle = records.filter { it.isInitialRecord }.groupBy { it.vehicleId }
+            require(initialRecordsByVehicle.values.all { it.size == 1 }) {
+                "备份文件损坏：同一辆车存在多条初始化记录"
+            }
+            val vehiclesById = vehicles.associateBy { it.id }
+            for ((vehicleId, initialRecords) in initialRecordsByVehicle) {
+                val owner = vehiclesById[vehicleId] ?: throw IllegalArgumentException("初始化记录引用了不存在的车辆")
+                val initial = initialRecords.single()
+                require(initial.odometer != null) { "车辆初始化记录缺少当前里程" }
+                if (owner.fuelType != "纯电动") {
+                    val initialFuel = initial.initialFuel ?: initial.remainingFuel
+                    require(initialFuel != null) { "燃油车辆初始化记录缺少当前剩余油量" }
+                    require(initialFuel <= owner.tankCapacity + 1e-6) { "车辆初始化油量超过油箱容量" }
                 }
+            }
+            require(vehicles.all { initialRecordsByVehicle.containsKey(it.id) }) {
+                "备份文件损坏：有车辆缺少初始化记录"
+            }
 
             val expenses = mutableListOf<ExpenseRecord>()
             for (i in 0 until expenseArray.length()) {
