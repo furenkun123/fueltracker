@@ -38,8 +38,8 @@ import com.fueltracker.ui.SettingsScreen
 import com.fueltracker.ui.VehicleScreen
 import com.fueltracker.ui.miuix.dialogs.MiuixPrivacyDialog
 import com.fueltracker.ui.miuix.dialogs.MiuixUpdateLogDialog
-import com.fueltracker.ui.miuix.MiuixAppNavigationBar
-import com.fueltracker.ui.miuix.AppNavItem
+import com.fueltracker.ui.miuix.navigation.MiuixAppNavigationBar
+import com.fueltracker.ui.miuix.navigation.AppNavItem
 import com.fueltracker.ui.miuix.MiuixTopBar
 import com.fueltracker.ui.miuix.MiuixTopBarIconButton
 import com.fueltracker.util.UpdateLogManager
