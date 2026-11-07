@@ -353,10 +353,16 @@ object FuelCalculator {
             .filter { deliveryDate == null || it.timestamp >= deliveryDate }
             .minByOrNull { it.timestamp }
 
+        val tankCapacity = vehicle?.tankCapacity?.takeIf { it.isFinite() && it > 0.0 }
+
         // 0 km 对全新车辆是合法起点；普通加油记录仍由 validOdometer 单独校验。
         val initialOdo = initialRecord?.odometer?.takeIf { it.isFinite() && it >= 0.0 }
-        val initialFuel = initialRecord?.initialFuel?.takeIf { it.isFinite() && it >= 0.0 }
+        val initialFuelCandidate = initialRecord?.initialFuel?.takeIf { it.isFinite() && it >= 0.0 }
             ?: initialRecord?.remainingFuel?.takeIf { it.isFinite() && it >= 0.0 }
+        // 防止旧数据中的初始油量超过油箱容量，污染首个计算区间。
+        val initialFuel = initialFuelCandidate?.takeIf {
+            tankCapacity == null || it <= tankCapacity + 1e-6
+        }
 
         val visibleRecords = records.asSequence()
             .filter { isFuelVisible(it, deliveryDate) }
@@ -378,8 +384,6 @@ object FuelCalculator {
             nextValidIndex[i] = nextIndex
             if (validOdometer(visibleRecords[i]) != null) nextIndex = i
         }
-
-        val tankCapacity = vehicle?.tankCapacity?.takeIf { it.isFinite() && it > 0.0 }
 
         // 初始里程统一来自初始 FuelRecord，不再从 Vehicle 读取备用里程。
         val firstAnchor = findFirstAnchor(
