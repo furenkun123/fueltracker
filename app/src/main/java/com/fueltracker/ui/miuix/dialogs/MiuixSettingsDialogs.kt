@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -23,16 +22,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 // ============================================================
 // 公共弹窗外壳
@@ -47,39 +44,61 @@ fun MiuixScrollableSettingsDialog(
     spacedContent: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MiuixTheme.colorScheme.surface,
-            modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp).padding(horizontal = 16.dp)
+    WindowDialog(
+        title = if (centeredTitle) null else title,
+        show = true,
+        onDismissRequest = onDismiss,
+        backgroundColor = MiuixTheme.colorScheme.surface,
+        cornerRadius = 28.dp,
+        insideMargin = DpSize(24.dp, 20.dp),
+        maxWidth = 420.dp
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+            // 居中标题
+            if (centeredTitle) {
                 Text(
                     text = title,
-                    fontSize = if (centeredTitle) 18.sp else 20.sp,
-                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 18.dp),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = MiuixTheme.colorScheme.onSurface,
-                    textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(16.dp))
-                Column(
-                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()),
-                    verticalArrangement = if (spacedContent) Arrangement.spacedBy(10.dp) else Arrangement.Top,
-                    content = content
-                )
-                Spacer(Modifier.height(20.dp))
-                TextButton(
-                    text = buttonText,
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    cornerRadius = 24.dp,
-                    colors = ButtonDefaults.textButtonColors(
-                        color = MiuixTheme.colorScheme.primary,
-                        textColor = MiuixTheme.colorScheme.onPrimary
-                    )
+                    textAlign = TextAlign.Center
                 )
             }
+
+            // 滚动内容
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = if (spacedContent) {
+                    Arrangement.spacedBy(12.dp)
+                } else {
+                    Arrangement.Top
+                },
+                content = content
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            // 底部按钮
+            TextButton(
+                text = buttonText,
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                cornerRadius = 24.dp,
+                colors = ButtonDefaults.textButtonColors(
+                    color = MiuixTheme.colorScheme.primary,
+                    textColor = MiuixTheme.colorScheme.onPrimary
+                )
+            )
         }
     }
 }
@@ -116,10 +135,26 @@ fun MiuixPrivacyDialog(onDismiss: () -> Unit) {
 
 @Composable
 private fun PrivacySection(title: String, body: String) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(body, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary, lineHeight = 20.sp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 7.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MiuixTheme.colorScheme.onSurface
+        )
+
+        Spacer(Modifier.height(6.dp))
+
+        Text(
+            text = body,
+            fontSize = 13.sp,
+            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+            lineHeight = 21.sp
+        )
     }
 }
 
@@ -155,5 +190,3 @@ private fun MiuixInstructionItem(index: Int, text: String) {
         Text(text, fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurface, lineHeight = 21.sp, modifier = Modifier.weight(1f))
     }
 }
-
-

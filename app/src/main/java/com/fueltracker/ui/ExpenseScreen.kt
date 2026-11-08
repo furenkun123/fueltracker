@@ -57,6 +57,8 @@ import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
 import com.fueltracker.ui.components.SummaryCard
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miuix.MiuixCard
+import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
+import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.buildMonthTrend
 import com.fueltracker.util.buildStructureData
@@ -194,10 +196,14 @@ fun ExpenseScreen(
                     text = "费用",
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
+                    color = adaptiveBackgroundTitleColor(
+                        MiuixTheme.colorScheme.onBackground
+                    ),
+                    style = adaptiveBackgroundTitleStyle(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = (-15).dp)
-                        .padding(horizontal = 15.dp, vertical = 0.dp)
+                        .padding(horizontal = 15.dp)
                 )
             }
 

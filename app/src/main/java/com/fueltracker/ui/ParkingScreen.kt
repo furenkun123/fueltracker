@@ -51,6 +51,8 @@ import com.fueltracker.ui.miuix.MiuixButton
 import com.fueltracker.ui.miuix.MiuixChip
 import com.fueltracker.ui.miuix.MiuixFormCard
 import com.fueltracker.ui.miuix.MiuixTextField
+import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
+import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.LocationHelper
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -127,7 +129,6 @@ fun ParkingScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(MiuixTheme.colorScheme.background)
             .imePadding()
             .navigationBarsPadding(),
         contentPadding = PaddingValues(
@@ -152,7 +153,10 @@ fun ParkingScreen(
                     text = if (isEditMode) "编辑停车" else "记停车",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onBackground
+                    color = adaptiveBackgroundTitleColor(
+                        MiuixTheme.colorScheme.onBackground
+                    ),
+                    style = adaptiveBackgroundTitleStyle()
                 )
             }
         }

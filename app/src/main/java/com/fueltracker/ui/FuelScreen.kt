@@ -54,6 +54,8 @@ import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixFieldLabel
 import com.fueltracker.ui.miuix.MiuixSwitch
 import com.fueltracker.ui.miuix.MiuixTextField
+import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
+import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.viewmodel.MainViewModel
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
@@ -294,7 +296,6 @@ fun FuelScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MiuixTheme.colorScheme.surface)
             .imePadding()
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
@@ -325,7 +326,10 @@ fun FuelScreen(
                     text = if (isEditMode) "编辑加油记录" else "记加油",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurface
+                    color = adaptiveBackgroundTitleColor(
+                        MiuixTheme.colorScheme.onBackground
+                    ),
+                    style = adaptiveBackgroundTitleStyle()
                 )
             }
 
@@ -484,7 +488,6 @@ fun FuelScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
-                                        // 这里的图标如果在引入 M3 时报错，可以用 Text("↔") 替代
                                         Icon(
                                             Icons.Rounded.SwapHoriz,
                                             "切换单位",

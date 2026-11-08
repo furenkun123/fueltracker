@@ -1,6 +1,5 @@
 package com.fueltracker.ui
 
-import android.R.attr.subtitle
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -455,13 +453,3 @@ private fun lightenPickerBackground(color: Color): Color {
     )
 }
 
-/** Darken the search field slightly so it remains distinct from the page background. */
-private fun darkenPickerSearchColor(color: Color): Color {
-    val factor = 0.92f
-    return Color(
-        red = color.red * factor,
-        green = color.green * factor,
-        blue = color.blue * factor,
-        alpha = color.alpha
-    )
-}

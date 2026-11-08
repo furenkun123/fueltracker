@@ -501,7 +501,6 @@ private fun MiuixDateWheelPickerBottomSheet(
     }
 }
 
-// 在你的 VehicleScreen.kt 文件最底部，只保留这一个自己写的组件
 @Composable
 private fun MiuixFuelInputListItem(
     title: String,

@@ -147,8 +147,14 @@ private fun NavigationBarSurface(
     itemCount: Int,
     content: @Composable RowScope.() -> Unit
 ) {
-    // 浅色模式也使用主题 surface，而不是纯白，缩小玻璃与实色材质的色差。
-    val solidColor = MiuixTheme.colorScheme.surface
+
+    val solidColor = if (isLight) {
+        // 浅色模式：向纯白混合 60%，让底栏明显变白，与页面背景区分开
+        lerp(MiuixTheme.colorScheme.surface, Color.White, 0.6f)
+    } else {
+        // 深色模式：向纯白混合 8%，让底栏有一点灰白的质感，不那么死黑
+        lerp(MiuixTheme.colorScheme.surface, Color.White, 0.08f)
+    }
 
     // 悬浮导航栏保持稳定的玻璃材质，不再随内容检测在玻璃与实色之间切换。
     val shouldUseGlass = isGlassEnabled && isFloating

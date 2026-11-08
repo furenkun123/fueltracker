@@ -75,6 +75,8 @@ import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixFilterChip
 import com.fueltracker.ui.miuix.MiuixTextButton
 import com.fueltracker.ui.components.MiuixVehicleCard
+import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
+import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.StatisticsSummary
@@ -211,6 +213,10 @@ fun HomeScreen(
                     text = "随记油耗",
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
+                    color = adaptiveBackgroundTitleColor(
+                        MiuixTheme.colorScheme.onBackground
+                    ),
+                    style = adaptiveBackgroundTitleStyle(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = (-15).dp)
@@ -262,9 +268,13 @@ fun HomeScreen(
                 item {
                     Text(
                         text = "最近加油",
-                        style = MiuixTheme.textStyles.title4,
+                        style = adaptiveBackgroundTitleStyle(
+                            MiuixTheme.textStyles.title4
+                        ),
                         fontWeight = FontWeight.SemiBold,
-                        color = MiuixTheme.colorScheme.onBackground,
+                        color = adaptiveBackgroundTitleColor(
+                            MiuixTheme.colorScheme.onBackground
+                        ),
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }

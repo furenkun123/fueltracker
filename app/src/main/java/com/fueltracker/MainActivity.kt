@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import com.fueltracker.ui.theme.BackgroundPreferences
 import com.fueltracker.ui.theme.FuelTrackerTheme
 import com.fueltracker.ui.theme.ThemePreferences
 import com.fueltracker.viewmodel.MainViewModel
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         ThemePreferences.init(applicationContext)
+        BackgroundPreferences.init(applicationContext)
 
         // 启用 Edge-to-Edge
         WindowCompat.setDecorFitsSystemWindows(window, false)

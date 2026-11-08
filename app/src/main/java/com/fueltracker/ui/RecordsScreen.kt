@@ -24,9 +24,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LocalGasStation
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -53,6 +54,8 @@ import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixChip
 import com.fueltracker.ui.miuix.MiuixFilterChip
 import com.fueltracker.ui.miuix.MiuixTextButton
+import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
+import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.IntervalConfidence
@@ -131,19 +134,31 @@ fun RecordsScreen(
                     text = "加油记录",
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
+                    color = adaptiveBackgroundTitleColor(
+                        MiuixTheme.colorScheme.onBackground
+                    ),
+                    style = adaptiveBackgroundTitleStyle(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = (-15).dp)
-                        .padding(horizontal = 15.dp, vertical = 0.dp)
+                        .padding(horizontal = 15.dp)
                 )
             }
 
-            item(key = "filter_bar") {
-                RecordFilterBar(filterType, selectedYear, selectedMonth, selectedDay, { filterType = it }, { showDatePicker = true })
+            // ✅ 替换：将筛选与统计合并到同一个卡片中
+            item(key = "header_card") {
+                RecordHeaderCard(
+                    displayRecords = displayRecords,
+                    vehicle = vehicle,
+                    filterType = filterType,
+                    selectedYear = selectedYear,
+                    selectedMonth = selectedMonth,
+                    selectedDay = selectedDay,
+                    onFilterChange = { filterType = it },
+                    onMonthClick = { showDatePicker = true }
+                )
             }
-            item(key = "statistics") {
-                RecordStatistics(displayRecords, vehicle)
-            }
+
             item(key = "spacer") { Spacer(modifier = Modifier.height(8.dp)) }
 
             if (displayRecords.isEmpty()) {
@@ -175,8 +190,62 @@ fun RecordsScreen(
 }
 
 // =================================================
-// 基础卡片 & 统计区域
+// ✅ 新组件：合并筛选与统计的头部卡片
 // =================================================
+
+@Composable
+private fun RecordHeaderCard(
+    displayRecords: List<FuelRecord>,
+    vehicle: Vehicle?,
+    filterType: String,
+    selectedYear: Int,
+    selectedMonth: Int,
+    selectedDay: Int,
+    onFilterChange: (String) -> Unit,
+    onMonthClick: () -> Unit
+) {
+    val totalMoney = remember(displayRecords) { displayRecords.sumOf { it.actualPaidAmount } }
+    val totalVolume = remember(displayRecords) { displayRecords.sumOf { it.volume } }
+    val averageConsumption = remember(displayRecords, vehicle) {
+        if (displayRecords.isEmpty()) null else FuelCalculator.calculateSummary(allRecords = displayRecords, vehicle = vehicle).averageConsumption
+    }
+    val customText = remember(selectedYear, selectedMonth, selectedDay) {
+        if (selectedDay == 0) "${selectedYear}.${selectedMonth}月 ▼" else "${selectedYear}.${selectedMonth}.${selectedDay} ▼"
+    }
+
+    MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column {
+            // 上半部分：筛选胶囊
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MiuixFilterChip("全部", filterType == "全部") { onFilterChange("全部") }
+                MiuixFilterChip("本月", filterType == "本月") { onFilterChange("本月") }
+                MiuixFilterChip(customText, filterType == "按时间", onMonthClick)
+            }
+
+            // 中间细分割线（贯穿卡片但留出左右边距）
+            HorizontalDivider(
+                color = MiuixTheme.colorScheme.surfaceVariant,
+                thickness = 0.6.dp,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            // 下半部分：统计数字
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                StatCell("次数", "${displayRecords.size}")
+                StatCell("金额", "¥%.2f".format(totalMoney))
+                StatCell("油量", "%.1f L".format(totalVolume))
+                StatCell("油耗", averageConsumption?.let { "%.1f".format(it) } ?: "--", isHighlight = true)
+            }
+        }
+    }
+}
 
 @Composable
 private fun StatCell(title: String, value: String, isHighlight: Boolean = false) {
@@ -184,42 +253,6 @@ private fun StatCell(title: String, value: String, isHighlight: Boolean = false)
         Text(title, color = MiuixTheme.colorScheme.onSurfaceSecondary, fontSize = 11.sp)
         Spacer(modifier = Modifier.height(2.dp))
         Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (isHighlight) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface)
-    }
-}
-
-@Composable
-private fun RecordStatistics(displayRecords: List<FuelRecord>, vehicle: Vehicle?) {
-    val totalMoney = remember(displayRecords) { displayRecords.sumOf { it.actualPaidAmount } }
-    val totalVolume = remember(displayRecords) { displayRecords.sumOf { it.volume } }
-    val averageConsumption = remember(displayRecords, vehicle) {
-        if (displayRecords.isEmpty()) null else FuelCalculator.calculateSummary(allRecords = displayRecords, vehicle = vehicle).averageConsumption
-    }
-
-    MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
-        ) {
-            StatCell("次数", "${displayRecords.size}")
-            StatCell("金额", "¥%.2f".format(totalMoney))
-            StatCell("油量", "%.1f L".format(totalVolume))
-            StatCell("油耗", averageConsumption?.let { "%.1f".format(it) } ?: "--", isHighlight = true)
-        }
-    }
-}
-
-// =================================================
-// 筛选组件
-// =================================================
-
-@Composable
-private fun RecordFilterBar(filterType: String, year: Int, month: Int, day: Int, onFilterChange: (String) -> Unit, onMonthClick: () -> Unit) {
-    val customText = remember(year, month, day) { if (day == 0) "${year}.${month}月 ▼" else "${year}.${month}.${day} ▼" }
-
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        MiuixFilterChip("全部", filterType == "全部") { onFilterChange("全部") }
-        MiuixFilterChip("本月", filterType == "本月") { onFilterChange("本月") }
-        MiuixFilterChip(customText, filterType == "按时间", onMonthClick)
     }
 }
 
@@ -245,14 +278,14 @@ private fun FuelRecordCard(
     MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(
             modifier = Modifier
-                .fillMaxWidth() // ✅ 确保内层撑满卡片
+                .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             // 1. 顶部：时间、标签、编辑
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 FlowRow(
-                    modifier = Modifier.weight(1f), // ✅ 限制左侧标签区宽度，防止挤压编辑按钮
+                    modifier = Modifier.weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -289,7 +322,6 @@ private fun FuelRecordCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // ✅ 左侧加上 weight(1f) 和 maxLines，彻底杜绝长文本把布局撑破
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text("¥", fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
@@ -304,7 +336,7 @@ private fun FuelRecordCard(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp)) // 左右增加一点间距
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Column(horizontalAlignment = Alignment.End) {
                     if (calculationResult != null && calculationResult.distance > 0) {
