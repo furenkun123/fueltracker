@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -506,6 +507,39 @@ fun FuelScreen(
                             },
                             supportingText = remainingSupportingText
                         )
+
+                    }
+                    // ✅ 核心修改：将错误提示放在输入卡片的底部
+                    if (errorMessages.isNotEmpty()) {
+                        // 加一条极细的分割线，和输入框隔开
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(0.5.dp)
+                                .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                        )
+
+                        // 使用 FlowRow 自动换行排列标签
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            errorMessages.forEach { msg ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(MiuixTheme.colorScheme.error.copy(alpha = 0.1f))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = msg,
+                                        color = MiuixTheme.colorScheme.error,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -529,15 +563,6 @@ fun FuelScreen(
                         color = MiuixTheme.colorScheme.error,
                         modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                     )
-                }
-            }
-
-            // 统一错误提示
-            if (errorMessages.isNotEmpty()) {
-                Column(Modifier.padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    for (msg in errorMessages) {
-                        Text(msg, color = MiuixTheme.colorScheme.error, fontSize = 12.sp)
-                    }
                 }
             }
 
@@ -637,7 +662,6 @@ fun FuelScreen(
                             .clip(RoundedCornerShape(25.dp))
                             .background(if (isFormValid && !isSaving) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.primary.copy(alpha = 0.4f))
                             .clickable(enabled = isFormValid && !isSaving) {
-                                // ... 内部保存逻辑保持原样 ...
                                 if (!isFormValid) {
                                     Toast.makeText(context, "请检查表单错误", Toast.LENGTH_SHORT).show()
                                     return@clickable

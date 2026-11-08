@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -24,10 +23,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LocalGasStation
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -46,7 +41,6 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
 import com.fueltracker.ui.components.LazyColumnScrollbar
-import com.fueltracker.ui.miuix.dialogs.MiuixBottomSheetWrapper
 import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
 import com.fueltracker.ui.components.scrollToHideFab
@@ -54,12 +48,17 @@ import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixChip
 import com.fueltracker.ui.miuix.MiuixFilterChip
 import com.fueltracker.ui.miuix.MiuixTextButton
+import com.fueltracker.ui.miuix.dialogs.MiuixBottomSheetWrapper
 import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
 import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.IntervalConfidence
 import com.fueltracker.viewmodel.MainViewModel
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -140,7 +139,6 @@ fun RecordsScreen(
                     style = adaptiveBackgroundTitleStyle(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(y = (-15).dp)
                         .padding(horizontal = 15.dp)
                 )
             }

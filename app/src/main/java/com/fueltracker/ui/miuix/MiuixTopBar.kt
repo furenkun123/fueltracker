@@ -215,7 +215,9 @@ fun MiuixBackButton(
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
             contentDescription = "返回",
-            tint = MiuixTheme.colorScheme.onBackground,
+            tint = adaptiveBackgroundTitleColor(
+                MiuixTheme.colorScheme.onBackground
+            ),
             modifier = Modifier.size(22.dp)
         )
     }

@@ -254,11 +254,12 @@ private fun NavigationBarSurface(
 
         LaunchedEffect(safeSelectedIndex) {
             if (!isDragging) {
+                // ✅ 点击时，如果感觉慢，可以把 stiffness 调高，让它弹得更快
                 animatedIndex.animateTo(
                     targetValue = latestSelectedIndex.value.toFloat(),
                     animationSpec = spring(
-                        dampingRatio = 0.72f,
-                        stiffness = 380f
+                        dampingRatio = 0.75f,
+                        stiffness = 500f // 从 380f 提高到 500f，响应更迅速
                     )
                 )
             }
@@ -311,7 +312,7 @@ private fun NavigationBarSurface(
             modifier = Modifier
                 .offset {
                     IntOffset(
-                        x = pillOffset.toInt(),
+                        x = pillOffset.roundToInt(),
                         y = MiuixGlassDefaults.Navigation.pillOffsetY.roundToPx()
                     )
                 }
@@ -332,7 +333,7 @@ private fun NavigationBarSurface(
             modifier = Modifier
                 .offset {
                     IntOffset(
-                        x = pillOffset.toInt(),
+                        x = pillOffset.roundToInt(),
                         y = MiuixGlassDefaults.Navigation.pillOffsetY.roundToPx()
                     )
                 }
@@ -354,9 +355,6 @@ private fun NavigationBarSurface(
         )
 
         // 第五层：导航内容
-        val horizontalPaddingPx = with(LocalDensity.current) {
-            horizontalPadding.toPx()
-        }
 
         val tabWidthPx = with(LocalDensity.current) {
             tabWidth.toPx()
@@ -390,35 +388,34 @@ private fun NavigationBarSurface(
                     density
                 ) {
                     var draggingPill = false
+                    var dragFingerOffset = 0f
                     var lastDragTimeMillis = 0L
                     var smoothedSpeedDpPerSecond = 0f
-                    // 当前拖动过程中，已经通知页面切换到哪个导航项。
                     var lastNotifiedIndex = latestSelectedIndex.value
 
                     detectHorizontalDragGestures(
                         onDragStart = { position ->
-
-                            // 从手指按下的位置计算起始导航项
-                            val startIndex = (
-                                    (position.x - horizontalPaddingPx) / tabWidthPx
-                                    ).toInt().coerceIn(0, tabCount - 1)
+                            // position.x 已经是 Row 内部坐标（已扣除 padding）
+                            val startIndex = (position.x / tabWidthPx)
+                                .toInt()
+                                .coerceIn(0, tabCount - 1)
 
                             // 仅允许在导航栏内容区域内开始拖动
-                            draggingPill =
-                                position.y in pillTopPx..(pillTopPx + pillHeightPx)
+                            draggingPill = position.y in pillTopPx..(pillTopPx + pillHeightPx)
 
                             if (draggingPill) {
                                 lastDragTimeMillis = 0L
                                 smoothedSpeedDpPerSecond = 0f
 
-                                // 以手指按下的导航项作为起点
+                                // ✅ 移除了冗余的 dragStartIndex，直接计算偏移
+                                val initialPillCenter = startIndex * tabWidthPx + pillWidthPx / 2f
+                                dragFingerOffset = position.x - initialPillCenter
+
                                 lastNotifiedIndex = startIndex
                                 dragIndex = startIndex.toFloat()
-
                                 dragStretch = 1f
                                 isDragging = true
 
-                                // 如果按下的不是当前页面，立即切换
                                 if (startIndex != latestSelectedIndex.value) {
                                     selectionCallback.value(startIndex)
                                 }
@@ -426,46 +423,29 @@ private fun NavigationBarSurface(
                         },
 
                         onHorizontalDrag = { change, dragAmount ->
-
                             if (draggingPill) {
                                 change.consume()
 
                                 // 根据相邻手势事件估算当前速度，并做平滑，避免形变抖动
                                 val currentTime = change.uptimeMillis
                                 if (lastDragTimeMillis != 0L) {
-                                    val deltaTime = (
-                                            currentTime - lastDragTimeMillis
-                                            ).coerceAtLeast(1L)
-
-                                    val currentSpeedDpPerSecond =
-                                        abs(dragAmount) * 1000f /
-                                                deltaTime.toFloat() / density
-
-                                    smoothedSpeedDpPerSecond =
-                                        smoothedSpeedDpPerSecond * 0.55f +
-                                                currentSpeedDpPerSecond * 0.45f
-
+                                    val deltaTime = (currentTime - lastDragTimeMillis).coerceAtLeast(1L)
+                                    val currentSpeedDpPerSecond = abs(dragAmount) * 1000f / deltaTime.toFloat() / density
+                                    smoothedSpeedDpPerSecond = smoothedSpeedDpPerSecond * 0.55f + currentSpeedDpPerSecond * 0.45f
                                     // 快速拖动时横向拉伸，最高 14%
-                                    dragStretch = (
-                                            1f + smoothedSpeedDpPerSecond / 3_000f
-                                            ).coerceIn(1f, 1.14f)
+                                    dragStretch = (1f + smoothedSpeedDpPerSecond / 3_000f).coerceIn(1f, 1.14f)
                                 }
                                 lastDragTimeMillis = currentTime
 
+                                // 由手指当前位置反算胶囊中心，保持按下时的抓取偏移。
+                                val pillCenter = change.position.x - dragFingerOffset
                                 dragIndex = (
-                                        dragIndex + dragAmount / tabWidthPx.coerceAtLeast(1f)
-                                        ).coerceIn(
-                                        0f,
-                                        (tabCount - 1).toFloat()
-                                    )
+                                        (pillCenter - pillWidthPx / 2f) /
+                                                tabWidthPx.coerceAtLeast(1f)
+                                        ).coerceIn(0f, (tabCount - 1).toFloat())
 
                                 // 越过相邻导航项的中点时，立即切换页面。
-                                // roundToInt() 以每个导航项的中心作为切换阈值，
-                                // 拖回上一项时也会立即切回。
-                                val crossedIndex = dragIndex
-                                    .roundToInt()
-                                    .coerceIn(0, tabCount - 1)
-
+                                val crossedIndex = dragIndex.roundToInt().coerceIn(0, tabCount - 1)
                                 if (crossedIndex != lastNotifiedIndex) {
                                     lastNotifiedIndex = crossedIndex
                                     selectionCallback.value(crossedIndex)
@@ -474,65 +454,40 @@ private fun NavigationBarSurface(
                         },
 
                         onDragEnd = {
-
                             if (draggingPill) {
-
                                 val releasePosition = dragIndex
+                                val targetIndex = releasePosition.roundToInt().coerceIn(0, tabCount - 1)
 
-                                val targetIndex = releasePosition
-                                    .roundToInt()
-                                    .coerceIn(0, tabCount - 1)
-
-                                // 防止最后一次拖动事件与松手位置之间存在细小差异，
-                                // 确保最终吸附项与页面选中项一致。
                                 if (targetIndex != lastNotifiedIndex) {
                                     lastNotifiedIndex = targetIndex
                                     selectionCallback.value(targetIndex)
                                 }
 
+                                // ✅ 确保 snapTo 在协程中调用
                                 animationScope.launch {
-                                    // 从手指松开的位置继续动画
                                     animatedIndex.snapTo(releasePosition)
-
                                     isDragging = false
-
-                                    // 吸附到最近的导航项
                                     animatedIndex.animateTo(
                                         targetValue = targetIndex.toFloat(),
-                                        animationSpec = spring(
-                                            dampingRatio = 0.72f,
-                                            stiffness = 380f
-                                        )
+                                        animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f)
                                     )
                                 }
                             }
-
                             draggingPill = false
                         },
 
                         onDragCancel = {
-
                             if (draggingPill) {
-
                                 val releasePosition = dragIndex
-
                                 animationScope.launch {
-
                                     animatedIndex.snapTo(releasePosition)
-
                                     isDragging = false
-
-                                    // 取消拖动时回到原来的导航项
                                     animatedIndex.animateTo(
                                         targetValue = latestSelectedIndex.value.toFloat(),
-                                        animationSpec = spring(
-                                            dampingRatio = 0.72f,
-                                            stiffness = 380f
-                                        )
+                                        animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f)
                                     )
                                 }
                             }
-
                             draggingPill = false
                         }
                     )

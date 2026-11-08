@@ -3,11 +3,8 @@ package com.fueltracker.ui.theme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.text.TextStyle
 
@@ -72,15 +69,6 @@ fun rememberAdaptiveTitleColor(backgroundBitmap: ImageBitmap?): Color? {
 fun adaptiveBackgroundTitleStyle(
     base: TextStyle = TextStyle()
 ): TextStyle {
-    val color = LocalBackgroundTitleColor.current ?: return base
-
-    // 使用 luminance 判断是否为亮色，避免死板比对 Color.White
-    val shadowColor = if (color.luminance() > 0.5f) {
-        Color.Black.copy(alpha = 0.65f)
-    } else {
-        Color.White.copy(alpha = 0.85f)
-    }
-
     return base.copy(
         shadow = null
     )

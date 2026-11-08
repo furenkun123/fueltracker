@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -36,11 +35,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import top.yukonga.miuix.kmp.basic.FloatingActionButton
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.basic.Surface
-import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -67,14 +61,14 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
-import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
-import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
+import com.fueltracker.ui.components.MiuixVehicleCard
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miuix.MiuixButton
 import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixFilterChip
 import com.fueltracker.ui.miuix.MiuixTextButton
-import com.fueltracker.ui.components.MiuixVehicleCard
+import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
 import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
 import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.ExpenseRange
@@ -86,6 +80,11 @@ import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
+import top.yukonga.miuix.kmp.basic.FloatingActionButton
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Calendar
 import kotlin.time.Duration.Companion.seconds
 
@@ -219,7 +218,6 @@ fun HomeScreen(
                     style = adaptiveBackgroundTitleStyle(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(y = (-15).dp)
                         .padding(
                             horizontal = 15.dp,
                             vertical = 0.dp

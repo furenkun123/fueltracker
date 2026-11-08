@@ -6,6 +6,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -19,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -34,6 +37,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.dp
 import com.fueltracker.AppScreen.*
 import com.fueltracker.notif.ParkingNotification
 import com.fueltracker.ui.ExpenseEditScreen
@@ -166,27 +170,63 @@ fun FuelTrackerApp(
         screen == HOME ||
                 screen == RECORDS ||
                 screen == EXPENSES
-    val adaptiveTitleColor = if (showBottomBar) rememberAdaptiveTitleColor(backgroundBitmap) else null
+    val adaptiveTitleColor = rememberAdaptiveTitleColor(backgroundBitmap)
 
     val isGlassEnabled = viewModel.isGlassEffectEnabled
 
-    // ✅ Pager 的核心状态提升到顶层
+    // ---------- Pager 与导航栏状态 ----------
     val mainScreens = listOf(HOME, RECORDS, EXPENSES)
+
     val initialPage = mainScreens.indexOf(screen).takeIf { it >= 0 } ?: 0
-    val pagerState = rememberPagerState(initialPage = initialPage) { mainScreens.size }
+
+    val pagerState = rememberPagerState(
+        initialPage = initialPage
+    ) {
+        mainScreens.size
+    }
+
     val scope = rememberCoroutineScope()
 
-    // 1. 监听外部 screen 改变，驱动 Pager 滑动
+// 导航栏选中状态：点击时立即更新，不等待 Pager 动画结束
+    var navigationSelectedIndex by remember {
+        mutableIntStateOf(initialPage)
+    }
+
+// 外部页面跳转时同步导航栏和 Pager
     LaunchedEffect(screen) {
         val targetIndex = mainScreens.indexOf(screen)
-        if (targetIndex >= 0 && pagerState.currentPage != targetIndex) {
-            pagerState.animateScrollToPage(targetIndex)
+
+        if (targetIndex >= 0) {
+            navigationSelectedIndex = targetIndex
+
+            if (
+                pagerState.currentPage != targetIndex &&
+                !pagerState.isScrollInProgress
+            ) {
+                pagerState.animateScrollToPage(targetIndex)
+            }
         }
     }
 
-    // 2. 监听 Pager 滑动结束，同步 screen 状态到 ViewModel
+// Pager 滑动结束后同步 ViewModel 和导航栏
     LaunchedEffect(pagerState.settledPage) {
-        val targetScreen = mainScreens[pagerState.settledPage]
+        val targetIndex = pagerState.settledPage
+
+        navigationSelectedIndex = targetIndex
+
+        val targetScreen = mainScreens[targetIndex]
+
+        if (screen != targetScreen) {
+            viewModel.navigateTo(targetScreen)
+        }
+    }
+// 手势滑动结束后同步 ViewModel 和导航栏
+    LaunchedEffect(pagerState.settledPage) {
+        val targetIndex = pagerState.settledPage
+        navigationSelectedIndex = targetIndex
+
+        val targetScreen = mainScreens[targetIndex]
+
         if (screen != targetScreen) {
             viewModel.navigateTo(targetScreen)
         }
@@ -260,7 +300,7 @@ fun FuelTrackerApp(
                         if (backgroundBitmap == null) {
                             // ✅ 如果没有背景图，页面底色给浅灰
                             if (MiuixTheme.colorScheme.background.luminance() > 0.5f) {
-                                Color(0xFFF2F2F7) // 页面背景（浅灰）
+                                Color(0xFFEFEFF4) // 页面背景（浅灰）
                             } else {
                                 MiuixTheme.colorScheme.background // 深色模式
                             }
@@ -454,35 +494,37 @@ fun FuelTrackerApp(
             MiuixTopBar(
                 backdrop = appBackdrop,
                 isGlassEnabled = isGlassEnabled,
-                showActionArea = screen == HOME,
+                showActionArea = false, // ✅ 所有页面统一，顶栏只有状态栏那么高
                 navigationIcon = null,
-                action = if (screen == HOME) {
-                    {
-                        MiuixTopBarIconButton(
-                            icon = Icons.Default.Settings,
-                            contentDescription = "设置",
-                            onClick = {
-                                viewModel.navigateTo(SETTINGS)
-                            }
-                        )
-                    }
-                } else null
+                action = null // ✅ 移除顶栏里的按钮
             )
+
+            if (screen == HOME) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding() // 避开状态栏
+                        .padding(top = 8.dp, end = 16.dp)
+                ) {
+                    MiuixTopBarIconButton(
+                        icon = Icons.Default.Settings,
+                        contentDescription = "设置",
+                        onClick = { viewModel.navigateTo(SETTINGS) }
+                    )
+                }
+            }
 
             // 4. 底部导航栏
             if (showBottomBar) {
                 MiuixAppNavigationBar(
-                    selectedIndex = when (screen) {
-                        HOME -> 0
-                        RECORDS -> 1
-                        EXPENSES -> 2
-                        else -> 0
-                    },
+                    selectedIndex = navigationSelectedIndex,
                     modifier = Modifier.align(Alignment.BottomCenter),
                     backdrop = appBackdrop,
                     isGlassEnabled = isGlassEnabled,
                     isFloating = viewModel.isFloatingBottomBar,
                     onSelectedIndexChange = { index ->
+                        navigationSelectedIndex = index
+
                         scope.launch {
                             pagerState.animateScrollToPage(index)
                         }

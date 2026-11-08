@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,10 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Receipt
-import top.yukonga.miuix.kmp.basic.FloatingActionButton
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -52,11 +47,11 @@ import com.fueltracker.ui.components.ExpenseDetailItemCard
 import com.fueltracker.ui.components.ExpenseStructureCard
 import com.fueltracker.ui.components.ExpenseTrendCard
 import com.fueltracker.ui.components.LazyColumnScrollbar
-import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
-import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
 import com.fueltracker.ui.components.SummaryCard
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miuix.MiuixCard
+import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
+import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
 import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
 import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.ExpenseRange
@@ -69,6 +64,10 @@ import com.fueltracker.util.inRange
 import com.fueltracker.util.toDateTimeText
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
+import top.yukonga.miuix.kmp.basic.FloatingActionButton
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Calendar
 
 private const val CATEGORY_FUEL = "加油"
@@ -202,7 +201,6 @@ fun ExpenseScreen(
                     style = adaptiveBackgroundTitleStyle(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(y = (-15).dp)
                         .padding(horizontal = 15.dp)
                 )
             }

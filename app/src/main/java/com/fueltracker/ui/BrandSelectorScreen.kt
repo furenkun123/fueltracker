@@ -403,13 +403,3 @@ private fun lightenPickerBackground(color: Color): Color {
     )
 }
 
-/** Darken the search field slightly so it remains distinct from the page background. */
-private fun darkenPickerSearchColor(color: Color): Color {
-    val factor = 0.92f
-    return Color(
-        red = color.red * factor,
-        green = color.green * factor,
-        blue = color.blue * factor,
-        alpha = color.alpha
-    )
-}

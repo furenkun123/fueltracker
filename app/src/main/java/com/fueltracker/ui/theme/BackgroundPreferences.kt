@@ -66,17 +66,6 @@ object BackgroundPreferences {
         }
     }
 
-    fun setScrimAlpha(context: Context, alpha: Float) {
-        val safeAlpha = alpha.coerceIn(0f, 0.8f)
-
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit {
-                putFloat(KEY_SCRIM_ALPHA, safeAlpha)
-            }
-
-        scrimAlphaState = safeAlpha
-    }
-
     fun clear(context: Context) {
         val oldUri = backgroundUri
 

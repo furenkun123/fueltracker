@@ -14,7 +14,6 @@ import com.fueltracker.AppScreen
 import com.fueltracker.data.*
 import com.fueltracker.util.BackupManager
 import com.fueltracker.util.FuelCalculator
-import com.fueltracker.util.StatisticsSummary
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlin.math.abs
@@ -222,18 +221,6 @@ class MainViewModel(
                 SharingStarted.WhileSubscribed(STOP_TIMEOUT),
                 ParkingNotificationState.NotReady
             )
-    // =========================================================
-    // 油耗计算状态
-    // =========================================================
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val statisticsSummary: StateFlow<StatisticsSummary?> = currentVehicle
-        .flatMapLatest { vehicle ->
-            if (vehicle == null) flowOf(null)
-            else fuelDao.observeRecords(vehicle.id).map { list ->
-                if (list.isEmpty()) null else FuelCalculator.calculateSummary(allRecords = list, vehicle = vehicle)
-            }
-        }.flowOn(Dispatchers.Default)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val latestConsumption: StateFlow<Double?> = currentVehicle
@@ -243,11 +230,6 @@ class MainViewModel(
                 FuelCalculator.latestReliableConsumption(records = list, vehicle = vehicle)
             }
         }.flowOn(Dispatchers.Default)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), null)
-
-    val averageConsumption: StateFlow<Double?> = statisticsSummary
-        .map { it?.averageConsumption }
-        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), null)
 
     // =========================================================
@@ -642,11 +624,6 @@ class MainViewModel(
             } catch (e: Exception) { Log.e(TAG, "ignoreActiveParkingNotification failed", e) }
         }
     }
-
-    // =========================================================
-    // 费用分类重命名
-    // =========================================================
-    private val defaultExpenseCategories = listOf("加油", "停车", "高速", "保养", "保险", "维修", "洗车", "其他")
 
 
     fun renameExpenseCategory(
