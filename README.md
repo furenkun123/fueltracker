@@ -8,6 +8,8 @@
   <img src="https://github.com/user-attachments/assets/ce3e5352-d449-4179-bf7f-1123b73fbfc1" width="200" />
 </p>
 
+## ✨ 交流反馈 点击链接加入群聊：https://qm.qq.com/q/FiXPEN4Ysm
+
 ## ✨ 核心功能
 
 - **⛽ 油耗统计与分析**：以满箱法为基础计算油耗，结合数据校验与异常识别，处理漏记加油记录，减少错误数据对统计结果的影响。
