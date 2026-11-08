@@ -25,7 +25,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.runtime.Composable
@@ -53,7 +52,10 @@ import com.fueltracker.ui.components.WheelList
 import com.fueltracker.ui.components.WheelStyle
 import com.fueltracker.ui.miuix.MiuixBackButton
 import com.fueltracker.ui.miuix.MiuixButton
+import com.fueltracker.ui.miuix.MiuixClickableItem
+import com.fueltracker.ui.miuix.MiuixFieldLabel
 import com.fueltracker.ui.miuix.MiuixGroupCard
+import com.fueltracker.ui.miuix.MiuixInputItem
 import com.fueltracker.ui.miuix.MiuixSectionHeader
 import com.fueltracker.ui.miuix.MiuixTextButton
 import com.fueltracker.ui.miuix.dialogs.MiuixBottomSheetWrapper
@@ -229,16 +231,18 @@ fun VehicleScreen(
 
         MiuixGroupCard {
             // 品牌
-            MiuixListItem("品牌", brand.ifBlank { "选择品牌" }) {
+            MiuixClickableItem("品牌", brand.ifBlank { "" }, "选择品牌") {
                 pickerStartLevel = PickerLevel.BRAND
                 showCarPicker = true
             }
 
-            // 车系（带下拉菜单的特殊处理）
+            // 车系（带下拉菜单）
             Box(modifier = Modifier.fillMaxWidth()) {
-                MiuixListItem(
-                    title = "车系",
-                    value = series.ifBlank { "选择车系" },
+                MiuixClickableItem(
+                    label = "车系",
+                    value = series,
+                    placeholder = "选择车系",
+                    showArrow = selectedBrand?.series.isNullOrEmpty(), // 没下拉菜单就显示箭头
                     onClick = {
                         pickerStartLevel = if (brand.isBlank()) PickerLevel.BRAND else PickerLevel.SERIES
                         showCarPicker = true
@@ -284,7 +288,7 @@ fun VehicleScreen(
             }
 
             // 年款
-            MiuixListItem("年款", year) {
+            MiuixClickableItem("年款", year) {
                 pickerStartLevel = when {
                     brand.isBlank() -> PickerLevel.BRAND
                     series.isBlank() -> PickerLevel.SERIES
@@ -294,7 +298,7 @@ fun VehicleScreen(
             }
 
             // 车型
-            MiuixListItem("车型", model.ifBlank { "选择车型" }) {
+            MiuixClickableItem("车型", model, "选择车型") {
                 pickerStartLevel = when {
                     brand.isBlank() -> PickerLevel.BRAND
                     series.isBlank() -> PickerLevel.SERIES
@@ -304,12 +308,12 @@ fun VehicleScreen(
             }
 
             // 能源类型
-            MiuixListItem("能源类型", fuelType) { showFuelTypePickerSheet = true }
+            MiuixClickableItem("能源类型", fuelType) { showFuelTypePickerSheet = true }
 
-            MiuixListItem("燃油标号", fuelGrade.ifBlank { "未设置" }) { showFuelGradePickerSheet = true }
+            MiuixClickableItem("燃油标号", fuelGrade, "未设置") { showFuelGradePickerSheet = true }
 
-            MiuixInputListItem(
-                title = "油箱容量 (L)",
+            MiuixInputItem(
+                label = "油箱容量(L)",
                 value = tankCapacity,
                 onValueChange = { tankCapacity = it },
                 placeholder = "例如：50",
@@ -319,24 +323,35 @@ fun VehicleScreen(
                 Text("油箱容量必须大于 0", fontSize = 13.sp, color = MiuixTheme.colorScheme.error, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp))
             }
 
-            MiuixListItem("交车日期", formattedDeliveryDate) { showDatePickerSheet = true }
+            HorizontalDivider(
+                color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                thickness = 0.5.dp,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            MiuixClickableItem("交车日期", formattedDeliveryDate, "未填写") { showDatePickerSheet = true }
         }
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 初始数据属于 FuelRecord，仅在添加车辆时录入，不混入车辆资料卡片。
         if (!isEditMode) {
             MiuixSectionHeader(title = "初始数据（必填）")
             MiuixGroupCard {
-                MiuixInputListItem(
-                    title = "当前里程 (km)",
+                MiuixInputItem(
+                    label = "当前里程",
                     value = initialOdometer,
                     onValueChange = { initialOdometer = it },
-                    placeholder = "必填",
+                    placeholder = "必填，单位：km",
                     keyboardType = KeyboardType.Decimal
                 )
                 if (initialOdometer.isNotBlank() && (parsedOdometer == null || parsedOdometer < 0.0)) {
                     Text("当前里程必须是有效的非负数", fontSize = 13.sp, color = MiuixTheme.colorScheme.error, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp))
                 }
+
+                HorizontalDivider(
+                    color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 0.5.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
 
                 MiuixFuelInputListItem(
                     title = "当前油量",
@@ -351,13 +366,9 @@ fun VehicleScreen(
                                 } else {
                                     parsedFuel / 100.0 * parsedCapacity
                                 }
-                                // 👈 直接返回转换并格式化后的字符串
                                 String.format(Locale.US, "%.2f", converted).removeSuffix(".00").removeSuffix(".0")
-                            } else {
-                                "" // 如果油箱容量无效，直接清空
-                            }
+                            } else ""
                         }
-                        // 👈 切换单位标记放最后
                         fuelUnit = if (fuelUnit == "L") "%" else "L"
                     },
                     placeholder = "必填"
@@ -490,122 +501,7 @@ private fun MiuixDateWheelPickerBottomSheet(
     }
 }
 
-// ==========================================
-// 下方是统一的列表 UI 组件
-// ==========================================
-
-@Composable
-private fun MiuixListItem(
-    title: String,
-    value: String,
-    showArrow: Boolean = true,
-    trailingContent: (@Composable () -> Unit)? = null,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            fontSize = 16.sp,
-            color = MiuixTheme.colorScheme.onSurface,
-            modifier = Modifier.width(100.dp) // 固定宽度保证对齐
-        )
-
-        Text(
-            text = value,
-            fontSize = 16.sp,
-            color = MiuixTheme.colorScheme.onSurfaceSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Start,
-            modifier = Modifier.weight(1f)
-        )
-
-        Box(
-            modifier = Modifier.size(24.dp),
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            if (trailingContent != null) {
-                trailingContent()
-            } else if (showArrow) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-    HorizontalDivider(
-        color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-        thickness = 0.5.dp,
-        modifier = Modifier.padding(horizontal = 16.dp)
-    )
-}
-
-@Composable
-private fun MiuixInputListItem(
-    title: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    keyboardType: KeyboardType = KeyboardType.Text
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 👈 统一宽度 100.dp
-        Text(
-            text = title,
-            fontSize = 16.sp,
-            color = MiuixTheme.colorScheme.onSurface,
-            modifier = Modifier.width(100.dp)
-        )
-
-        // 👈 加一个固定间距，让输入框起点对齐且有呼吸感
-        Spacer(modifier = Modifier.width(16.dp))
-
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = TextStyle(
-                fontSize = 16.sp,
-                color = MiuixTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Start
-            ),
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            decorationBox = { innerTextField ->
-                if (value.isEmpty()) {
-                    Text(
-                        text = placeholder,
-                        fontSize = 16.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        textAlign = TextAlign.Start
-                    )
-                }
-                innerTextField()
-            }
-        )
-        Spacer(modifier = Modifier.width(24.dp))
-    }
-    HorizontalDivider(
-        color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-        thickness = 0.5.dp,
-        modifier = Modifier.padding(horizontal = 16.dp)
-    )
-}
-
+// 在你的 VehicleScreen.kt 文件最底部，只保留这一个自己写的组件
 @Composable
 private fun MiuixFuelInputListItem(
     title: String,
@@ -618,50 +514,48 @@ private fun MiuixFuelInputListItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .height(56.dp), // 👈 高度与 MiuixInputItem 统一
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 👈 同样锁死为 100.dp，与上面保持绝对一致
-        Text(
+        MiuixFieldLabel(
             text = title,
-            fontSize = 16.sp,
-            color = MiuixTheme.colorScheme.onSurface,
-            modifier = Modifier.width(100.dp)
+            modifier = Modifier.width(110.dp) // 👈 复用公共标签，统一宽度
         )
-
-        // 👈 同样加 16.dp 间距，让“必填”两个字和上面的“必填”对齐
-        Spacer(modifier = Modifier.width(16.dp))
 
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
             textStyle = TextStyle(
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 color = MiuixTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Start
             ),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .height(56.dp)
+                .padding(start = 12.dp),
             singleLine = true,
             decorationBox = { innerTextField ->
-                if (value.isEmpty()) {
-                    Text(
-                        text = placeholder,
-                        fontSize = 16.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        textAlign = TextAlign.Start,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                    if (value.isEmpty()) {
+                        Text(
+                            text = placeholder,
+                            fontSize = 15.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    innerTextField()
                 }
-                innerTextField()
             }
         )
 
         // 切换小按钮
         Row(
             modifier = Modifier
-                .padding(start = 8.dp)
+                .padding(start = 8.dp, end = 16.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f))
                 .clickable(onClick = onUnitToggle)
@@ -684,9 +578,4 @@ private fun MiuixFuelInputListItem(
             )
         }
     }
-    HorizontalDivider(
-        color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-        thickness = 0.5.dp,
-        modifier = Modifier.padding(horizontal = 16.dp)
-    )
 }
