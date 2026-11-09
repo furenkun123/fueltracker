@@ -2,10 +2,10 @@
 
 一款注重简洁体验的 Android 车辆油耗与日常记账应用。基于 **Kotlin** 和 **Jetpack Compose** 开发，采用本地数据存储，并逐步引入 **Miuix** 组件库，打造更贴近 MIUI / HyperOS 设计语言的界面体验。
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/c217f8fb-eadf-4393-befc-a1ca97206981" width="200" />
-  <img src="https://github.com/user-attachments/assets/acf1b8e3-fbd8-4919-965f-d5b8e645c92b" width="200" />
-  <img src="https://github.com/user-attachments/assets/ce3e5352-d449-4179-bf7f-1123b73fbfc1" width="200" />
+<p style="text-align: center;">
+  <img src="https://github.com/user-attachments/assets/c217f8fb-eadf-4393-befc-a1ca97206981" style="width: 200px;" alt=""/>
+  <img src="https://github.com/user-attachments/assets/acf1b8e3-fbd8-4919-965f-d5b8e645c92b" style="width: 200px;" alt=""/>
+  <img src="https://github.com/user-attachments/assets/ce3e5352-d449-4179-bf7f-1123b73fbfc1" style="width: 200px;" alt=""/>
 </p>
 
 ## ✨ 交流反馈 点击链接加入群聊：https://qm.qq.com/q/FiXPEN4Ysm
@@ -21,17 +21,17 @@
 
 ## 🛠️ 技术栈
 
-| 技术 | 用途 |
-| --- | --- |
-| Kotlin | 主要开发语言 |
-| Jetpack Compose | 声明式 UI 框架 |
+| 技术                                            | 用途                                                |
+|-------------------------------------------------|-----------------------------------------------------|
+| Kotlin                                          | 主要开发语言                                        |
+| Jetpack Compose                                 | 声明式 UI 框架                                      |
 | [Miuix](https://github.com/compose-miuix/miuix) | Compose UI 组件库，用于构建 MIUI / HyperOS 风格界面 |
-| MVVM、ViewModel、StateFlow | 界面状态管理与业务逻辑组织 |
-| Room | 本地数据库持久化 |
-| Kotlin Coroutines | 异步任务与协程管理 |
-| Kotlinx Serialization | JSON 序列化与数据备份 |
-| Kyant Backdrop | 部分界面的背景模糊与悬浮玻璃效果 |
-| Kyant Shapes | 自定义形状支持 |
+| MVVM、ViewModel、StateFlow                      | 界面状态管理与业务逻辑组织                          |
+| Room                                            | 本地数据库持久化                                    |
+| Kotlin Coroutines                               | 异步任务与协程管理                                  |
+| Kotlinx Serialization                           | JSON 序列化与数据备份                               |
+| Kyant Backdrop                                  | 部分界面的背景模糊与悬浮玻璃效果                    |
+| Kyant Shapes                                    | 自定义形状支持                                      |
 
 
 ## 🚗 车辆数据库说明
