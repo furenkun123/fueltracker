@@ -150,7 +150,7 @@ fun BrandSelectorScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = "选择品牌",
-                                    fontSize = 26.sp,
+                                    fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MiuixTheme.colorScheme.onBackground
                                 )

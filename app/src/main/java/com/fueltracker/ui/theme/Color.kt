@@ -8,10 +8,9 @@ val Blue400 = Color(0xFF4096FF)
 
 // ---- 浅色 ----
 // 👇 1. 页面背景：加深一点点灰度（如 #EFEFF2），让白色卡片能凸显出来，同时降低整体亮度
-val BackgroundLight = Color(0xFFF7F7F7)
-
+val BackgroundLight = Color(0xFFEFEFF2)
 // 👇 2. 卡片颜色：不用纯白，用非常柔和的“米灰白/微霜白”（如 #F8F8FA），去掉了刺眼感
-val SurfaceWhite = Color(0xFFF2F2F4)
+val SurfaceWhite = Color(0xFFFFFFFF)
 
 // 👇 3. 输入框等内嵌背景：比卡片再深一点，形成略微凹陷的视觉
 val SurfaceVariantLight = Color(0xFFE5E5EA)

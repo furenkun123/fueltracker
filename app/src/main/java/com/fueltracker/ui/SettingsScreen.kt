@@ -304,7 +304,12 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(bottom = 8.dp)
             ) {
-                MiuixBackButton(onClick = onBack)
+                MiuixBackButton(
+                    onClick = onBack,
+                    iconTint = adaptiveBackgroundTitleColor(
+                        MiuixTheme.colorScheme.onBackground
+                    )
+                )
 
                 Spacer(Modifier.width(8.dp))
 

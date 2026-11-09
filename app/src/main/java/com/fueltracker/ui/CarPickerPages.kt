@@ -165,7 +165,7 @@ private fun <T> PickerListScreen(
                     Spacer(Modifier.width(12.dp))
                     Text(
                         text = title,
-                        fontSize = 26.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MiuixTheme.colorScheme.onBackground,
                         maxLines = 1

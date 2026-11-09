@@ -221,7 +221,7 @@ fun VehicleScreen(
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = if (isEditMode) "编辑车辆信息" else "添加新车辆",
-                fontSize = 18.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = MiuixTheme.colorScheme.onBackground
             )
