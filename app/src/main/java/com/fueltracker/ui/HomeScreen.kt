@@ -7,13 +7,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -35,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -44,29 +43,28 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
+import com.fueltracker.ui.components.ChartCard
+import com.fueltracker.ui.components.ConsumptionTrendCard
+import com.fueltracker.ui.components.ConsumptionTrendPoint
+import com.fueltracker.ui.components.CostPoint
 import com.fueltracker.ui.components.MiuixVehicleCard
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miuix.MiuixButton
 import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixFilterChip
 import com.fueltracker.ui.miuix.MiuixTextButton
+import com.fueltracker.ui.miuix.MiuixTopBarIconButton
 import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
 import com.fueltracker.ui.miuix.dialogs.MiuixYearMonthSheet
 import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
@@ -79,7 +77,6 @@ import com.fueltracker.util.toDateTimeText
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.firstOrNull
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Surface
@@ -88,8 +85,6 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Calendar
 import kotlin.time.Duration.Companion.seconds
 
-
-private data class CostPoint(val timestamp: Long, val value: Double)
 
 @Composable
 fun HomeScreen(
@@ -105,6 +100,7 @@ fun HomeScreen(
     onClearParking: () -> Unit,
     onIgnoreParking: () -> Unit,
     onCollapseProgressChange: (Float) -> Unit = {},
+    onOpenSettings: () -> Unit
 ) {
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
@@ -149,6 +145,44 @@ fun HomeScreen(
             startTime = statsRange.first,
             endTime = statsRange.second
         )
+    }
+
+    // 油耗趋势图独立年份筛选，emptySet() 表示全部年份
+    var selectedConsumptionYears by remember(vehicle) {
+        mutableStateOf<Set<Int>>(emptySet())
+    }
+// 获取完整时间范围的油耗计算结果
+    val consumptionTrendSummary = remember(vehicle, records) {
+        FuelCalculator.calculateSummary(
+            allRecords = records,
+            vehicle = vehicle
+        )
+    }
+// 提取所有符合趋势图条件的油耗数据
+    val consumptionTrendPoints = remember(consumptionTrendSummary) {
+        consumptionTrendSummary.rangeResults
+            .filter { FuelCalculator.isTrendUsable(it) }
+            .map {
+                ConsumptionTrendPoint(
+                    timestamp = it.endTimestamp,
+                    value = it.consumption,
+                    distance = it.distance,
+                    recordId = it.recordId
+                )
+            }
+            .sortedBy { it.timestamp }
+    }
+
+// 只显示存在有效油耗数据的年份
+    val consumptionYears = remember(consumptionTrendPoints) {
+        consumptionTrendPoints
+            .map {
+                Calendar.getInstance().apply {
+                    timeInMillis = it.timestamp
+                }.get(Calendar.YEAR)
+            }
+            .distinct()
+            .sortedDescending()
     }
 
     val listState = rememberLazyListState()
@@ -208,21 +242,40 @@ fun HomeScreen(
             )
         ) {
             item(key = "home_title") {
-                Text(
-                    text = "随记油耗",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = adaptiveBackgroundTitleColor(
-                        MiuixTheme.colorScheme.onBackground
-                    ),
-                    style = adaptiveBackgroundTitleStyle(),
+                val titleColor = adaptiveBackgroundTitleColor(
+                    MiuixTheme.colorScheme.onBackground
+                )
+
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(
-                            horizontal = 15.dp,
-                            vertical = 0.dp
-                        )
-                )
+                        .padding(horizontal = 15.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "随记油耗",
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = titleColor,
+                        style = adaptiveBackgroundTitleStyle(),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    MiuixTopBarIconButton(
+                        icon = Icons.Default.Settings,
+                        contentDescription = "设置",
+                        onClick = onOpenSettings,
+                        containerSize = 42.dp,
+                        iconSize = 21.dp,
+                        iconTint = titleColor,
+                        containerColor = if (titleColor.luminance() > 0.5f) {
+                            androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.18f)
+                        } else {
+                            androidx.compose.ui.graphics.Color.White.copy(alpha = 0.25f)
+                        }
+                    )
+                }
             }
 
             if (vehicle == null) {
@@ -245,6 +298,7 @@ fun HomeScreen(
                     }
                 }
 
+                //加油趋势（按月）
                 item {
                     ConsumptionCard(
                             latestConsumption = resolvedLatestConsumption,
@@ -256,10 +310,22 @@ fun HomeScreen(
                             onCustomMonthClick = { showYearMonthPicker = true }
                         )
                 }
-
                 if (costData.size >= 2) {
-                    item {
+                    item(key = "chart_cost") {
                         ChartCard(points = costData)
+                    }
+                }
+
+
+                //油耗变化趋势
+                if (consumptionTrendPoints.size >= 2) {
+                    item(key = "chart_consumption") {
+                        ConsumptionTrendCard(
+                            points = consumptionTrendPoints,
+                            years = consumptionYears,
+                            selectedYears = selectedConsumptionYears,
+                            onYearsSelected = { selectedConsumptionYears = it }
+                        )
                     }
                 }
 
@@ -387,7 +453,6 @@ private fun StatItem(title: String, value: String, modifier: Modifier = Modifier
 @Composable
 private fun ConsumptionCard(
     latestConsumption: Double?,
-//    averageConsumption: Double?,
     summary: StatisticsSummary,
     selectedRange: ExpenseRange,
     customYear: Int,
@@ -501,114 +566,6 @@ private fun ConsumptionCard(
             ) {
                 StatItem("平均油价", summary.averagePrice?.let { "%.2f 元/L".format(it) } ?: "--", Modifier.weight(1f))
                 StatItem("累计行驶", "%.0f km".format(summary.totalDistance), Modifier.weight(1f))
-            }
-        }
-    }
-}// =================================================
-// 趋势图
-// =================================================
-
-private data class MonthCostPoint(val year: Int, val month: Int, val value: Double)
-
-@Composable
-private fun ChartCard(points: List<CostPoint>) {
-    val monthlyPoints = remember(points) {
-        val grouped = mutableMapOf<Pair<Int, Int>, Double>()
-        points.forEach {
-            if (!it.value.isFinite()) return@forEach
-            val c = Calendar.getInstance().apply { timeInMillis = it.timestamp }
-            val key = c.get(Calendar.YEAR) to (c.get(Calendar.MONTH) + 1)
-            grouped[key] = (grouped[key] ?: 0.0) + it.value
-        }
-        grouped.map { MonthCostPoint(it.key.first, it.key.second, it.value) }
-            .filter { it.value > 0.0 && it.value.isFinite() }
-            .sortedWith(compareBy({ it.year }, { it.month }))
-    }
-    if (monthlyPoints.isEmpty()) return
-
-    val values = remember(monthlyPoints) { monthlyPoints.map { it.value } }
-    val maxValue = values.maxOrNull() ?: return
-    val yMax = maxValue * 1.15
-    if (!yMax.isFinite() || yMax <= 0.0) return
-
-    val primaryColor = MiuixTheme.colorScheme.primary
-    val onSurfaceColor = MiuixTheme.colorScheme.onSurface
-    val onSurfaceVariantColor = MiuixTheme.colorScheme.onSurfaceSecondary
-
-    val textMeasurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-
-    val baseValueLabelStyle = remember(onSurfaceColor) {
-        TextStyle(color = onSurfaceColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-    }
-    val baseTimeLabelStyle = remember(onSurfaceVariantColor) {
-        TextStyle(color = onSurfaceVariantColor, fontSize = 8.sp)
-    }
-
-    val valueLabelLayouts = remember(values, textMeasurer, baseValueLabelStyle) {
-        values.map { textMeasurer.measure("%.0f".format(it), baseValueLabelStyle) }
-    }
-    val isSameYear = remember(monthlyPoints) { monthlyPoints.map { it.year }.distinct().size <= 1 }
-    val timeLabelLayouts = remember(monthlyPoints, isSameYear, textMeasurer, baseTimeLabelStyle) {
-        monthlyPoints.map { textMeasurer.measure(if (isSameYear) "${it.month}月" else "%02d/%02d".format(it.year % 100, it.month), baseTimeLabelStyle) }
-    }
-
-    val topPaddingDp = remember(valueLabelLayouts, density) {
-        with(density) { ((valueLabelLayouts.maxOfOrNull { it.size.height } ?: 0).toDp() + 4.dp).coerceAtLeast(16.dp) }
-    }
-    val chartAreaHeight = 94.dp
-    val timeAxisHeight = 18.dp
-    val canvasHeight = topPaddingDp + chartAreaHeight + timeAxisHeight
-
-    val scrollState = rememberScrollState()
-    val visibleCount = 10
-
-    LaunchedEffect(monthlyPoints.size) {
-        if (monthlyPoints.size > visibleCount) {
-            snapshotFlow { scrollState.maxValue }
-                .firstOrNull { it > 0 }
-                ?.let { scrollState.scrollTo(it) }
-        }
-    }
-
-    MiuixCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("加油趋势 (按月 · 元)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val itemWidth = maxWidth / visibleCount
-                val chartWidth = if (monthlyPoints.size <= visibleCount) maxWidth else itemWidth * monthlyPoints.size
-                Box(modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState)) {
-                    Canvas(modifier = Modifier.width(chartWidth).height(canvasHeight)) {
-                        val slotWidth = size.width / monthlyPoints.size
-                        val barWidth = (slotWidth * 0.5f).coerceIn(4.dp.toPx(), 40.dp.toPx())
-                        val chartHeight = size.height - topPaddingDp.toPx() - timeAxisHeight.toPx()
-                        val timeLabelY = topPaddingDp.toPx() + chartHeight + 4.dp.toPx()
-
-                        monthlyPoints.forEachIndexed { index, point ->
-                            val barCenterX = index * slotWidth + slotWidth / 2f
-                            val barLeft = barCenterX - barWidth / 2f
-                            val barHeight = (chartHeight * (point.value / yMax).toFloat().coerceIn(0f, 1f)).coerceAtLeast(2.dp.toPx())
-                            val barTop = topPaddingDp.toPx() + (chartHeight - barHeight)
-
-                            drawRoundRect(
-                                color = primaryColor.copy(alpha = 0.85f),
-                                topLeft = Offset(barLeft, barTop),
-                                size = Size(barWidth, barHeight),
-                                cornerRadius = CornerRadius(4.dp.toPx())
-                            )
-
-                            val vLayout = valueLabelLayouts[index]
-                            if (vLayout.size.width <= size.width) {
-                                drawText(vLayout, topLeft = Offset((barCenterX - vLayout.size.width / 2f).coerceIn(0f, size.width - vLayout.size.width), barTop - vLayout.size.height - 2.dp.toPx()))
-                            }
-
-                            val tLayout = timeLabelLayouts[index]
-                            if (tLayout.size.width <= size.width) {
-                                drawText(tLayout, topLeft = Offset((barCenterX - tLayout.size.width / 2f).coerceIn(0f, size.width - tLayout.size.width), timeLabelY))
-                            }
-                        }
-                    }
-                }
             }
         }
     }

@@ -6,15 +6,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -37,8 +34,18 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.dp
-import com.fueltracker.AppScreen.*
+import com.fueltracker.AppScreen.ADD_EXPENSE
+import com.fueltracker.AppScreen.ADD_FUEL
+import com.fueltracker.AppScreen.ADD_PARKING
+import com.fueltracker.AppScreen.ADD_VEHICLE
+import com.fueltracker.AppScreen.EDIT_EXPENSE
+import com.fueltracker.AppScreen.EDIT_FUEL
+import com.fueltracker.AppScreen.EDIT_PARKING
+import com.fueltracker.AppScreen.EDIT_VEHICLE
+import com.fueltracker.AppScreen.EXPENSES
+import com.fueltracker.AppScreen.HOME
+import com.fueltracker.AppScreen.RECORDS
+import com.fueltracker.AppScreen.SETTINGS
 import com.fueltracker.notif.ParkingNotification
 import com.fueltracker.ui.ExpenseEditScreen
 import com.fueltracker.ui.ExpenseScreen
@@ -49,7 +56,6 @@ import com.fueltracker.ui.RecordsScreen
 import com.fueltracker.ui.SettingsScreen
 import com.fueltracker.ui.VehicleScreen
 import com.fueltracker.ui.miuix.MiuixTopBar
-import com.fueltracker.ui.miuix.MiuixTopBarIconButton
 import com.fueltracker.ui.miuix.dialogs.MiuixPrivacyDialog
 import com.fueltracker.ui.miuix.dialogs.MiuixUpdateLogDialog
 import com.fueltracker.ui.miuix.navigation.AppNavItem
@@ -338,7 +344,8 @@ fun FuelTrackerApp(
                                     },
                                     onClearParking = { viewModel.clearActiveParking() },
                                     onIgnoreParking = { viewModel.ignoreActiveParkingNotification() },
-                                    onCollapseProgressChange = { homeCollapseProgress = it }
+                                    onCollapseProgressChange = { homeCollapseProgress = it },
+                                    onOpenSettings = { viewModel.navigateTo(SETTINGS) }
                                 )
                             }
                             1 -> { // 加油记录
@@ -494,25 +501,11 @@ fun FuelTrackerApp(
             MiuixTopBar(
                 backdrop = appBackdrop,
                 isGlassEnabled = isGlassEnabled,
-                showActionArea = false, // ✅ 所有页面统一，顶栏只有状态栏那么高
-                navigationIcon = null,
-                action = null // ✅ 移除顶栏里的按钮
+                showActionArea = false,
+                statusBarDarkIcons = (
+                        adaptiveTitleColor ?: MiuixTheme.colorScheme.background
+                        ).luminance() > 0.5f
             )
-
-            if (screen == HOME) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .statusBarsPadding() // 避开状态栏
-                        .padding(top = 8.dp, end = 16.dp)
-                ) {
-                    MiuixTopBarIconButton(
-                        icon = Icons.Default.Settings,
-                        contentDescription = "设置",
-                        onClick = { viewModel.navigateTo(SETTINGS) }
-                    )
-                }
-            }
 
             // 4. 底部导航栏
             if (showBottomBar) {

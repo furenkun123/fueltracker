@@ -196,6 +196,13 @@ object FuelCalculator {
     fun calculateAll(records: List<FuelRecord>, vehicle: Vehicle? = null): List<ConsumptionResult> =
         analyze(records, vehicle).results
 
+    //判断油耗区间是否适合用于趋势展示。
+    // 与现有统计可靠性判断保持一致。
+
+    fun isTrendUsable(result: ConsumptionResult): Boolean {
+        return isPhysicallyUsable(result)
+    }
+
     @JvmOverloads
     fun calculateSummary(
         allRecords: List<FuelRecord>,
@@ -213,7 +220,7 @@ object FuelCalculator {
         val periodRecords = visible.filter { inPeriod(it.timestamp) }
         val rangeResults = analysis.results.filter { inPeriod(it.endTimestamp) }
 
-        // 🚨 核心修复 1：移除 id == 0 的误判
+        //移除 id == 0 的误判
         val pendingRecords = periodRecords
             .filter { it.id !in analysis.usedRecordIds }
             .sortedByDescending { it.timestamp }
@@ -254,7 +261,7 @@ object FuelCalculator {
             val totalAmountValid = record.totalAmount == null || isValidMoney(record.totalAmount)
             val discountValid = record.discount == null || isValidMoney(record.discount)
 
-            // 🚨 核心修复 2：完善所有关键字段的有效性检查
+            //完善所有关键字段的有效性检查
             val odometerValid = record.odometer == null || (record.odometer.isFinite() && record.odometer > 0.0)
             val remainingValid = record.remainingFuel == null || (record.remainingFuel.isFinite() && record.remainingFuel >= 0.0)
             val missedOdoValid = !record.hasMissedRecord || (record.missedOdometer != null && record.missedOdometer.isFinite() && record.missedOdometer > 0.0)
@@ -337,6 +344,7 @@ object FuelCalculator {
             hasInvalidRecords = hasInvalidRecords
         )
     }
+
 
     // --------------------------------------------------------
     // 主算法
