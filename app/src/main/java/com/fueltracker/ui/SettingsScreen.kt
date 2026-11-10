@@ -1,21 +1,19 @@
 
 package com.fueltracker.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,15 +21,12 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -42,16 +37,17 @@ import androidx.compose.material.icons.filled.CallToAction
 import androidx.compose.material.icons.filled.CarRental
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PrivacyTip
@@ -66,14 +62,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -82,8 +76,6 @@ import androidx.lifecycle.viewModelScope
 import com.fueltracker.BuildConfig
 import com.fueltracker.data.Vehicle
 import com.fueltracker.ui.miuix.MiuixBackButton
-import com.fueltracker.ui.miuix.MiuixCard
-import com.fueltracker.ui.miuix.MiuixSwitch
 import com.fueltracker.ui.miuix.dialogs.MiuixConfirmDialog
 import com.fueltracker.ui.miuix.dialogs.MiuixInstructionsDialog
 import com.fueltracker.ui.miuix.dialogs.MiuixPrivacyDialog
@@ -98,10 +90,7 @@ import com.fueltracker.util.XiaoxiongCsvImporter
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
@@ -131,28 +120,29 @@ fun SettingsScreen(
         mutableStateOf<Uri?>(null)
     }
 
-    var showBackupSheet by remember { mutableStateOf(false) }
-    var showAboutSheet by remember { mutableStateOf(false) }
+    // 弹窗状态
     var showThemePicker by remember { mutableStateOf(false) }
+    var showPrivacyDialog by remember { mutableStateOf(false) }
+    var showUpdateHistory by remember { mutableStateOf(false) }
+    var showInstructions by remember { mutableStateOf(false) }
+    var showClearBackgroundConfirm by remember { mutableStateOf(false) }
 
     var currentThemeMode by remember {
         mutableStateOf(ThemePreferences.mode)
     }
 
-    var showPrivacyDialog by remember { mutableStateOf(false) }
-    var showUpdateHistory by remember { mutableStateOf(false) }
-    var showInstructions by remember { mutableStateOf(false) }
-
+    // 权限状态
     var notificationsEnabled by remember {
         mutableStateOf(
             NotificationManagerCompat.from(context).areNotificationsEnabled()
         )
     }
 
-    var showClearBackgroundConfirm by remember {
-        mutableStateOf(false)
+    var locationPermissionStatus by remember {
+        mutableStateOf(getLocationPermissionStatus(context))
     }
 
+    // 从系统设置返回时刷新权限状态
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
@@ -160,6 +150,9 @@ fun SettingsScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 notificationsEnabled =
                     NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+                locationPermissionStatus =
+                    getLocationPermissionStatus(context)
             }
         }
 
@@ -393,101 +386,7 @@ fun SettingsScreen(
         }
 
         // =================================================
-        // 2. 备份
-        // =================================================
-
-        item(key = "directory_backup") {
-            SettingsDirectory(
-                icon = Icons.Default.Backup,
-                title = "备份",
-                subtitle = "数据导入、导出和小熊油耗数据迁移",
-                expanded = expandedSection == "backup",
-                onClick = {
-                    expandedSection =
-                        if (expandedSection == "backup") null else "backup"
-                }
-            ) {
-                SettingsArrowRow(
-                    icon = Icons.Default.FileUpload,
-                    title = "导出本地备份",
-                    subtitle = "导出为 JSON 文件",
-                    enabled = !viewModel.isBackupOperationRunning,
-                    onClick = {
-                        exportLauncher.launch(BackupManager.generateFileName())
-                    }
-                )
-
-                SettingsDivider()
-
-                SettingsArrowRow(
-                    icon = Icons.Default.FileDownload,
-                    title = "恢复本地备份",
-                    subtitle = "覆盖当前所有数据",
-                    enabled = !viewModel.isBackupOperationRunning,
-                    onClick = {
-                        importLauncher.launch(
-                            arrayOf("application/json", "*/*")
-                        )
-                    }
-                )
-
-                SettingsDivider()
-
-                SettingsArrowRow(
-                    icon = Icons.Default.CloudDownload,
-                    title = "导入小熊油耗（加油）",
-                    subtitle = "导入 fuel-eco-*.csv",
-                    enabled = !viewModel.isBackupOperationRunning,
-                    onClick = {
-                        fuelImporter.launch(
-                            arrayOf(
-                                "text/csv",
-                                "text/comma-separated-values",
-                                "text/plain",
-                                "application/vnd.ms-excel"
-                            )
-                        )
-                    }
-                )
-
-                SettingsDivider()
-
-                SettingsArrowRow(
-                    icon = Icons.Default.CloudDownload,
-                    title = "导入小熊油耗（费用）",
-                    subtitle = "导入 expense-*.csv",
-                    enabled = !viewModel.isBackupOperationRunning,
-                    onClick = {
-                        expenseImporter.launch(
-                            arrayOf(
-                                "text/csv",
-                                "text/comma-separated-values",
-                                "text/plain",
-                                "application/vnd.ms-excel"
-                            )
-                        )
-                    }
-                )
-
-                SettingsDivider()
-
-                SettingsArrowRow(
-                    icon = Icons.Default.CloudDownload,
-                    title = "前往小熊网页导出",
-                    subtitle = "登录网页版导出 CSV 数据",
-                    onClick = {
-                        openExternalPage(
-                            context,
-                            "https://www.xiaoxiongyouhao.com/carowner/page_data_mgr.php",
-                            "无法打开浏览器"
-                        )
-                    }
-                )
-            }
-        }
-
-        // =================================================
-        // 3. 个性化
+        // 2. 个性化
         // =================================================
 
         item(key = "directory_personalization") {
@@ -586,7 +485,199 @@ fun SettingsScreen(
         }
 
         // =================================================
-        // 4. 关于
+        // 3. 备份
+        // =================================================
+
+        item(key = "directory_backup") {
+            SettingsDirectory(
+                icon = Icons.Default.Backup,
+                title = "备份",
+                subtitle = "数据导入、导出和小熊油耗数据迁移",
+                expanded = expandedSection == "backup",
+                onClick = {
+                    expandedSection =
+                        if (expandedSection == "backup") null else "backup"
+                }
+            ) {
+                SettingsArrowRow(
+                    icon = Icons.Default.FileUpload,
+                    title = "导出本地备份",
+                    subtitle = "导出为 JSON 文件",
+                    enabled = !viewModel.isBackupOperationRunning,
+                    onClick = {
+                        exportLauncher.launch(BackupManager.generateFileName())
+                    }
+                )
+
+                SettingsDivider()
+
+                SettingsArrowRow(
+                    icon = Icons.Default.FileDownload,
+                    title = "恢复本地备份",
+                    subtitle = "覆盖当前所有数据",
+                    enabled = !viewModel.isBackupOperationRunning,
+                    onClick = {
+                        importLauncher.launch(
+                            arrayOf("application/json", "*/*")
+                        )
+                    }
+                )
+
+                SettingsDivider()
+
+                SettingsArrowRow(
+                    icon = Icons.Default.CloudDownload,
+                    title = "导入小熊油耗（加油）",
+                    subtitle = "导入 fuel-eco-*.csv",
+                    enabled = !viewModel.isBackupOperationRunning,
+                    onClick = {
+                        fuelImporter.launch(
+                            arrayOf(
+                                "text/csv",
+                                "text/comma-separated-values",
+                                "text/plain",
+                                "application/vnd.ms-excel"
+                            )
+                        )
+                    }
+                )
+
+                SettingsDivider()
+
+                SettingsArrowRow(
+                    icon = Icons.Default.CloudDownload,
+                    title = "导入小熊油耗（费用）",
+                    subtitle = "导入 expense-*.csv",
+                    enabled = !viewModel.isBackupOperationRunning,
+                    onClick = {
+                        expenseImporter.launch(
+                            arrayOf(
+                                "text/csv",
+                                "text/comma-separated-values",
+                                "text/plain",
+                                "application/vnd.ms-excel"
+                            )
+                        )
+                    }
+                )
+
+                SettingsDivider()
+
+                SettingsArrowRow(
+                    icon = Icons.Default.CloudDownload,
+                    title = "前往小熊网页导出",
+                    subtitle = "登录网页版导出 CSV 数据",
+                    onClick = {
+                        openExternalPage(
+                            context,
+                            "https://www.xiaoxiongyouhao.com/carowner/page_data_mgr.php",
+                            "无法打开浏览器"
+                        )
+                    }
+                )
+            }
+        }
+
+        // =================================================
+        // 4. 权限设置
+        // =================================================
+
+        item(key = "directory_permissions") {
+            SettingsDirectory(
+                icon = Icons.Default.Security,
+                title = "权限设置",
+                subtitle = "管理应用通知和定位权限",
+                expanded = expandedSection == "permissions",
+                onClick = {
+                    expandedSection =
+                        if (expandedSection == "permissions") {
+                            null
+                        } else {
+                            "permissions"
+                        }
+                }
+            ) {
+                SettingsArrowRow(
+                    icon = Icons.Default.Notifications,
+                    title = "通知权限",
+                    subtitle = if (notificationsEnabled) {
+                        "已开启，记停车时会显示位置提醒"
+                    } else {
+                        "已关闭，点击前往系统设置开启"
+                    },
+                    trailingText = if (notificationsEnabled) {
+                        "已开启"
+                    } else {
+                        "未开启"
+                    },
+                    trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    onClick = {
+                        try {
+                            val intent = Intent(
+                                Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                            ).apply {
+                                putExtra(
+                                    Settings.EXTRA_APP_PACKAGE,
+                                    context.packageName
+                                )
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            Toast.makeText(
+                                context,
+                                "无法打开系统设置",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                )
+
+                SettingsDivider()
+
+                SettingsArrowRow(
+                    icon = Icons.Default.LocationOn,
+                    title = "定位权限",
+                    subtitle = when (locationPermissionStatus) {
+                        "精确定位已开启" ->
+                            "已允许精确定位，停车位置记录更准确"
+
+                        "仅允许大致位置" ->
+                            "当前仅允许大致位置，定位精度可能受影响"
+
+                        else ->
+                            "未授权，点击前往系统设置开启"
+                    },
+                    trailingText = when (locationPermissionStatus) {
+                        "精确定位已开启" -> "已开启"
+                        "仅允许大致位置" -> "部分授权"
+                        else -> "未开启"
+                    },
+                    trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    onClick = {
+                        try {
+                            val intent = Intent(
+                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.fromParts(
+                                    "package",
+                                    context.packageName,
+                                    null
+                                )
+                            )
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            Toast.makeText(
+                                context,
+                                "无法打开系统设置",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                )
+            }
+        }
+
+        // =================================================
+        // 5. 关于
         // =================================================
 
         item(key = "directory_about") {
@@ -619,7 +710,22 @@ fun SettingsScreen(
                         openExternalPage(
                             context,
                             "https://qm.qq.com/q/7dkbKfAfgQ",
-                            "无法打开网盘链接"
+                            "无法打开更新链接"
+                        )
+                    }
+                )
+
+                SettingsDivider()
+
+                SettingsArrowRow(
+                    icon = Icons.Default.Code,
+                    title = "查看 GitHub",
+                    subtitle = "查看源码，欢迎 Star 和反馈",
+                    onClick = {
+                        openExternalPage(
+                            context,
+                            "https://github.com/furenkun123/fueltracker",
+                            "无法打开 GitHub"
                         )
                     }
                 )
@@ -661,59 +767,7 @@ fun SettingsScreen(
         }
 
         // =================================================
-        // 5. 权限设置
-        // =================================================
-
-        item(key = "directory_permissions") {
-            SettingsDirectory(
-                icon = Icons.Default.Security,
-                title = "权限设置",
-                subtitle = "管理应用通知权限",
-                expanded = expandedSection == "permissions",
-                onClick = {
-                    expandedSection =
-                        if (expandedSection == "permissions") {
-                            null
-                        } else {
-                            "permissions"
-                        }
-                }
-            ) {
-                SettingsArrowRow(
-                    icon = Icons.Default.Notifications,
-                    title = "通知权限",
-                    subtitle = if (notificationsEnabled) {
-                        "已开启，记停车时会显示位置提醒"
-                    } else {
-                        "已关闭，点击前往系统设置开启"
-                    },
-                    trailingText = if (notificationsEnabled) "已开启" else "未开启",
-                    trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    onClick = {
-                        try {
-                            val intent = Intent(
-                                Settings.ACTION_APP_NOTIFICATION_SETTINGS
-                            ).apply {
-                                putExtra(
-                                    Settings.EXTRA_APP_PACKAGE,
-                                    context.packageName
-                                )
-                            }
-                            context.startActivity(intent)
-                        } catch (_: Exception) {
-                            Toast.makeText(
-                                context,
-                                "无法打开系统设置",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                )
-            }
-        }
-
-        // =================================================
-        // 6. 隐私
+        // 6. 隐私说明
         // =================================================
 
         item(key = "directory_privacy") {
@@ -726,163 +780,7 @@ fun SettingsScreen(
                     showPrivacyDialog = true
                 }
             ) {
-            }
-        }
-    }
-
-    // =====================================================
-    // 备份与恢复弹窗
-    // =====================================================
-
-    if (showBackupSheet) {
-        WindowBottomSheet(
-            show = true,
-            title = "备份与恢复",
-            onDismissRequest = {
-                showBackupSheet = false
-            }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 32.dp)
-            ) {
-                SettingsArrowRow(
-                    icon = Icons.Default.FileUpload,
-                    title = "导出本地备份",
-                    subtitle = "导出为 JSON 文件",
-                    onClick = {
-                        exportLauncher.launch(BackupManager.generateFileName())
-                    }
-                )
-
-                SettingsArrowRow(
-                    icon = Icons.Default.FileDownload,
-                    title = "恢复本地备份",
-                    subtitle = "覆盖当前所有数据",
-                    onClick = {
-                        importLauncher.launch(
-                            arrayOf("application/json", "*/*")
-                        )
-                    }
-                )
-
-                SettingsArrowRow(
-                    icon = Icons.Default.CloudDownload,
-                    title = "导入小熊油耗（加油）",
-                    subtitle = "导入 fuel-eco-*.csv",
-                    onClick = {
-                        fuelImporter.launch(
-                            arrayOf(
-                                "text/csv",
-                                "text/comma-separated-values",
-                                "text/plain",
-                                "application/vnd.ms-excel"
-                            )
-                        )
-                    }
-                )
-
-                SettingsArrowRow(
-                    icon = Icons.Default.CloudDownload,
-                    title = "导入小熊油耗（费用）",
-                    subtitle = "导入 expense-*.csv",
-                    onClick = {
-                        expenseImporter.launch(
-                            arrayOf(
-                                "text/csv",
-                                "text/comma-separated-values",
-                                "text/plain",
-                                "application/vnd.ms-excel"
-                            )
-                        )
-                    }
-                )
-
-                SettingsArrowRow(
-                    icon = Icons.Default.CloudDownload,
-                    title = "前往小熊网页导出",
-                    subtitle = "登录网页版导出 CSV 数据",
-                    onClick = {
-                        showBackupSheet = false
-                        openExternalPage(
-                            context,
-                            "https://www.xiaoxiongyouhao.com/carowner/page_data_mgr.php",
-                            "无法打开浏览器"
-                        )
-                    }
-                )
-            }
-        }
-    }
-
-    // =====================================================
-    // 关于弹窗
-    // =====================================================
-
-    if (showAboutSheet) {
-        WindowBottomSheet(
-            show = true,
-            title = "关于应用",
-            onDismissRequest = {
-                showAboutSheet = false
-            }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 32.dp)
-            ) {
-                SettingsArrowRow(
-                    icon = Icons.AutoMirrored.Filled.MenuBook,
-                    title = "应用说明",
-                    subtitle = "使用指南与常见问题",
-                    onClick = {
-                        showInstructions = true
-                    }
-                )
-
-                SettingsArrowRow(
-                    icon = Icons.Default.CloudDownload,
-                    title = "查看更新",
-                    subtitle = "跳转 QQ 下载和反馈",
-                    onClick = {
-                        openExternalPage(
-                            context,
-                            "https://qm.qq.com/q/7dkbKfAfgQ",
-                            "无法打开网盘链接"
-                        )
-                    }
-                )
-
-                SettingsArrowRow(
-                    icon = Icons.Default.History,
-                    title = "更新历史",
-                    subtitle = "查看历次版本更新内容",
-                    onClick = {
-                        showUpdateHistory = true
-                    }
-                )
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        "版本号",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MiuixTheme.colorScheme.onSurface
-                    )
-
-                    Text(
-                        "v${BuildConfig.VERSION_NAME}",
-                        fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary
-                    )
-                }
+                // 隐私内容通过独立弹窗展示
             }
         }
     }
@@ -1060,374 +958,23 @@ fun SettingsScreen(
         )
     }
 
+    // =====================================================
+    // 更新历史
+    // =====================================================
+
     if (showUpdateHistory) {
         MiuixUpdateHistoryDialog {
             showUpdateHistory = false
         }
     }
 
+    // =====================================================
+    // 应用说明
+    // =====================================================
+
     if (showInstructions) {
         MiuixInstructionsDialog {
             showInstructions = false
-        }
-    }
-}
-
-// =========================================================
-// 可展开目录卡片
-// =========================================================
-
-@Composable
-private fun SettingsDirectory(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    expanded: Boolean,
-    onClick: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    MiuixCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(
-                animationSpec = tween(durationMillis = 350)
-            ),
-        cornerRadius = 16.dp
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onClick)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier.size(21.dp)
-                    )
-                }
-
-                Spacer(Modifier.width(14.dp))
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Text(
-                        title,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MiuixTheme.colorScheme.onSurface
-                    )
-
-                    Text(
-                        subtitle,
-                        fontSize = 12.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary
-                    )
-                }
-
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = if (expanded) "收起" else "展开",
-                    tint = MiuixTheme.colorScheme.onSurfaceSecondary,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .graphicsLayer {
-                            rotationZ = if (expanded) 90f else 0f
-                        }
-                )
-            }
-
-            if (expanded) {
-                HorizontalDivider(
-                    color = MiuixTheme.colorScheme.surfaceVariant,
-                    thickness = 0.6.dp,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    content = content
-                )
-            }
-        }
-    }
-}
-
-// =========================================================
-// 设置项分割线
-// =========================================================
-
-@Composable
-private fun SettingsDivider() {
-    HorizontalDivider(
-        color = MiuixTheme.colorScheme.surfaceVariant,
-        thickness = 0.6.dp,
-        modifier = Modifier.padding(start = 50.dp, end = 16.dp)
-    )
-}
-
-// =========================================================
-// 紧凑设置行
-// =========================================================
-
-@Composable
-fun SettingsArrowRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    trailingText: String? = null,
-    trailingIcon: ImageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    val alpha = if (enabled) 1f else 0.4f
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                enabled = enabled,
-                onClick = onClick
-            )
-            .padding(horizontal = 16.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MiuixTheme.colorScheme.primary.copy(alpha = alpha),
-            modifier = Modifier.size(21.dp)
-        )
-
-        Spacer(Modifier.width(12.dp))
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                title,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = MiuixTheme.colorScheme.onSurface.copy(alpha = alpha)
-            )
-
-            Text(
-                subtitle,
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = alpha)
-            )
-        }
-
-        if (trailingText != null) {
-            Text(
-                trailingText,
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = alpha),
-                modifier = Modifier.padding(end = 5.dp)
-            )
-        }
-
-        Icon(
-            imageVector = trailingIcon,
-            contentDescription = null,
-            tint = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = alpha),
-            modifier = Modifier.size(19.dp)
-        )
-    }
-}
-
-// =========================================================
-// 紧凑开关行
-// =========================================================
-
-@Composable
-fun SettingsSwitchRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    enabled: Boolean = true
-) {
-    val alpha = if (enabled) 1f else 0.4f
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled) {
-                onCheckedChange(!checked)
-            }
-            .padding(horizontal = 16.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MiuixTheme.colorScheme.primary.copy(alpha = alpha),
-            modifier = Modifier.size(21.dp)
-        )
-
-        Spacer(Modifier.width(12.dp))
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                title,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = MiuixTheme.colorScheme.onSurface.copy(alpha = alpha)
-            )
-
-            Text(
-                subtitle,
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = alpha)
-            )
-        }
-
-        MiuixSwitch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled
-        )
-    }
-}
-
-// =========================================================
-// 车辆信息行
-// =========================================================
-
-@Composable
-private fun VehicleItemCard(
-    vehicle: Vehicle,
-    onSelect: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onSelect)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(
-                    if (vehicle.isCurrent) {
-                        MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
-                    } else {
-                        MiuixTheme.colorScheme.surfaceVariant
-                    }
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.DirectionsCar,
-                null,
-                tint = if (vehicle.isCurrent) {
-                    MiuixTheme.colorScheme.primary
-                } else {
-                    MiuixTheme.colorScheme.onSurfaceSecondary
-                },
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        Spacer(Modifier.width(12.dp))
-
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                listOf(vehicle.brand, vehicle.series, vehicle.model)
-                    .filter { it.isNotBlank() }
-                    .joinToString(" "),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = MiuixTheme.colorScheme.onSurface
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            Text(
-                "${vehicle.year}款 | ${vehicle.fuelType} | 油箱 ${vehicle.tankCapacity}L",
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary
-            )
-        }
-
-        Spacer(Modifier.width(8.dp))
-
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            if (vehicle.isCurrent) {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = MiuixTheme.colorScheme.primaryContainer
-                ) {
-                    Text(
-                        "当前使用",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MiuixTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(
-                            horizontal = 6.dp,
-                            vertical = 2.dp
-                        )
-                    )
-                }
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        "编辑",
-                        tint = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Icon(
-                        Icons.Default.DeleteOutline,
-                        "删除",
-                        tint = MiuixTheme.colorScheme.error.copy(alpha = 0.9f),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
         }
     }
 }
@@ -1575,5 +1122,27 @@ private fun <T> launchCsvImport(
                 ).show()
             }
         )
+    }
+}
+
+// =========================================================
+// 定位权限状态
+// =========================================================
+
+private fun getLocationPermissionStatus(context: Context): String {
+    val fine = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    val coarse = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    return when {
+        fine -> "精确定位已开启"
+        coarse -> "仅允许大致位置"
+        else -> "定位权限未开启"
     }
 }
