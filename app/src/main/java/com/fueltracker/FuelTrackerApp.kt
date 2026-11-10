@@ -62,6 +62,7 @@ import com.fueltracker.ui.miuix.navigation.AppNavItem
 import com.fueltracker.ui.miuix.navigation.MiuixAppNavigationBar
 import com.fueltracker.ui.theme.BackgroundPreferences
 import com.fueltracker.ui.theme.LocalBackgroundTitleColor
+import com.fueltracker.ui.theme.rememberAdaptiveStatusBarIcons
 import com.fueltracker.ui.theme.rememberAdaptiveTitleColor
 import com.fueltracker.util.UpdateLogManager
 import com.fueltracker.viewmodel.MainViewModel
@@ -88,10 +89,13 @@ fun FuelTrackerApp(
 
     // 个性化背景
     val backgroundUri = BackgroundPreferences.backgroundUri
+
+
     val windowSize = LocalWindowInfo.current.containerSize
 
     val targetWidthPx = windowSize.width.coerceAtLeast(1)
     val targetHeightPx = windowSize.height.coerceAtLeast(1)
+
 
     val backgroundBitmap by produceState<ImageBitmap?>(
         initialValue = null,
@@ -178,7 +182,22 @@ fun FuelTrackerApp(
                 screen == EXPENSES
     val adaptiveTitleColor = rememberAdaptiveTitleColor(backgroundBitmap)
 
+// 当前应用实际主题
+    val isDarkTheme =
+        MiuixTheme.colorScheme.background.luminance() < 0.5f
+
     val isGlassEnabled = viewModel.isGlassEffectEnabled
+
+// 暗色主题使用白色状态栏图标，浅色主题使用黑色图标
+    val isVehicleScreen =
+        screen == ADD_VEHICLE || screen == EDIT_VEHICLE
+
+    val statusBarDarkIcons = if (isVehicleScreen) {
+        !isDarkTheme
+    } else {
+        rememberAdaptiveStatusBarIcons(backgroundBitmap)
+            ?: !isDarkTheme
+    }
 
     // ---------- Pager 与导航栏状态 ----------
     val mainScreens = listOf(HOME, RECORDS, EXPENSES)
@@ -226,17 +245,6 @@ fun FuelTrackerApp(
             viewModel.navigateTo(targetScreen)
         }
     }
-// 手势滑动结束后同步 ViewModel 和导航栏
-    LaunchedEffect(pagerState.settledPage) {
-        val targetIndex = pagerState.settledPage
-        navigationSelectedIndex = targetIndex
-
-        val targetScreen = mainScreens[targetIndex]
-
-        if (screen != targetScreen) {
-            viewModel.navigateTo(targetScreen)
-        }
-    }
 
     // ---------- 统一返回逻辑 ----------
     val handleBack: () -> Unit = {
@@ -274,29 +282,14 @@ fun FuelTrackerApp(
         onBack = handleBack
     )
 
-    // ============================================================
     // 全 App 内容层
-    // ============================================================
     CompositionLocalProvider(
         LocalBackgroundTitleColor provides adaptiveTitleColor
     ) {
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            // 1. 最底层：图片背景 + 遮罩
-            if (backgroundBitmap != null) {
-                Image(
-                    bitmap = backgroundBitmap!!,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = BackgroundPreferences.scrimAlpha))
-                )
-            }
+
 
             // 2. Backdrop 采集层
             Box(
@@ -316,6 +309,20 @@ fun FuelTrackerApp(
                     )
                     .layerBackdrop(appBackdrop)
             ) {
+                // 1. 最底层：图片背景 + 遮罩
+                if (backgroundBitmap != null) {
+                    Image(
+                        bitmap = backgroundBitmap!!,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = BackgroundPreferences.scrimAlpha))
+                    )
+                }
                 if (showBottomBar) {
                     // 主页面 Pager
                     HorizontalPager(
@@ -495,19 +502,14 @@ fun FuelTrackerApp(
                         }
                     }
                 }
-            } // ✅ 闭合采集层
+            }
 
             // 3. 顶栏
             MiuixTopBar(
-                backdrop = appBackdrop,
-                isGlassEnabled = isGlassEnabled,
-                showActionArea = false,
-                statusBarDarkIcons = (
-                        adaptiveTitleColor ?: MiuixTheme.colorScheme.background
-                        ).luminance() > 0.5f
+                statusBarDarkIcons = statusBarDarkIcons
             )
 
-            // 4. 底部导航栏
+            // 5. 底部导航栏
             if (showBottomBar) {
                 MiuixAppNavigationBar(
                     selectedIndex = navigationSelectedIndex,

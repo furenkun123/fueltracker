@@ -54,7 +54,8 @@ class MainActivity : ComponentActivity() {
             FuelTrackerTheme(
                 themeMode = ThemePreferences.mode
             ) {
-                // 根据应用实际主题判断系统栏图标颜色
+                // 只由 MainActivity 管理底部导航栏图标颜色。
+// 状态栏图标颜色交给 MiuixTopBar 根据背景亮度统一控制。
                 val isDarkTheme =
                     MiuixTheme.colorScheme.background.luminance() < 0.5f
 
@@ -62,11 +63,7 @@ class MainActivity : ComponentActivity() {
                     WindowCompat.getInsetsController(
                         window,
                         window.decorView
-                    ).apply {
-                        // true：深色图标，适合浅色背景
-                        isAppearanceLightStatusBars = !isDarkTheme
-                        isAppearanceLightNavigationBars = !isDarkTheme
-                    }
+                    ).isAppearanceLightNavigationBars = !isDarkTheme
                 }
 
                 val application = application as FuelTrackerApplication

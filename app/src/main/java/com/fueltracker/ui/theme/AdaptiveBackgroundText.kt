@@ -61,6 +61,51 @@ fun rememberAdaptiveTitleColor(backgroundBitmap: ImageBitmap?): Color? {
         }
     }
 }
+@Composable
+fun rememberAdaptiveStatusBarIcons(
+    backgroundBitmap: ImageBitmap?
+): Boolean? {
+    val scrimAlpha = BackgroundPreferences.scrimAlpha
+
+    return remember(backgroundBitmap, scrimAlpha) {
+        backgroundBitmap?.let { bitmap ->
+            val pixels = bitmap.toPixelMap()
+
+            // 只采样顶部 5% 区域
+            val topRegionHeight =
+                (pixels.height * 0.05f).toInt().coerceAtLeast(1)
+
+            val stepX = (pixels.width / 32).coerceAtLeast(1)
+            val stepY = (topRegionHeight / 8).coerceAtLeast(1)
+
+            var totalLuminance = 0f
+            var count = 0
+
+            for (y in 0 until topRegionHeight step stepY) {
+                for (x in 0 until pixels.width step stepX) {
+                    val color = pixels[x, y]
+
+                    val luminance =
+                        color.red * 0.2126f +
+                                color.green * 0.7152f +
+                                color.blue * 0.0722f
+
+                    totalLuminance += luminance
+                    count++
+                }
+            }
+
+            val averageLuminance =
+                if (count > 0) totalLuminance / count else 0.5f
+
+            val actualLuminance =
+                averageLuminance * (1f - scrimAlpha)
+
+            // true = 黑色状态栏图标，false = 白色状态栏图标
+            actualLuminance >= 0.5f
+        }
+    }
+}
 
 /**
  * 轻微反差投影，帮助文字从复杂背景中凸显。

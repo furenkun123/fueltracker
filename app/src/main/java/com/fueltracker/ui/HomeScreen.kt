@@ -471,7 +471,8 @@ private fun ConsumptionCard(
                 Text(
                     text = "当前油耗",
                     fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(
