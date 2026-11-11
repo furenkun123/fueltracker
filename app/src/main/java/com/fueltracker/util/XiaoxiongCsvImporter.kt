@@ -15,7 +15,6 @@ import java.util.Locale
 object XiaoxiongCsvImporter {
 
     private const val TAG = "XiaoxiongCsv"
-    private const val DEFAULTFUELGRADE = "92"
     private const val FALLBACKUNITPRICE = 8.0
     private const val MAXSANEUNITPRICE = 50.0
 
@@ -250,7 +249,34 @@ object XiaoxiongCsvImporter {
     }
 
     private fun normalizeFuelGrade(raw: String): String {
-        val value = raw.trim().ifBlank { DEFAULTFUELGRADE }
-        return if (value.contains("#")) value else "$value#"
+        val value = raw.trim()
+            .replace("＃", "#")
+            .replace(Regex("\\s+"), "")
+
+        if (value.isBlank()) return "92号"
+
+        // 汽油标号
+        val gasolineRegex = Regex(
+            "^(89|90|92|93|95|97|98)[号#]?(?:汽油)?$"
+        )
+
+        val gasolineMatch = gasolineRegex.matchEntire(value)
+        if (gasolineMatch != null) {
+            return "${gasolineMatch.groupValues[1]}号"
+        }
+
+        // 柴油标号
+        val dieselRegex = Regex(
+            "^(-?\\d{1,2})[号#]?柴油$"
+        )
+
+        val dieselMatch = dieselRegex.matchEntire(value)
+        if (dieselMatch != null) {
+            return "${dieselMatch.groupValues[1]}号柴油"
+        }
+
+        // 空白或无法识别的内容统一归为 92 号
+        Log.w(TAG, "无法识别小熊油耗燃油标号，按 92 号处理：$raw")
+        return "92号"
     }
 }
