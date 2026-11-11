@@ -17,7 +17,7 @@ val SurfaceVariantLight = Color(0xFFE5E5EA)
 
 // 👇 4. 文字颜色可以稍微柔和一点，不要纯黑
 val TextPrimary = Color(0xFF2C2C2C)
-val TextSecondary = Color(0xFF8E8E93)
+val TextSecondary = Color(0xFF626269)
 
 val OutlineLight = Color(0xFFD1D1D6)
 val PrimaryContainerLight = Color(0xFFD6E4FF)
@@ -28,7 +28,7 @@ val OnPrimaryContainerLight = Color(0xFF003A8C)
 val BackgroundDark = Color(0xFF121212)
 val SurfaceDark = Color(0xFF1C1C1E)
 val TextPrimaryDark = Color(0xFFE6E6E6)
-val TextSecondaryDark = Color(0xFF9E9E9E)
+val TextSecondaryDark = Color(0xFFB0B0B5)
 val SurfaceVariantDark = Color(0xFF2C2C2C)
 val OutlineDark = Color(0xFF3A3A3A)
 val PrimaryContainerDark = Color(0xFF11366E)
