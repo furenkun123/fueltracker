@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CallToAction
 import androidx.compose.material.icons.filled.CarRental
 import androidx.compose.material.icons.filled.Check
@@ -52,6 +53,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -86,6 +88,8 @@ import com.fueltracker.ui.theme.ThemePreferences
 import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
 import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.BackupManager
+import com.fueltracker.util.OutlierSensitivity
+import com.fueltracker.util.OutlierSensitivityPreferences
 import com.fueltracker.util.XiaoxiongCsvImporter
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.CancellationException
@@ -122,6 +126,9 @@ fun SettingsScreen(
 
     // 弹窗状态
     var showThemePicker by remember { mutableStateOf(false) }
+    var showOutlierSensitivityPicker by remember {
+        mutableStateOf(false)
+    }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showUpdateHistory by remember { mutableStateOf(false) }
     var showInstructions by remember { mutableStateOf(false) }
@@ -483,6 +490,44 @@ fun SettingsScreen(
                 )
             }
         }
+
+// =================================================
+// 3. 油耗计算
+// =================================================
+
+        item(key = "directory_calculation") {
+            SettingsDirectory(
+                icon = Icons.Default.Calculate,
+                title = "油耗计算",
+                subtitle = "油耗统计和异常识别设置",
+                expanded = expandedSection == "calculation",
+                onClick = {
+                    expandedSection =
+                        if (expandedSection == "calculation") {
+                            null
+                        } else {
+                            "calculation"
+                        }
+                }
+            ) {
+                SettingsArrowRow(
+                    icon = Icons.Default.Tune,
+                    title = "偏离值识别",
+                    subtitle = when (OutlierSensitivityPreferences.mode) {
+                        OutlierSensitivity.STANDARD ->
+                            "标准模式：适合日常连续记录"
+                        OutlierSensitivity.LOOSE ->
+                            "宽松模式：适合补录或导入历史数据"
+                    },
+                    trailingText = OutlierSensitivityPreferences.mode.displayName,
+                    trailingIcon = Icons.Default.UnfoldMore,
+                    onClick = {
+                        showOutlierSensitivityPicker = true
+                    }
+                )
+            }
+        }
+
 
         // =================================================
         // 3. 备份
@@ -856,6 +901,75 @@ fun SettingsScreen(
             }
         }
     }
+
+// =====================================================
+// 偏离值识别模式选择
+// =====================================================
+
+    if (showOutlierSensitivityPicker) {
+        WindowBottomSheet(
+            show = true,
+            title = "偏离值识别",
+            onDismissRequest = {
+                showOutlierSensitivityPicker = false
+            }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 32.dp)
+            ) {
+                OutlierSensitivity.entries.forEach { mode ->
+                    val selected =
+                        OutlierSensitivityPreferences.mode == mode
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                OutlierSensitivityPreferences.setMode(
+                                    context,
+                                    mode
+                                )
+                                showOutlierSensitivityPicker = false
+                            }
+                            .padding(
+                                horizontal = 16.dp,
+                                vertical = 14.dp
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                mode.displayName,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MiuixTheme.colorScheme.onSurface
+                            )
+
+                            Text(
+                                mode.description,
+                                fontSize = 12.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceSecondary
+                            )
+                        }
+
+                        if (selected) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = "已选中",
+                                tint = MiuixTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 
     // =====================================================
     // 删除车辆确认

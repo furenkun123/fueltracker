@@ -95,12 +95,8 @@ object FuelCalculator {
 
     private const val LOCAL_MAD_WINDOW = 11
     private const val MIN_MAD_SAMPLE_COUNT = 5
-    private const val MAD_THRESHOLD_FLOOR = 0.35
-    private const val MAD_MULTIPLIER = 3.0
     private const val MAD_CONSISTENCY_FACTOR = 1.4826
     private const val GLOBAL_MAD_SAMPLE_THRESHOLD = 15
-    private const val RELATIVE_MAD_MIN_WIDTH = 0.35
-    private const val PLUG_IN_MAD_MIN_WIDTH = 0.75
 
     // 剩余油量相关阈值
     private const val REMAINING_FUEL_CONSISTENCY_LOW = 0.90
@@ -168,7 +164,8 @@ object FuelCalculator {
         val rejected: Map<Int, String>,
         val usedRecordIds: Set<Long>,
         val openAnchorIndex: Int?,
-        val hasValidAnchor: Boolean
+        val hasValidAnchor: Boolean,
+        val verifiedMergedRecordIds: Set<Long> = emptySet()
     )
 
     private data class AnchorInfo(val index: Int, val odometer: Double)
@@ -184,17 +181,34 @@ object FuelCalculator {
         calculateAll(records, vehicle).lastOrNull(::isReliable)?.consumption
 
     @JvmOverloads
-    fun calculateMap(records: List<FuelRecord>, vehicle: Vehicle? = null): Map<Long, ConsumptionResult> {
+    fun calculateMap(
+        records: List<FuelRecord>,
+        vehicle: Vehicle? = null,
+        sensitivity: OutlierSensitivity = OutlierSensitivityPreferences.mode
+    ): Map<Long, ConsumptionResult> {
         val map = LinkedHashMap<Long, ConsumptionResult>()
-        for (result in calculateAll(records, vehicle)) {
+        for (result in calculateAll(records, vehicle, sensitivity)) {
             if (result.recordId > 0L) map[result.recordId] = result
         }
         return map
     }
 
     @JvmOverloads
-    fun calculateAll(records: List<FuelRecord>, vehicle: Vehicle? = null): List<ConsumptionResult> =
-        analyze(records, vehicle).results
+    fun calculateAll(
+        records: List<FuelRecord>,
+        vehicle: Vehicle? = null,
+        sensitivity: OutlierSensitivity = OutlierSensitivityPreferences.mode
+    ): List<ConsumptionResult> =
+        analyze(records, vehicle, sensitivity).results
+
+    @JvmOverloads
+    fun getVerifiedMergedRecordIds(
+        records: List<FuelRecord>,
+        vehicle: Vehicle? = null,
+        sensitivity: OutlierSensitivity = OutlierSensitivityPreferences.mode
+    ): Set<Long> {
+        return analyze(records, vehicle, sensitivity).verifiedMergedRecordIds
+    }
 
     //判断油耗区间是否适合用于趋势展示。
     // 与现有统计可靠性判断保持一致。
@@ -208,9 +222,10 @@ object FuelCalculator {
         allRecords: List<FuelRecord>,
         vehicle: Vehicle? = null,
         startTime: Long? = null,
-        endTime: Long? = null
+        endTime: Long? = null,
+        sensitivity: OutlierSensitivity = OutlierSensitivityPreferences.mode
     ): StatisticsSummary {
-        val analysis = analyze(allRecords, vehicle)
+        val analysis = analyze(allRecords, vehicle, sensitivity)
         val visible = analysis.visible
         val tankCapacity = vehicle?.tankCapacity?.takeIf { it.isFinite() && it > 0.0 }
 
@@ -350,7 +365,11 @@ object FuelCalculator {
     // 主算法
     // --------------------------------------------------------
 
-    private fun analyze(records: List<FuelRecord>, vehicle: Vehicle?): Analysis {
+    private fun analyze(
+        records: List<FuelRecord>,
+        vehicle: Vehicle?,
+        sensitivity: OutlierSensitivity
+    ): Analysis {
         if (records.isEmpty()) return Analysis(emptyList(), emptyList(), emptyMap(), emptySet(), null, false)
 
         val deliveryDate = vehicle?.deliveryDate?.takeIf { it > 0L }
@@ -399,6 +418,7 @@ object FuelCalculator {
         val results = ArrayList<ConsumptionResult>()
         val rejected = HashMap<Int, String>()
         val usedRecordIds = mutableSetOf<Long>()
+        val verifiedMergedRecordIds = mutableSetOf<Long>()
         val state = SegmentState()
 
         // 👇 新增：计算“初始记录 -> 第一条满箱”的初始区间
@@ -508,7 +528,37 @@ object FuelCalculator {
             }
 
             val currentFuelSevere = isSeverelyOversizedVolume(record.volume, tankCapacity)
-            if (currentFuelSevere) {
+
+// 仅对严重超出油箱容量的满油记录，尝试验证是否为两次加油合并记录。
+            val verifiedMergedFuel = if (
+                currentFuelSevere &&
+                record.isFull &&
+                currentOdometer != null &&
+                (odoClass == OdoClass.ACCEPT || odoClass == OdoClass.SMALL_DIP) &&
+                !state.hasUnresolvedFuelGap &&
+                !state.hasFuelOverflow &&
+                !record.hasMissedRecord &&
+                !isRemainingFuelSeverelyInconsistent(record, tankCapacity)
+            ) {
+                val distance = currentOdometer - segmentStartOdometer
+                val totalFuel = state.pendingFuel + record.volume
+
+                val candidateConsumption = calculateConsumption(totalFuel, distance)
+
+                distance.isFinite() &&
+                        distance > 0.0 &&
+                        totalFuel.isFinite() &&
+                        candidateConsumption.isFinite() &&
+                        candidateConsumption in MIN_HARD_CONSUMPTION..MAX_HARD_CONSUMPTION
+            } else {
+                false
+            }
+            if (verifiedMergedFuel) {
+                verifiedMergedRecordIds.add(record.id)
+            }
+
+// 原有严重异常处理保持不变，只有验证通过的记录例外放行。
+            if (currentFuelSevere && !verifiedMergedFuel) {
                 state.markUnresolvedFuelGap()
                 rejected[index] = REASON_VOLUME_SEVERE
                 continue
@@ -527,7 +577,7 @@ object FuelCalculator {
                 else -> Unit
             }
 
-            if (hasValidFuelVolume(record)) {
+            if (hasValidFuelVolume(record) || verifiedMergedFuel) {
                 state.addFuel(safeFuelVolume(record))
                 usedRecordIds.add(record.id)
             } else {
@@ -545,7 +595,7 @@ object FuelCalculator {
                 usedRecordIds.add(record.id)
             }
 
-            if (!hasValidFuelVolume(record)) {
+            if (!hasValidFuelVolume(record) && !verifiedMergedFuel) {
                 rejected[index] = REASON_VOLUME_INVALID
                 continue
             }
@@ -612,7 +662,15 @@ object FuelCalculator {
             reanchor(index, record, currentOdometer)
         }
 
-        return Analysis(visibleRecords, markOutliers(results, vehicle?.fuelType), rejected, usedRecordIds, segmentStartIndex, true)
+        return Analysis(
+            visibleRecords,
+            markOutliers(results, vehicle?.fuelType, sensitivity),
+            rejected,
+            usedRecordIds,
+            segmentStartIndex,
+            true,
+            verifiedMergedRecordIds
+        )
     }
 
     // --------------------------------------------------------
@@ -903,7 +961,11 @@ object FuelCalculator {
     // 离群检测与统计辅助
     // --------------------------------------------------------
 
-    private fun markOutliers(results: List<ConsumptionResult>, fuelType: String?): List<ConsumptionResult> {
+    private fun markOutliers(
+        results: List<ConsumptionResult>,
+        fuelType: String?,
+        sensitivity: OutlierSensitivity
+    ): List<ConsumptionResult> {
         val reliableIndices = results.indices.filter { isReliable(results[it]) && results[it].consumption.isFinite() }
         if (reliableIndices.size <= MIN_MAD_SAMPLE_COUNT) return results
 
@@ -922,7 +984,16 @@ object FuelCalculator {
             for (cursor in start until end) {
                 if (cursor != sampleIndex) context.add(reliableSamples[cursor].consumption)
             }
-            val bounds = robustBounds(context, if (plugIn) PLUG_IN_MAD_MIN_WIDTH else RELATIVE_MAD_MIN_WIDTH) ?: continue
+            val bounds = robustBounds(
+                values = context,
+                relativeMinWidth = if (plugIn) {
+                    sensitivity.plugInMadMinWidth
+                } else {
+                    sensitivity.relativeMadMinWidth
+                },
+                madMultiplier = sensitivity.madMultiplier,
+                thresholdFloor = sensitivity.madThresholdFloor
+            ) ?: continue
             if (result.consumption < bounds.lower || result.consumption > bounds.upper) {
                 val oldQuality = result.quality ?: IntervalQuality()
                 updated[reliableIndices[sampleIndex]] = result.copy(
@@ -934,14 +1005,22 @@ object FuelCalculator {
         return updated
     }
 
-    private fun robustBounds(values: List<Double>, relativeMinWidth: Double): RobustBounds? {
+    private fun robustBounds(
+        values: List<Double>,
+        relativeMinWidth: Double,
+        madMultiplier: Double,
+        thresholdFloor: Double
+    ): RobustBounds? {
         val finite = values.filter { it.isFinite() }.sorted()
         if (finite.size < MIN_MAD_SAMPLE_COUNT) return null
         val medianValue = median(finite) ?: return null
         val deviations = finite.map { abs(it - medianValue) }.sorted()
         val madValue = median(deviations) ?: return null
-        val madWidth = MAD_MULTIPLIER * madValue * MAD_CONSISTENCY_FACTOR
-        val minimumWidth = max(MAD_THRESHOLD_FLOOR, abs(medianValue) * relativeMinWidth)
+        val madWidth = madMultiplier * madValue * MAD_CONSISTENCY_FACTOR
+        val minimumWidth = max(
+            thresholdFloor,
+            abs(medianValue) * relativeMinWidth
+        )
         val threshold = max(madWidth, minimumWidth)
         return RobustBounds(
             median = medianValue, mad = madValue,
