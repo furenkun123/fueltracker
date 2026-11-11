@@ -33,6 +33,15 @@ private val defaultDateTimeFormat by lazy { SimpleDateFormat("MM-dd HH:mm", Loca
 
 /** 格式化为短日期时间：10-27 14:30 */
 fun Long.toDateTimeText(): String = defaultDateTimeFormat.format(Date(this))
+/**
+ * 格式化为带年份的日期时间：2026-11-11 14:30
+ */
+private val dateTimeFormatWithYear by lazy {
+    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+}
+
+fun Long.toDateTimeTextWithYear(): String =
+    dateTimeFormatWithYear.format(Date(this))
 
 /** 快速获取某个时间戳的年份 */
 fun Long.getYear(): Int = Calendar.getInstance().apply { timeInMillis = this@getYear }.get(Calendar.YEAR)

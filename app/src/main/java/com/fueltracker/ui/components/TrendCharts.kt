@@ -561,12 +561,7 @@ fun ConsumptionTrendCard(
                             var previousPoint: MonthlyConsumptionPoint? = null
 
                             for (month in 1..12) {
-                                val point = yearPoints[month]
-
-                                if (point == null) {
-                                    previousPoint = null
-                                    continue
-                                }
+                                val point = yearPoints[month] ?: continue
 
                                 val x = (month - 0.5f) * slotWidth
                                 val y = topPadding +
@@ -575,19 +570,17 @@ fun ConsumptionTrendCard(
 
                                 // 连接相邻月份
                                 previousPoint?.let { previous ->
-                                    if (previous.month + 1 == month) {
-                                        val previousX = (previous.month - 0.5f) * slotWidth
-                                        val previousY = topPadding +
-                                                plotHeight *
-                                                ((yMax - previous.value) / actualRange).toFloat()
+                                    val previousX = (previous.month - 0.5f) * slotWidth
+                                    val previousY = topPadding +
+                                            plotHeight *
+                                            ((yMax - previous.value) / actualRange).toFloat()
 
-                                        drawLine(
-                                            color = displayColor,
-                                            start = Offset(previousX, previousY),
-                                            end = Offset(x, y),
-                                            strokeWidth = 2.dp.toPx()
-                                        )
-                                    }
+                                    drawLine(
+                                        color = displayColor,
+                                        start = Offset(previousX, previousY),
+                                        end = Offset(x, y),
+                                        strokeWidth = 2.dp.toPx()
+                                    )
                                 }
 
                                 // 选中点增加外圈

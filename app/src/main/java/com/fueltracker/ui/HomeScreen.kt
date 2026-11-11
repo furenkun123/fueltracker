@@ -38,10 +38,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,12 +71,14 @@ import com.fueltracker.ui.theme.adaptiveBackgroundTitleColor
 import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.FuelCalculator
+import com.fueltracker.util.OutlierSensitivityPreferences
 import com.fueltracker.util.StatisticsSummary
 import com.fueltracker.util.computeExpenseRange
 import com.fueltracker.util.toDateTimeText
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Surface
@@ -105,6 +107,9 @@ fun HomeScreen(
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
 
+// 当前异常识别模式
+    val outlierSensitivity = OutlierSensitivityPreferences.mode
+
     val (displayRecords, recentRecords) = remember(records, deliveryDate) {
         val list = records
             .filter { (deliveryDate == null || it.timestamp >= deliveryDate) && !it.isInitialRecord }
@@ -121,11 +126,13 @@ fun HomeScreen(
     val resolvedLatestConsumption = remember(latestConsumption, displayRecords) {
         latestConsumption ?: displayRecords.firstOrNull { it.consumption != null }?.consumption
     }
+    val scope = rememberCoroutineScope()
 
     // 👈 统一使用 ExpenseRange
-    var selectedRange by remember { mutableStateOf(ExpenseRange.ALL) }
-    var customYear by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
-    var customMonth by remember { mutableIntStateOf(0) }
+    val selectedRange = viewModel.homeStatsSelectedRange
+    val customYear = viewModel.homeStatsCustomYear
+    val customMonth = viewModel.homeStatsCustomMonth
+
     var showYearMonthPicker by remember { mutableStateOf(false) }
 
     val availableYears = remember(records, customYear) {
@@ -138,24 +145,33 @@ fun HomeScreen(
         computeExpenseRange(selectedRange, customYear, customMonth)
     }
 
-    val statsSummary = remember(vehicle, records, statsRange) {
+    val statsSummary = remember(
+        vehicle,
+        records,
+        statsRange,
+        outlierSensitivity
+    ) {
         FuelCalculator.calculateSummary(
             allRecords = records,
             vehicle = vehicle,
             startTime = statsRange.first,
-            endTime = statsRange.second
+            endTime = statsRange.second,
+            sensitivity = outlierSensitivity
         )
     }
 
-    // 油耗趋势图独立年份筛选，emptySet() 表示全部年份
-    var selectedConsumptionYears by remember(vehicle) {
-        mutableStateOf<Set<Int>>(emptySet())
-    }
+    // 油耗趋势图独立年份筛选
+    val selectedConsumptionYears = viewModel.homeConsumptionYears
 // 获取完整时间范围的油耗计算结果
-    val consumptionTrendSummary = remember(vehicle, records) {
+    val consumptionTrendSummary = remember(
+        vehicle,
+        records,
+        outlierSensitivity
+    ) {
         FuelCalculator.calculateSummary(
             allRecords = records,
-            vehicle = vehicle
+            vehicle = vehicle,
+            sensitivity = outlierSensitivity
         )
     }
 // 提取所有符合趋势图条件的油耗数据
@@ -185,7 +201,25 @@ fun HomeScreen(
             .sortedDescending()
     }
 
-    val listState = rememberLazyListState()
+    val scrollKey = "home:${vehicle?.id ?: "none"}"
+
+    val savedScroll = remember(viewModel, scrollKey) {
+        viewModel.getPageScrollPosition(scrollKey)
+    }
+
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = savedScroll.first,
+        initialFirstVisibleItemScrollOffset = savedScroll.second
+    )
+
+    LaunchedEffect(listState, scrollKey) {
+        androidx.compose.runtime.snapshotFlow {
+            listState.firstVisibleItemIndex to
+                    listState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            viewModel.savePageScrollPosition(scrollKey, index, offset)
+        }
+    }
 
     val density = LocalDensity.current
 
@@ -306,8 +340,16 @@ fun HomeScreen(
                             selectedRange = selectedRange,
                             customYear = customYear,
                             customMonth = customMonth,
-                            onRangeSelected = { selectedRange = it },
-                            onCustomMonthClick = { showYearMonthPicker = true }
+                        onRangeSelected = {
+                            viewModel.updateHomeStatsRange(it)
+
+                            viewModel.resetPageScrollPosition(scrollKey)
+
+                            scope.launch {
+                                listState.scrollToItem(0)
+                            }
+                        },
+                        onCustomMonthClick = { showYearMonthPicker = true }
                         )
                 }
                 if (costData.size >= 2) {
@@ -324,7 +366,9 @@ fun HomeScreen(
                             points = consumptionTrendPoints,
                             years = consumptionYears,
                             selectedYears = selectedConsumptionYears,
-                            onYearsSelected = { selectedConsumptionYears = it }
+                            onYearsSelected = {
+                                viewModel.updateHomeConsumptionYears(it)
+                            }
                         )
                     }
                 }
@@ -415,8 +459,18 @@ fun HomeScreen(
             initialYear = customYear, initialMonth = customMonth, availableYears = availableYears,
             onDismiss = { showYearMonthPicker = false },
             onConfirm = { y, m ->
-                customYear = y; customMonth = m
-                selectedRange = ExpenseRange.CUSTOM_MONTH
+                viewModel.updateHomeStatsRange(
+                    ExpenseRange.CUSTOM_MONTH,
+                    y,
+                    m
+                )
+
+                viewModel.resetPageScrollPosition(scrollKey)
+
+                scope.launch {
+                    listState.scrollToItem(0)
+                }
+
                 showYearMonthPicker = false
             }
         )

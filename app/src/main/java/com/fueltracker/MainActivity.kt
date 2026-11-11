@@ -29,6 +29,7 @@ import androidx.core.view.WindowCompat
 import com.fueltracker.ui.theme.BackgroundPreferences
 import com.fueltracker.ui.theme.FuelTrackerTheme
 import com.fueltracker.ui.theme.ThemePreferences
+import com.fueltracker.util.OutlierSensitivityPreferences
 import com.fueltracker.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
 
         ThemePreferences.init(applicationContext)
         BackgroundPreferences.init(applicationContext)
+        OutlierSensitivityPreferences.init(applicationContext)
 
         // 启用 Edge-to-Edge
         WindowCompat.setDecorFitsSystemWindows(window, false)

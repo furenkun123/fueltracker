@@ -29,9 +29,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,14 +61,14 @@ import com.fueltracker.util.computeExpenseRange
 import com.fueltracker.util.computeSummary
 import com.fueltracker.util.getYear
 import com.fueltracker.util.inRange
-import com.fueltracker.util.toDateTimeText
+import com.fueltracker.util.toDateTimeTextWithYear
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.util.Calendar
 
 private const val CATEGORY_FUEL = "加油"
 
@@ -107,9 +107,12 @@ fun ExpenseScreen(
     val fuelRecords by viewModel.records.collectAsState()
 
     var deletingItem by remember { mutableStateOf<ExpenseListItem?>(null) }
-    var selectedRange by remember { mutableStateOf(ExpenseRange.ALL) }
-    var customYear by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
-    var customMonth by remember { mutableIntStateOf(0) }
+
+    val selectedRange = viewModel.expensesSelectedRange
+    val customYear = viewModel.expensesCustomYear
+    val customMonth = viewModel.expensesCustomMonth
+    val scope = rememberCoroutineScope()
+
     var showYearMonthPicker by remember { mutableStateOf(false) }
 
     val availableYears = remember(expenses, fuelRecords) {
@@ -132,7 +135,7 @@ fun ExpenseScreen(
         computeSummary(expenses, fuelRecords, rangeBounds, rangeLabel)
     }
 
-    var selectedTrendYear by remember { mutableStateOf<Int?>(null) }
+    val selectedTrendYear = viewModel.expensesTrendYear
 
     val trendYears = remember(expenses, fuelRecords) {
         (
@@ -143,7 +146,7 @@ fun ExpenseScreen(
 
     LaunchedEffect(trendYears) {
         if (selectedTrendYear != null && selectedTrendYear !in trendYears) {
-            selectedTrendYear = null
+            viewModel.updateExpensesTrendYear(null)
         }
     }
 
@@ -168,12 +171,44 @@ fun ExpenseScreen(
         list.sortedByDescending { it.timestamp }
     }
 
+
     val monthTrend = remember(expenses, fuelRecords, selectedTrendYear) {
         buildMonthTrend(expenses, fuelRecords, selectedTrendYear)
     }
 
     val isEmpty = expenses.isEmpty() && fuelRecords.none { !it.isInitialRecord }
-    val listState = rememberLazyListState()
+
+    val currentVehicle by viewModel.currentVehicle.collectAsState()
+    val scrollKey = "expenses:${currentVehicle?.id ?: "none"}"
+
+    val savedScroll = remember(viewModel, scrollKey) {
+        viewModel.getPageScrollPosition(scrollKey)
+    }
+
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = savedScroll.first,
+        initialFirstVisibleItemScrollOffset = savedScroll.second
+    )
+
+
+
+    LaunchedEffect(listState, scrollKey) {
+        androidx.compose.runtime.snapshotFlow {
+            listState.firstVisibleItemIndex to
+                    listState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            viewModel.savePageScrollPosition(scrollKey, index, offset)
+        }
+    }
+
+    fun resetExpenseList() {
+        viewModel.resetPageScrollPosition(scrollKey)
+
+        scope.launch {
+            listState.scrollToItem(0)
+        }
+    }
+
     val isFloating = viewModel.isFloatingBottomBar
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -226,7 +261,10 @@ fun ExpenseScreen(
                         summary,
                         selectedRange,
                         rangeLabel,
-                        { selectedRange = it },
+                        {
+                            viewModel.updateExpensesRange(it)
+                            resetExpenseList()
+                        },
                         { showYearMonthPicker = true }
                     )
                 }
@@ -237,7 +275,9 @@ fun ExpenseScreen(
                             points = monthTrend,
                             years = trendYears,
                             selectedYear = selectedTrendYear,
-                            onYearSelected = { selectedTrendYear = it }
+                            onYearSelected = {
+                                viewModel.updateExpensesTrendYear(it)
+                            }
                         )
                     }
                 }
@@ -248,6 +288,7 @@ fun ExpenseScreen(
                             onSelectedCategoryChange(
                                 if (selectedCategory == category) null else category
                             )
+                            resetExpenseList()
                         }
                     }
                 }
@@ -262,13 +303,18 @@ fun ExpenseScreen(
                     Text(
                         if (selectedCategory == null) "明细" else "明细 · $selectedCategory",
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary
+                        fontWeight = FontWeight.Medium,
+                        color = adaptiveBackgroundTitleColor(
+                            MiuixTheme.colorScheme.onSurface
+                        )
                     )
                     if (selectedCategory != null) {
                         Box(
                             Modifier.clip(RoundedCornerShape(8.dp))
-                                .clickable { onSelectedCategoryChange(null) }
+                                .clickable {
+                                    onSelectedCategoryChange(null)
+                                    resetExpenseList()
+                                }
                                 .padding(8.dp)
                         ) {
                             Text("清除", fontSize = 12.sp, color = MiuixTheme.colorScheme.primary)
@@ -300,7 +346,7 @@ fun ExpenseScreen(
                 ) { item ->
                     ExpenseDetailItemCard(
                         title = item.title,
-                        time = item.timestamp.toDateTimeText(),
+                        time = item.timestamp.toDateTimeTextWithYear(),
                         amount = item.amount,
                         onEdit = {
                             if (item is ExpenseListItem.Fuel) {
@@ -343,8 +389,20 @@ fun ExpenseScreen(
     }
 
     if (showYearMonthPicker) {
-        MiuixYearMonthSheet(customYear, customMonth, availableYears, { showYearMonthPicker = false }) { y, m ->
-            customYear = y; customMonth = m; selectedRange = ExpenseRange.CUSTOM_MONTH; showYearMonthPicker = false
+        MiuixYearMonthSheet(
+            customYear,
+            customMonth,
+            availableYears,
+            { showYearMonthPicker = false }
+        ) { y, m ->
+            viewModel.updateExpensesRange(
+                ExpenseRange.CUSTOM_MONTH,
+                y,
+                m
+            )
+
+            resetExpenseList()
+            showYearMonthPicker = false
         }
     }
 

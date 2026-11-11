@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,7 +55,10 @@ import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.IntervalConfidence
+import com.fueltracker.util.OutlierSensitivity
+import com.fueltracker.util.OutlierSensitivityPreferences
 import com.fueltracker.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
@@ -75,43 +79,95 @@ fun RecordsScreen(
 ) {
     val records by viewModel.records.collectAsState()
     val vehicle by viewModel.currentVehicle.collectAsState()
-    val listState = rememberLazyListState()
-    val isFloating = viewModel.isFloatingBottomBar
+    val scrollKey = "records:${vehicle?.id ?: "none"}"
+    val savedScroll = remember(viewModel, scrollKey) {
+        viewModel.getPageScrollPosition(scrollKey)
+    }
+    val scope = rememberCoroutineScope()
 
-    val consumptionMap = remember(records, vehicle) { FuelCalculator.calculateMap(records, vehicle) }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = savedScroll.first,
+        initialFirstVisibleItemScrollOffset = savedScroll.second
+    )
 
-    val now = remember { Calendar.getInstance() }
-    val currentYear = remember(now) { now.get(Calendar.YEAR) }
-
-    var filterType by remember { mutableStateOf("全部") }
-    var showDatePicker by remember { mutableStateOf(false) }
-    var selectedYear by remember { mutableIntStateOf(currentYear) }
-    var selectedMonth by remember { mutableIntStateOf(now.get(Calendar.MONTH) + 1) }
-    var selectedDay by remember { mutableIntStateOf(0) }
-
-    val availableYears = remember(records, currentYear, selectedYear) {
-        val recordYears = records.map { Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.YEAR) }
-        (recordYears + currentYear + selectedYear).distinct().sortedDescending()
+    LaunchedEffect(listState, scrollKey) {
+        androidx.compose.runtime.snapshotFlow {
+            listState.firstVisibleItemIndex to
+                    listState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            viewModel.savePageScrollPosition(scrollKey, index, offset)
+        }
     }
 
-    val displayRecords = remember(records, filterType, selectedYear, selectedMonth, selectedDay) {
+    val isFloating = viewModel.isFloatingBottomBar
+
+    val outlierSensitivity = OutlierSensitivityPreferences.mode
+
+    val consumptionMap = remember(records, vehicle, outlierSensitivity) {
+        FuelCalculator.calculateMap(
+            records,
+            vehicle,
+            outlierSensitivity
+        )
+    }
+    val verifiedMergedRecordIds = remember(records, vehicle) {
+        FuelCalculator.getVerifiedMergedRecordIds(records, vehicle)
+    }
+
+    val filterType = viewModel.recordsFilterType
+    val selectedYear = viewModel.recordsSelectedYear
+    val selectedMonth = viewModel.recordsSelectedMonth
+
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+
+    val availableYears = remember(records, currentYear, selectedYear) {
+        val recordYears = records.map {
+            Calendar.getInstance()
+                .apply { timeInMillis = it.timestamp }
+                .get(Calendar.YEAR)
+        }
+
+        (recordYears + currentYear + selectedYear)
+            .distinct()
+            .sortedDescending()
+    }
+
+    val displayRecords = remember(
+        records,
+        filterType,
+        selectedYear,
+        selectedMonth
+    ) {
         val sorted = records.sortedByDescending { it.timestamp }
+
         when (filterType) {
             "本月" -> {
                 val cNow = Calendar.getInstance()
+
                 sorted.filter { record ->
-                    val c = Calendar.getInstance().apply { timeInMillis = record.timestamp }
-                    c.get(Calendar.YEAR) == cNow.get(Calendar.YEAR) && c.get(Calendar.MONTH) == cNow.get(Calendar.MONTH)
+                    val c = Calendar.getInstance()
+                        .apply { timeInMillis = record.timestamp }
+
+                    c.get(Calendar.YEAR) == cNow.get(Calendar.YEAR) &&
+                            c.get(Calendar.MONTH) == cNow.get(Calendar.MONTH)
                 }
             }
-            "按时间" -> {
+
+            "按年月" -> {
                 sorted.filter { record ->
-                    val c = Calendar.getInstance().apply { timeInMillis = record.timestamp }
+                    val c = Calendar.getInstance()
+                        .apply { timeInMillis = record.timestamp }
+
                     c.get(Calendar.YEAR) == selectedYear &&
-                            (c.get(Calendar.MONTH) + 1) == selectedMonth &&
-                            (selectedDay == 0 || c.get(Calendar.DAY_OF_MONTH) == selectedDay)
+                            (
+                                    selectedMonth == 0 ||
+                                            c.get(Calendar.MONTH) + 1 == selectedMonth
+                                    )
                 }
             }
+
             else -> sorted
         }
     }
@@ -148,11 +204,20 @@ fun RecordsScreen(
                 RecordHeaderCard(
                     displayRecords = displayRecords,
                     vehicle = vehicle,
+                    outlierSensitivity = outlierSensitivity,
                     filterType = filterType,
                     selectedYear = selectedYear,
                     selectedMonth = selectedMonth,
-                    selectedDay = selectedDay,
-                    onFilterChange = { filterType = it },
+                    onFilterChange = { type ->
+                        viewModel.updateRecordsFilter(type)
+                        viewModel.resetPageScrollPosition(scrollKey)
+
+                        // 当前页面立即回到顶部
+                        // 需要在 composable 中使用协程执行
+                        scope.launch {
+                            listState.scrollToItem(0)
+                        }
+                    },
                     onMonthClick = { showDatePicker = true }
                 )
             }
@@ -167,6 +232,7 @@ fun RecordsScreen(
                         record = record,
                         calculationResult = consumptionMap[record.id],
                         vehicle = vehicle,
+                        verifiedMergedRecordIds = verifiedMergedRecordIds,
                         onEdit = { onEdit(record) }
                     )
                 }
@@ -179,9 +245,25 @@ fun RecordsScreen(
     }
 
     if (showDatePicker) {
-        DatePicker3WheelSheet(
-            initialYear = selectedYear, initialMonth = selectedMonth, initialDay = selectedDay, availableYears = availableYears,
-            onSelect = { y, m, d -> selectedYear = y; selectedMonth = m; selectedDay = d; filterType = "按时间"; showDatePicker = false },
+        YearMonthPickerSheet(
+            initialYear = selectedYear,
+            initialMonth = selectedMonth,
+            availableYears = availableYears,
+            onSelect = { y, m ->
+                viewModel.updateRecordsFilter(
+                    type = "按年月",
+                    year = y,
+                    month = m
+                )
+
+                viewModel.resetPageScrollPosition(scrollKey)
+
+                scope.launch {
+                    listState.scrollToItem(0)
+                }
+
+                showDatePicker = false
+            },
             onDismiss = { showDatePicker = false }
         )
     }
@@ -195,20 +277,36 @@ fun RecordsScreen(
 private fun RecordHeaderCard(
     displayRecords: List<FuelRecord>,
     vehicle: Vehicle?,
+    outlierSensitivity: OutlierSensitivity,
     filterType: String,
     selectedYear: Int,
     selectedMonth: Int,
-    selectedDay: Int,
     onFilterChange: (String) -> Unit,
     onMonthClick: () -> Unit
 ) {
     val totalMoney = remember(displayRecords) { displayRecords.sumOf { it.actualPaidAmount } }
     val totalVolume = remember(displayRecords) { displayRecords.sumOf { it.volume } }
-    val averageConsumption = remember(displayRecords, vehicle) {
-        if (displayRecords.isEmpty()) null else FuelCalculator.calculateSummary(allRecords = displayRecords, vehicle = vehicle).averageConsumption
+    val averageConsumption = remember(
+        displayRecords,
+        vehicle,
+        outlierSensitivity
+    ) {
+        if (displayRecords.isEmpty()) {
+            null
+        } else {
+            FuelCalculator.calculateSummary(
+                allRecords = displayRecords,
+                vehicle = vehicle,
+                sensitivity = outlierSensitivity
+            ).averageConsumption
+        }
     }
-    val customText = remember(selectedYear, selectedMonth, selectedDay) {
-        if (selectedDay == 0) "${selectedYear}.${selectedMonth}月 ▼" else "${selectedYear}.${selectedMonth}.${selectedDay} ▼"
+    val customText = remember(selectedYear, selectedMonth) {
+        if (selectedMonth == 0) {
+            "${selectedYear}年全年 ▼"
+        } else {
+            "${selectedYear}年${selectedMonth}月 ▼"
+        }
     }
 
     MiuixCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -218,9 +316,19 @@ private fun RecordHeaderCard(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                MiuixFilterChip("全部", filterType == "全部") { onFilterChange("全部") }
-                MiuixFilterChip("本月", filterType == "本月") { onFilterChange("本月") }
-                MiuixFilterChip(customText, filterType == "按时间", onMonthClick)
+                MiuixFilterChip("全部", filterType == "全部") {
+                    onFilterChange("全部")
+                }
+
+                MiuixFilterChip("本月", filterType == "本月") {
+                    onFilterChange("本月")
+                }
+
+                MiuixFilterChip(
+                    customText,
+                    filterType == "按年月",
+                    onMonthClick
+                )
             }
 
             // 中间细分割线（贯穿卡片但留出左右边距）
@@ -263,6 +371,7 @@ private fun FuelRecordCard(
     record: FuelRecord,
     calculationResult: ConsumptionResult?,
     vehicle: Vehicle?,
+    verifiedMergedRecordIds: Set<Long>,
     onEdit: () -> Unit
 ) {
     val timeText = remember(record.timestamp) { RECORD_DATE_FORMAT.format(Date(record.timestamp)) }
@@ -294,13 +403,42 @@ private fun FuelRecordCard(
                         color = MiuixTheme.colorScheme.onSurfaceSecondary,
                         modifier = Modifier.padding(top = 2.dp)
                     )
-                    if (record.fuelGrade.isNotBlank()) TagChip(record.fuelGrade, MiuixTheme.colorScheme.primary, MiuixTheme.colorScheme.primary.copy(alpha = 0.1f))
-                    if (record.isFull) TagChip("加满", Color(0xFF34C759), Color(0xFF34C759).copy(alpha = 0.15f))
-                    if (record.hasMissedRecord) TagChip("含漏记", Color(0xFFFF9500), Color(0xFFFF9500).copy(alpha = 0.15f))
-                    if (isRemainingFuelAnomaly) TagChip("油量异常", Color(0xFFFF3B30), Color(0xFFFF3B30).copy(alpha = 0.15f))
+
+                    if (record.fuelGrade.isNotBlank()) {
+                        TagChip(
+                            record.fuelGrade,
+                            MiuixTheme.colorScheme.primary,
+                            MiuixTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        )
+                    }
+
+                    if (record.isFull) {
+                        TagChip("加满", Color(0xFF34C759), Color(0xFF34C759).copy(alpha = 0.15f))
+                    }
+
+// 新增：疑似合并加油标记
+                    if (record.id in verifiedMergedRecordIds) {
+                        TagChip(
+                            "疑似合并加油",
+                            Color(0xFFFF9500),
+                            Color(0xFFFF9500).copy(alpha = 0.15f)
+                        )
+                    }
+
+                    if (record.hasMissedRecord) {
+                        TagChip("含漏记", Color(0xFFFF9500), Color(0xFFFF9500).copy(alpha = 0.15f))
+                    }
+
+                    if (isRemainingFuelAnomaly) {
+                        TagChip("油量异常", Color(0xFFFF3B30), Color(0xFFFF3B30).copy(alpha = 0.15f))
+                    }
+
                     when {
-                        calculationResult?.isOutlier == true -> TagChip("偏离值", Color(0xFFFF3B30), Color(0xFFFF3B30).copy(alpha = 0.15f))
-                        calculationResult?.quality?.confidence == IntervalConfidence.LOW || calculationResult?.quality?.confidence == IntervalConfidence.UNRELIABLE ->
+                        calculationResult?.isOutlier == true ->
+                            TagChip("偏离值", Color(0xFFFF3B30), Color(0xFFFF3B30).copy(alpha = 0.15f))
+
+                        calculationResult?.quality?.confidence == IntervalConfidence.LOW ||
+                                calculationResult?.quality?.confidence == IntervalConfidence.UNRELIABLE ->
                             TagChip("预估值", Color(0xFFFF9500), Color(0xFFFF9500).copy(alpha = 0.15f))
                     }
                 }
@@ -409,33 +547,60 @@ private fun TagChip(text: String, color: Color, bgColor: Color) {
 }
 
 // =================================================
-// 三滚轮日期选择弹窗
+// 滚轮日期选择弹窗
 // =================================================
 
 @Composable
-private fun DatePicker3WheelSheet(initialYear: Int, initialMonth: Int, initialDay: Int, availableYears: List<Int>, onSelect: (Int, Int, Int) -> Unit, onDismiss: () -> Unit) {
-    var tempYear by remember { mutableIntStateOf(initialYear) }
-    var tempMonth by remember { mutableIntStateOf(initialMonth) }
-    var tempDay by remember { mutableIntStateOf(initialDay) }
-
-    val maxDays = remember(tempYear, tempMonth) {
-        Calendar.getInstance().apply { set(Calendar.YEAR, tempYear); set(Calendar.MONTH, tempMonth - 1); set(Calendar.DAY_OF_MONTH, 1) }.getActualMaximum(Calendar.DAY_OF_MONTH)
+private fun YearMonthPickerSheet(
+    initialYear: Int,
+    initialMonth: Int,
+    availableYears: List<Int>,
+    onSelect: (Int, Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var tempYear by remember {
+        mutableIntStateOf(initialYear)
     }
 
-    LaunchedEffect(maxDays) {
-        if (tempDay > maxDays) tempDay = maxDays
+    var tempMonth by remember {
+        mutableIntStateOf(initialMonth)
     }
 
     MiuixBottomSheetWrapper(
-        title = "选择日期",
+        title = "选择年月",
         onDismiss = onDismiss,
-        onConfirm = { onSelect(tempYear, tempMonth, tempDay) }
-    ) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            WheelList(selectedValue = tempYear, items = availableYears, modifier = Modifier.weight(1f), style = WheelStyle.DatePicker, itemLabel = { "$it 年" }, onChange = { tempYear = it })
-            WheelList(selectedValue = tempMonth, items = (1..12).toList(), modifier = Modifier.weight(1f), style = WheelStyle.DatePicker, itemLabel = { "%02d 月".format(it) }, onChange = { tempMonth = it })
-            WheelList(selectedValue = tempDay, items = (0..maxDays).toList(), modifier = Modifier.weight(1f), style = WheelStyle.DatePicker, itemLabel = { if (it == 0) "全月" else "%02d 日".format(it) }, onChange = { tempDay = it })
+        onConfirm = {
+            onSelect(tempYear, tempMonth)
         }
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            WheelList(
+                selectedValue = tempYear,
+                items = availableYears,
+                modifier = Modifier.weight(1f),
+                style = WheelStyle.DatePicker,
+                itemLabel = { "$it 年" },
+                onChange = { tempYear = it }
+            )
+
+            WheelList(
+                selectedValue = tempMonth,
+                items = (0..12).toList(),
+                modifier = Modifier.weight(1f),
+                style = WheelStyle.DatePicker,
+                itemLabel = {
+                    if (it == 0) "全年" else "%02d 月".format(it)
+                },
+                onChange = { tempMonth = it }
+            )
+        }
+
         Spacer(Modifier.height(20.dp))
     }
 }

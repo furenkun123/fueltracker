@@ -5,17 +5,40 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.fueltracker.AppScreen
-import com.fueltracker.data.*
+import com.fueltracker.data.AppDatabase
+import com.fueltracker.data.CATEGORY_PARKING
+import com.fueltracker.data.CustomCategoryEntity
+import com.fueltracker.data.ExpenseCategoryStore
+import com.fueltracker.data.ExpenseDao
+import com.fueltracker.data.ExpenseRecord
+import com.fueltracker.data.FuelRecord
+import com.fueltracker.data.Vehicle
 import com.fueltracker.util.BackupManager
+import com.fueltracker.util.ExpenseRange
 import com.fueltracker.util.FuelCalculator
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 class MainViewModel(
@@ -64,6 +87,121 @@ class MainViewModel(
     // =========================================================
     var currentScreen by mutableStateOf(AppScreen.HOME); private set
     var expenseSelectedCategory by mutableStateOf<String?>(null); private set
+    // =========================================================
+// 页面筛选状态：离开页面后仍然保留
+// =========================================================
+
+    // 加油记录筛选
+    var recordsFilterType by mutableStateOf("全部")
+        private set
+
+    var recordsSelectedYear by mutableIntStateOf(
+        java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    )
+        private set
+
+    // 0 表示全年，1~12 表示指定月份
+    var recordsSelectedMonth by mutableIntStateOf(0)
+        private set
+
+    // 费用页面筛选
+    var expensesSelectedRange by mutableStateOf(ExpenseRange.ALL)
+        private set
+
+    var expensesCustomYear by mutableIntStateOf(
+        java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    )
+        private set
+
+    var expensesCustomMonth by mutableIntStateOf(0)
+        private set
+
+    var expensesTrendYear by mutableStateOf<Int?>(null)
+        private set
+
+    // 首页统计筛选
+    var homeStatsSelectedRange by mutableStateOf(ExpenseRange.ALL)
+        private set
+
+    var homeStatsCustomYear by mutableIntStateOf(
+        java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    )
+        private set
+
+    var homeStatsCustomMonth by mutableIntStateOf(0)
+        private set
+
+    // 首页油耗趋势图年份多选
+    var homeConsumptionYears by mutableStateOf<Set<Int>>(emptySet())
+        private set
+
+// =========================================================
+// 页面列表滚动位置
+// =========================================================
+
+    // 使用普通变量，避免滚动过程中持续触发 Compose 重组。
+// 按页面和车辆分别保存。
+    private val pageScrollPositions =
+        mutableMapOf<String, Pair<Int, Int>>()
+
+    fun getPageScrollPosition(key: String): Pair<Int, Int> {
+        return pageScrollPositions[key] ?: (0 to 0)
+    }
+
+    fun savePageScrollPosition(
+        key: String,
+        index: Int,
+        offset: Int
+    ) {
+        pageScrollPositions[key] =
+            index.coerceAtLeast(0) to offset.coerceAtLeast(0)
+    }
+
+    fun resetPageScrollPosition(key: String) {
+        pageScrollPositions[key] = 0 to 0
+    }
+
+// =========================================================
+// 筛选状态更新方法
+// =========================================================
+
+    fun updateRecordsFilter(
+        type: String,
+        year: Int = recordsSelectedYear,
+        month: Int = recordsSelectedMonth
+    ) {
+        recordsFilterType = type
+        recordsSelectedYear = year
+        recordsSelectedMonth = month
+    }
+
+    fun updateExpensesRange(
+        range: ExpenseRange,
+        year: Int = expensesCustomYear,
+        month: Int = expensesCustomMonth
+    ) {
+        expensesSelectedRange = range
+        expensesCustomYear = year
+        expensesCustomMonth = month
+    }
+
+    fun updateExpensesTrendYear(year: Int?) {
+        expensesTrendYear = year
+    }
+
+    fun updateHomeStatsRange(
+        range: ExpenseRange,
+        year: Int = homeStatsCustomYear,
+        month: Int = homeStatsCustomMonth
+    ) {
+        homeStatsSelectedRange = range
+        homeStatsCustomYear = year
+        homeStatsCustomMonth = month
+    }
+
+    fun updateHomeConsumptionYears(years: Set<Int>) {
+        homeConsumptionYears = years
+    }
     var editFuelOrigin by mutableStateOf(AppScreen.RECORDS); private set
     var editExpenseOrigin by mutableStateOf(AppScreen.EXPENSES); private set
     var addVehicleOrigin by mutableStateOf(AppScreen.HOME); private set
