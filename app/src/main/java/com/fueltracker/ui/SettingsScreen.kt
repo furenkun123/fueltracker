@@ -129,6 +129,10 @@ fun SettingsScreen(
     var showOutlierSensitivityPicker by remember {
         mutableStateOf(false)
     }
+    // 新增：待确认切换的偏离值识别模式
+    var pendingOutlierSensitivity by remember {
+        mutableStateOf<OutlierSensitivity?>(null)
+    }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showUpdateHistory by remember { mutableStateOf(false) }
     var showInstructions by remember { mutableStateOf(false) }
@@ -750,7 +754,7 @@ fun SettingsScreen(
                 SettingsArrowRow(
                     icon = Icons.Default.CloudDownload,
                     title = "查看更新",
-                    subtitle = "跳转 QQ 下载和反馈",
+                    subtitle = "跳转 QQ群 下载和反馈",
                     onClick = {
                         openExternalPage(
                             context,
@@ -765,7 +769,7 @@ fun SettingsScreen(
                 SettingsArrowRow(
                     icon = Icons.Default.Code,
                     title = "查看 GitHub",
-                    subtitle = "查看源码，欢迎 Star 和反馈",
+                    subtitle = "觉得好用不要吝啬你的Star",
                     onClick = {
                         openExternalPage(
                             context,
@@ -927,11 +931,14 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                OutlierSensitivityPreferences.setMode(
-                                    context,
-                                    mode
-                                )
-                                showOutlierSensitivityPicker = false
+                                if (selected) {
+                                    // 当前模式，直接关闭
+                                    showOutlierSensitivityPicker = false
+                                } else {
+                                    // 不立即切换，先关闭面板并弹出确认
+                                    showOutlierSensitivityPicker = false
+                                    pendingOutlierSensitivity = mode
+                                }
                             }
                             .padding(
                                 horizontal = 16.dp,
@@ -969,8 +976,31 @@ fun SettingsScreen(
             }
         }
     }
+    // =====================================================
+// 偏离值识别模式切换确认
+// =====================================================
 
+    pendingOutlierSensitivity?.let { targetMode ->
+        val currentMode = OutlierSensitivityPreferences.mode
 
+        MiuixConfirmDialog(
+            title = "确认切换识别模式？",
+            message = "即将从“${currentMode.displayName}”切换为“${targetMode.displayName}”。切换后会按新的识别规则重新处理异常数据，已有油耗统计结果可能发生变化。建议一般用户保持“标准模式”，确有必要时再调整。",
+            confirmText = "确认切换",
+            onConfirm = {
+                OutlierSensitivityPreferences.setMode(context, targetMode)
+                pendingOutlierSensitivity = null
+                Toast.makeText(
+                    context,
+                    "已切换为${targetMode.displayName}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            },
+            onDismiss = {
+                pendingOutlierSensitivity = null
+            }
+        )
+    }
     // =====================================================
     // 删除车辆确认
     // =====================================================
