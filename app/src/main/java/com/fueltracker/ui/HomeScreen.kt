@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -74,7 +73,6 @@ import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.OutlierSensitivityPreferences
 import com.fueltracker.util.StatisticsSummary
 import com.fueltracker.util.computeExpenseRange
-import com.fueltracker.util.toDateTimeText
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
@@ -110,11 +108,10 @@ fun HomeScreen(
 // 当前异常识别模式
     val outlierSensitivity = OutlierSensitivityPreferences.mode
 
-    val (displayRecords, recentRecords) = remember(records, deliveryDate) {
-        val list = records
+    val displayRecords = remember(records, deliveryDate) {
+        records
             .filter { (deliveryDate == null || it.timestamp >= deliveryDate) && !it.isInitialRecord }
             .sortedByDescending { it.timestamp }
-        list to list.take(15)
     }
 
     val costData = remember(displayRecords) {
@@ -372,30 +369,6 @@ fun HomeScreen(
                         )
                     }
                 }
-
-                item {
-                    Text(
-                        text = "最近加油",
-                        style = adaptiveBackgroundTitleStyle(
-                            MiuixTheme.textStyles.title4
-                        ),
-                        fontWeight = FontWeight.SemiBold,
-                        color = adaptiveBackgroundTitleColor(
-                            MiuixTheme.colorScheme.onBackground
-                        ),
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                }
-
-                if (recentRecords.isEmpty()) {
-                    item {
-                        EmptyRecordCard()
-                    }
-                } else {
-                    items(recentRecords, key = { it.id }) { record ->
-                        HomeFuelRecordItem(record)
-                    }
-                }
             }
         }
 
@@ -623,51 +596,6 @@ private fun ConsumptionCard(
                 StatItem("累计行驶", "%.0f km".format(summary.totalDistance), Modifier.weight(1f))
             }
         }
-    }
-}
-
-// =================================================
-// 最近记录卡片及其他
-// =================================================
-
-@Composable
-private fun HomeFuelRecordItem(record: FuelRecord) {
-    MiuixCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
-                    // 👈 日期用扩展函数
-                    Text(record.timestamp.toDateTimeText(), style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceSecondary)
-                    Text(if (record.isFull) "已加满" else "未加满", style = MiuixTheme.textStyles.footnote2, color = if (record.isFull) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceSecondary)
-                    if (record.hasMissedRecord) Text("含漏记 %.2f L".format(record.missedVolume ?: 0.0), style = MiuixTheme.textStyles.footnote2, color = MiuixTheme.colorScheme.onSurfaceSecondary)
-                }
-                Text(record.actualPaidAmount.toMoneyText(), style = MiuixTheme.textStyles.subtitle, fontWeight = FontWeight.SemiBold)
-            }
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("%.2f L".format(record.volume), style = MiuixTheme.textStyles.title3, fontWeight = FontWeight.Bold)
-                    val odoText = record.odometer?.takeIf { it > 0.0 }?.let { if (it % 1.0 == 0.0) "%.0f km".format(it) else "%.1f km".format(it) }
-                    Text(if (odoText != null) "$odoText · %.2f 元/L".format(record.unitPrice) else "%.2f 元/L".format(record.unitPrice), style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceSecondary)
-                }
-                record.consumption?.let {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("%.2f".format(it), style = MiuixTheme.textStyles.title4, fontWeight = FontWeight.Bold)
-                        Text("L/100km", style = MiuixTheme.textStyles.footnote2, color = MiuixTheme.colorScheme.onSurfaceSecondary)
-                    }
-                }
-            }
-            record.remainingFuel?.let {
-                Text("加油后剩余 %.2f L".format(it), style = MiuixTheme.textStyles.footnote1, color = MiuixTheme.colorScheme.onSurfaceSecondary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyRecordCard() {
-    MiuixCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Text("还没有加油记录", modifier = Modifier.padding(24.dp), color = MiuixTheme.colorScheme.onSurfaceSecondary)
     }
 }
 
