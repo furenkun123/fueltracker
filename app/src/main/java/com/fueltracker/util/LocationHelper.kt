@@ -97,12 +97,7 @@ object LocationHelper {
                 .joinToString(" · ")
                 .takeIf { it.isNotBlank() }
 
-            Log.d(
-                TAG,
-                "resolved: $name " +
-                        "(district=$district, street=$street, poi=$poi, " +
-                        "lat=${location.latitude}, lng=${location.longitude})"
-            )
+            Log.d(TAG, "地址解析成功：$name")
             name
         } catch (e: Exception) {
             Log.w(TAG, "getCurrentLocationName failed", e)
@@ -112,7 +107,6 @@ object LocationHelper {
 
     /**
      * 去掉 "XX路123号" 这类门牌号。
-     * "新城十九路47号幸福苑二期" → "幸福苑二期"
      */
     private fun removeStreetNumber(text: String): String {
         val match = Regex("""^.{2,8}(路|街|道|巷|大街)\d+号""").find(text)
