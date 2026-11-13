@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.ImageDecoder
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -461,9 +462,20 @@ fun FuelTrackerApp(
                                         viewModel.navigateTo(editFuelOrigin)
                                     },
                                     onDelete = {
-                                        viewModel.deleteRecord(editingRecord)
-                                        viewModel.clearEditingStates()
-                                        viewModel.navigateTo(editFuelOrigin)
+                                        viewModel.deleteRecord(editingRecord) { result ->
+                                            if (result.isSuccess) {
+                                                // 删除成功，退出编辑页面
+                                                viewModel.clearEditingStates()
+                                                viewModel.navigateTo(editFuelOrigin)
+                                            } else {
+                                                // 删除失败，保留当前编辑页面
+                                                Toast.makeText(
+                                                    context,
+                                                    "删除失败：${result.exceptionOrNull()?.message ?: "未知错误"}",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        }
                                     }
                                 )
                             }
