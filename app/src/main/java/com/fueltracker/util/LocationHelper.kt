@@ -118,7 +118,7 @@ object LocationHelper {
                     location.longitude
                 )
 
-                Log.w(TAG, "GPS定位成功，返回坐标：$coordinateName")
+                Log.d(TAG, "GPS定位成功，地址解析不可用，返回坐标")
 
                 return@withContext coordinateName
             }
@@ -147,7 +147,7 @@ object LocationHelper {
                 .takeIf { it.isNotBlank() }
 
             if (name != null) {
-                Log.d(TAG, "地址解析成功：$name")
+                Log.d(TAG, "地址解析成功")
                 name
             } else {
                 val coordinateName = "GPS坐标（离线）：%.5f, %.5f".format(
@@ -156,7 +156,7 @@ object LocationHelper {
                     location.longitude
                 )
 
-                Log.w(TAG, "GPS定位成功，但地址字段为空，返回坐标：$coordinateName")
+                Log.d(TAG, "GPS定位成功，但地址字段为空，返回坐标")
                 coordinateName
             }
         } catch (e: Exception) {
