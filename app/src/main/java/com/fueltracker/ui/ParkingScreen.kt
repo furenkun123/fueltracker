@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,18 +83,36 @@ fun ParkingScreen(
             .distinct().take(5).toList()
     }
 
-    // 表单状态
-    var locationName by remember(record) { mutableStateOf(record?.locationName ?: "") }
-    var floor by remember(record) { mutableStateOf(record?.floor ?: "") }
-    var area by remember(record) { mutableStateOf(record?.area ?: "") }
-    var spotNumber by remember(record) { mutableStateOf(record?.spotNumber ?: "") }
-    var amountText by remember(record) { mutableStateOf(record?.amount?.takeIf { it > 0 }?.let { "%.2f".format(it) } ?: "") }
-    var note by remember(record) { mutableStateOf(record?.note ?: "") }
+    // 停车表单：旋转屏幕后保留未保存的输入
+    var locationName by rememberSaveable(record?.id) {
+        mutableStateOf(record?.locationName ?: "")
+    }
+    var floor by rememberSaveable(record?.id) {
+        mutableStateOf(record?.floor ?: "")
+    }
+    var area by rememberSaveable(record?.id) {
+        mutableStateOf(record?.area ?: "")
+    }
+    var spotNumber by rememberSaveable(record?.id) {
+        mutableStateOf(record?.spotNumber ?: "")
+    }
+    var amountText by rememberSaveable(record?.id) {
+        mutableStateOf(
+            record?.amount?.takeIf { it > 0 }?.let { "%.2f".format(it) } ?: ""
+        )
+    }
+    var note by rememberSaveable(record?.id) {
+        mutableStateOf(record?.note ?: "")
+    }
+
+// 尚未确认填入的位置候选也保留
+    var locationCandidate by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
 
     // 状态流转
     var isSaving by remember { mutableStateOf(false) }
     var isLocating by remember { mutableStateOf(false) }
-    var locationCandidate by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     fun performLocate() {

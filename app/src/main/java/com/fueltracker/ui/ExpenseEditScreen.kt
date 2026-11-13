@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,11 +81,23 @@ fun ExpenseEditScreen(
 
     val allCategories = remember(customCategories) { DEFAULT_EXPENSE_CATEGORIES + customCategories }
 
-    var category by remember(record) { mutableStateOf(record?.category ?: DEFAULT_EXPENSE_CATEGORIES.first()) }
-    var amountText by remember(record) { mutableStateOf(record?.amount?.takeIf { it > 0 }?.let { "%.2f".format(it) } ?: "") }
-    var note by remember(record) { mutableStateOf(record?.note ?: "") }
-    var timestamp by remember(record) { mutableLongStateOf(record?.timestamp?.takeIf { it > 0 } ?: System.currentTimeMillis()) }
-
+    // 费用表单：旋转屏幕后保留未保存的输入
+    var category by rememberSaveable(record?.id) {
+        mutableStateOf(record?.category ?: DEFAULT_EXPENSE_CATEGORIES.first())
+    }
+    var amountText by rememberSaveable(record?.id) {
+        mutableStateOf(
+            record?.amount?.takeIf { it > 0 }?.let { "%.2f".format(it) } ?: ""
+        )
+    }
+    var note by rememberSaveable(record?.id) {
+        mutableStateOf(record?.note ?: "")
+    }
+    var timestamp by rememberSaveable(record?.id) {
+        mutableLongStateOf(
+            record?.timestamp?.takeIf { it > 0 } ?: System.currentTimeMillis()
+        )
+    }
     var showDatePicker by remember { mutableStateOf(false) }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var newCategoryName by remember { mutableStateOf("") }
