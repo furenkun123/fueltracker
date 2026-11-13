@@ -1,7 +1,12 @@
 package com.fueltracker
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.ImageDecoder
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -23,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +40,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.core.content.ContextCompat
 import com.fueltracker.AppScreen.ADD_EXPENSE
 import com.fueltracker.AppScreen.ADD_FUEL
 import com.fueltracker.AppScreen.ADD_PARKING
@@ -160,18 +167,61 @@ fun FuelTrackerApp(
     val activeParking by viewModel.activeParking.collectAsState()
     val parkingNotificationState by viewModel.parkingNotificationState.collectAsState()
 
+// 防止权限被拒绝后，停车状态变化时反复弹出权限请求
+    var hasRequestedNotificationPermission by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+// 统一显示停车通知
+    val showParkingNotification: (ParkingNotificationState.Visible) -> Unit = { s ->
+        ParkingNotification.show(
+            context = context,
+            vehicleId = s.vehicleId,
+            locationName = s.locationName,
+            floor = s.floor,
+            area = s.area,
+            spotNumber = s.spotNumber
+        )
+    }
+
+// Android 13+ 通知权限请求
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            (parkingNotificationState as? ParkingNotificationState.Visible)
+                ?.let(showParkingNotification)
+        }
+    }
+
     LaunchedEffect(parkingNotificationState) {
         when (val s = parkingNotificationState) {
             ParkingNotificationState.NotReady -> Unit
-            ParkingNotificationState.Hidden -> ParkingNotification.cancel(context)
-            is ParkingNotificationState.Visible -> ParkingNotification.show(
-                context = context,
-                vehicleId = s.vehicleId,
-                locationName = s.locationName,
-                floor = s.floor,
-                area = s.area,
-                spotNumber = s.spotNumber
-            )
+
+            ParkingNotificationState.Hidden -> {
+                ParkingNotification.cancel(context)
+            }
+
+            is ParkingNotificationState.Visible -> {
+                // Android 13（API 33）及以上需要运行时通知权限
+                val needsPermission =
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+
+                if (needsPermission) {
+                    if (!hasRequestedNotificationPermission) {
+                        hasRequestedNotificationPermission = true
+                        notificationPermissionLauncher.launch(
+                            Manifest.permission.POST_NOTIFICATIONS
+                        )
+                    }
+                } else {
+                    showParkingNotification(s)
+                }
+            }
         }
     }
 
@@ -234,7 +284,8 @@ fun FuelTrackerApp(
     }
 
 // Pager 滑动结束后同步 ViewModel 和导航栏
-    LaunchedEffect(pagerState.settledPage) {
+    LaunchedEffect(pagerState.settledPage, showBottomBar) {
+        if (!showBottomBar) return@LaunchedEffect
         val targetIndex = pagerState.settledPage
 
         navigationSelectedIndex = targetIndex
