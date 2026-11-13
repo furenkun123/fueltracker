@@ -47,17 +47,17 @@ FuelTracker 的油耗统计并不是简单地将某一次加油量除以行驶�
 
 ## 🛠️ 技术栈
 
-| 技术 | 用途 |
-|---|---|
-| Kotlin | 主要开发语言 |
-| Jetpack Compose | 声明式 UI 框架 |
-| [Miuix](https://github.com/compose-miuix/miuix) | Compose UI 组件库 |
-| MVVM、ViewModel、StateFlow | 界面状态管理与业务逻辑组织 |
-| Room | 本地数据库持久化 |
-| Kotlin Coroutines | 异步任务与协程管理 |
-| Kotlinx Serialization | JSON 序列化与数据备份 |
-| Kyant Backdrop | 部分界面的背景模糊与玻璃效果 |
-| Kyant Shapes | 自定义形状支持 |
+| 技术                                            | 用途                         |
+|-------------------------------------------------|------------------------------|
+| Kotlin                                          | 主要开发语言                 |
+| Jetpack Compose                                 | 声明式 UI 框架               |
+| [Miuix](https://github.com/compose-miuix/miuix) | Compose UI 组件库            |
+| MVVM、ViewModel、StateFlow                      | 界面状态管理与业务逻辑组织   |
+| Room                                            | 本地数据库持久化             |
+| Kotlin Coroutines                               | 异步任务与协程管理           |
+| Kotlinx Serialization                           | JSON 序列化与数据备份        |
+| Kyant Backdrop                                  | 部分界面的背景模糊与玻璃效果 |
+| Kyant Shapes                                    | 自定义形状支持               |
 
 ## 🚗 车辆数据库说明
 
