@@ -4,12 +4,19 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Geocoder
+import android.location.Location
 import android.location.LocationManager
+import android.os.CancellationSignal
 import android.util.Log
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
 import java.util.Locale
+import kotlin.coroutines.resume
+import kotlin.time.Duration.Companion.seconds
 
 object LocationHelper {
 
@@ -33,46 +40,88 @@ object LocationHelper {
      */
     suspend fun getCurrentLocationName(context: Context): String? = withContext(Dispatchers.IO) {
         try {
-            if (!Geocoder.isPresent()) {
-                Log.w(TAG, "Geocoder is not present on this device")
-                return@withContext null
-            }
+
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
                 ?: return@withContext null
 
-            val providers = listOf(
-                LocationManager.GPS_PROVIDER,
-                LocationManager.NETWORK_PROVIDER
-            )
+            // 检查定位权限
+            if (!hasPermission(context)) {
+                Log.w(TAG, "没有定位权限")
+                return@withContext null
+            }
+// 只使用 GPS 卫星定位，不使用 NETWORK_PROVIDER
+            val gpsProvider = LocationManager.GPS_PROVIDER
 
-            var bestLocation: android.location.Location? = null
-            providers.forEach { provider ->
-                if (lm.isProviderEnabled(provider)) {
-                    val loc = try {
-                        lm.getLastKnownLocation(provider)
-                    } catch (_: SecurityException) {
-                        null
-                    }
-                    if (loc != null) {
-                        if (bestLocation == null || loc.time > bestLocation.time) {
-                            bestLocation = loc
-                        }
-                    }
-                }
+            val gpsEnabled = try {
+                lm.isProviderEnabled(gpsProvider)
+            } catch (_: Exception) {
+                false
             }
 
-            val location = bestLocation ?: return@withContext null
+// 优先主动请求 GPS 定位
+            val currentLocation = if (gpsEnabled) {
+                requestSingleLocation(context, lm, gpsProvider)
+            } else {
+                null
+            }
 
-            @Suppress("DEPRECATION")
-            val geocoder = Geocoder(context, Locale.CHINA)
-            @Suppress("DEPRECATION")
-            val addresses = geocoder.getFromLocation(
-                location.latitude,
-                location.longitude,
-                1
+// 主动定位失败时，尝试读取 GPS 缓存
+            val cachedLocation = try {
+                lm.getLastKnownLocation(gpsProvider)
+            } catch (_: SecurityException) {
+                null
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+
+// 只接受 10 分钟以内的缓存位置
+            val usableCachedLocation = cachedLocation?.takeIf {
+                val age = System.currentTimeMillis() - it.time
+                age in 0..(10 * 60 * 1000L)
+            }
+
+            val location = currentLocation
+                ?: usableCachedLocation
+                ?: return@withContext null
+
+            Log.d(
+                TAG,
+                "GPS定位成功：主动定位=${currentLocation != null}，精度=${location.accuracy}米"
             )
 
-            val address = addresses?.firstOrNull() ?: return@withContext null
+            // 尝试将 GPS 坐标转换为具体地址
+            val address = try {
+                if (!Geocoder.isPresent()) {
+                    Log.w(TAG, "设备没有可用的 Geocoder 服务")
+                    null
+                } else {
+                    @Suppress("DEPRECATION")
+                    val geocoder = Geocoder(context, Locale.CHINA)
+
+                    @Suppress("DEPRECATION")
+                    geocoder.getFromLocation(
+                        location.latitude,
+                        location.longitude,
+                        1
+                    )?.firstOrNull()
+                }
+            } catch (e: IOException) {
+                Log.w(TAG, "地址解析失败，可能无法连接地址服务", e)
+                null
+            }
+
+// 地址解析失败时，退回 GPS 经纬度
+            if (address == null) {
+                val coordinateName = "GPS坐标（离线）：%.5f, %.5f".format(
+                    Locale.US,
+                    location.latitude,
+                    location.longitude
+                )
+
+                Log.w(TAG, "GPS定位成功，返回坐标：$coordinateName")
+
+                return@withContext coordinateName
+            }
 
             // 区县：subAdminArea → subLocality
             val district = sequenceOf(address.subAdminArea, address.subLocality)
@@ -97,11 +146,61 @@ object LocationHelper {
                 .joinToString(" · ")
                 .takeIf { it.isNotBlank() }
 
-            Log.d(TAG, "地址解析成功：$name")
-            name
+            if (name != null) {
+                Log.d(TAG, "地址解析成功：$name")
+                name
+            } else {
+                val coordinateName = "GPS坐标（离线）：%.5f, %.5f".format(
+                    Locale.US,
+                    location.latitude,
+                    location.longitude
+                )
+
+                Log.w(TAG, "GPS定位成功，但地址字段为空，返回坐标：$coordinateName")
+                coordinateName
+            }
         } catch (e: Exception) {
             Log.w(TAG, "getCurrentLocationName failed", e)
             null
+        }
+    }
+
+    /**
+     * 主动请求指定定位服务的当前位置。
+     * 最多等待 10 秒，超时或失败返回 null。
+     */
+    private suspend fun requestSingleLocation(
+        context: Context,
+        locationManager: LocationManager,
+        provider: String
+    ): Location? = withTimeoutOrNull(15.seconds) {
+        suspendCancellableCoroutine { continuation ->
+            val cancellationSignal = CancellationSignal()
+
+            // 协程取消时，同时取消系统定位请求
+            continuation.invokeOnCancellation {
+                cancellationSignal.cancel()
+            }
+
+            try {
+                locationManager.getCurrentLocation(
+                    provider,
+                    cancellationSignal,
+                    context.mainExecutor
+                ) { location ->
+                    if (continuation.isActive) {
+                        continuation.resume(location)
+                    }
+                }
+            } catch (_: SecurityException) {
+                if (continuation.isActive) {
+                    continuation.resume(null)
+                }
+            } catch (_: IllegalArgumentException) {
+                if (continuation.isActive) {
+                    continuation.resume(null)
+                }
+            }
         }
     }
 
