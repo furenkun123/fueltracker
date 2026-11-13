@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ExpenseRecord::class,
         CustomCategoryEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -233,6 +233,41 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE vehicles_new RENAME TO vehicles")
             }
         }
+        /**
+         * v6 → v7：
+         * 为加油记录和费用记录增加常用查询索引。
+         */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+
+                // 加油记录：按车辆及时间查询
+                db.execSQL(
+                    """
+            CREATE INDEX IF NOT EXISTS
+            `index_fuel_records_vehicleId_timestamp`
+            ON `fuel_records` (`vehicleId`, `timestamp`)
+            """.trimIndent()
+                )
+
+                // 费用记录：按车辆及时间查询
+                db.execSQL(
+                    """
+            CREATE INDEX IF NOT EXISTS
+            `index_expenses_vehicleId_timestamp`
+            ON `expenses` (`vehicleId`, `timestamp`)
+            """.trimIndent()
+                )
+
+                // 当前停车记录查询
+                db.execSQL(
+                    """
+            CREATE INDEX IF NOT EXISTS
+            `index_expenses_vehicleId_category_isActive_timestamp`
+            ON `expenses` (`vehicleId`, `category`, `isActive`, `timestamp`)
+            """.trimIndent()
+                )
+            }
+        }
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -241,7 +276,13 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "fuel_tracker.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6,
+                        MIGRATION_6_7
+                    )
                     .build()
                     .also {
                         INSTANCE = it

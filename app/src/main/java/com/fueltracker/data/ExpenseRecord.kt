@@ -1,6 +1,7 @@
 package com.fueltracker.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
@@ -20,7 +21,13 @@ val DEFAULT_EXPENSE_CATEGORIES = listOf(
 /** 停车分类名，避免各处硬编码字符串 */
 const val CATEGORY_PARKING = "停车"
 
-@Entity(tableName = "expenses")
+@Entity(
+    tableName = "expenses",
+    indices = [
+        Index(value = ["vehicleId", "timestamp"]),
+        Index(value = ["vehicleId", "category", "isActive", "timestamp"])
+    ]
+)
 data class ExpenseRecord(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val vehicleId: Long,

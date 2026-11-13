@@ -1,9 +1,15 @@
 package com.fueltracker.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "fuel_records")
+@Entity(
+    tableName = "fuel_records",
+    indices = [
+        Index(value = ["vehicleId", "timestamp"])
+    ]
+)
 data class FuelRecord(
 
     @PrimaryKey(autoGenerate = true)
