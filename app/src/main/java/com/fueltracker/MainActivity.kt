@@ -27,6 +27,10 @@ import com.fueltracker.ui.theme.FuelTrackerTheme
 import com.fueltracker.ui.theme.ThemePreferences
 import com.fueltracker.util.OutlierSensitivityPreferences
 import com.fueltracker.viewmodel.MainViewModel
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class MainActivity : ComponentActivity() {
 
