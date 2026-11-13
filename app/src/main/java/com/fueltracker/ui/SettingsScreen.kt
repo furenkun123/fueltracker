@@ -1012,11 +1012,15 @@ fun SettingsScreen(
             title = "确认删除车辆？",
             message = buildString {
                 append(
-                    "删除“${vehicle.brand} ${vehicle.model}”将同步删除该车辆下的所有加油记录，且不可恢复。"
+                    "删除“${vehicle.brand} ${vehicle.model}”后，以下数据将被永久删除："
                 )
 
+                append("\n\n• 全部加油记录")
+                append("\n• 全部费用记录")
+                append("\n• 全部停车记录及活动停车状态")
+                append("\n\n此操作不可撤销，删除后无法恢复，请确认已经备份重要数据。")
                 if (vehicle.isCurrent) {
-                    append("\n注意：这是当前正在使用的车辆。")
+                    append("\n\n注意：这是当前正在使用的车辆，删除后将自动切换到其他车辆（如果存在）。")
                 }
             },
             confirmText = "删除",
