@@ -86,6 +86,7 @@ class MainViewModel(
     // 导航与页面状态
     // =========================================================
     var currentScreen by mutableStateOf(AppScreen.HOME); private set
+
     var expenseSelectedCategory by mutableStateOf<String?>(null); private set
     // =========================================================
 // 页面筛选状态：离开页面后仍然保留
