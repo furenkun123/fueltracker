@@ -913,75 +913,168 @@ class MainViewModel(
     // =========================================================
     // CSV 导入（去重键增强 & 统一校验）
     // =========================================================
-    fun importFuelRecords(recordsToImport: List<FuelRecord>, onResult: (Result<Int>) -> Unit) {
+    fun importFuelRecords(
+        targetVehicleId: Long,
+        recordsToImport: List<FuelRecord>,
+        onResult: (Result<Int>) -> Unit
+    ) {
         viewModelScope.launch {
             val res = try {
                 val count = database.withTransaction {
-                    val vehicle = getCurrentVehicleFromDatabase() ?: throw IllegalStateException("没有当前车辆")
-                    // 👇 增加单价、油量等字段，减少误判
-                    val seen = fuelDao.getRecordsByVehicleId(vehicle.id)
-                        .map { listOf(it.timestamp, it.odometer, it.actualPaidAmount, it.volume, it.unitPrice) }
+
+                    // 使用导入开始时确定的车辆，不再重新读取当前车辆
+                    val vehicle = requireVehicleExists(targetVehicleId)
+
+                    // 查询目标车辆已有的加油记录
+                    val seen = fuelDao.getRecordsByVehicleId(targetVehicleId)
+                        .map {
+                            listOf(
+                                it.timestamp,
+                                it.odometer,
+                                it.actualPaidAmount,
+                                it.volume,
+                                it.unitPrice
+                            )
+                        }
                         .toMutableSet()
+
                     var importCount = 0
+
                     recordsToImport.forEach { source ->
+
+                        // 防止记录与本次导入指定车辆不一致
+                        require(source.vehicleId == targetVehicleId) {
+                            "导入记录与目标车辆不一致"
+                        }
+
                         validateFuelRecord(source)
-                        val key = listOf(source.timestamp, source.odometer, source.actualPaidAmount, source.volume, source.unitPrice)
+
+                        val key = listOf(
+                            source.timestamp,
+                            source.odometer,
+                            source.actualPaidAmount,
+                            source.volume,
+                            source.unitPrice
+                        )
+
                         if (seen.add(key)) {
-                            fuelDao.insert(source.copy(id = 0L, vehicleId = vehicle.id, fuelGrade = source.fuelGrade.ifBlank { vehicle.fuelGrade }))
+                            fuelDao.insert(
+                                source.copy(
+                                    id = 0L,
+                                    vehicleId = targetVehicleId,
+                                    fuelGrade = source.fuelGrade.ifBlank {
+                                        vehicle.fuelGrade
+                                    }
+                                )
+                            )
                             importCount++
                         }
                     }
+
                     importCount
                 }
+
                 Result.success(count)
-            } catch (e: CancellationException) { throw e
+
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "导入加油失败", e)
                 Result.failure(e)
             }
+
             onResult(res)
         }
     }
-
-    fun importExpenseRecords(recordsToImport: List<ExpenseRecord>, onResult: (Result<Int>) -> Unit) {
+    fun importExpenseRecords(
+        targetVehicleId: Long,
+        recordsToImport: List<ExpenseRecord>,
+        onResult: (Result<Int>) -> Unit
+    ) {
         viewModelScope.launch {
             val res = try {
                 val count = database.withTransaction {
-                    val vehicle = getCurrentVehicleFromDatabase() ?: throw IllegalStateException("没有当前车辆")
-                    // 👇 增加 note 等字段，减少误判
-                    val seen = expenseDao.getAll().filter { it.vehicleId == vehicle.id }
-                        .map { listOf(it.timestamp, it.amount, it.category, it.note) }
+
+                    // 确认导入开始时指定的车辆仍然存在
+                    if (vehicleDao.getVehicleById(targetVehicleId) == null) {
+                        throw IllegalStateException(
+                            "导入目标车辆已不存在，请重新选择车辆后再导入"
+                        )
+                    }
+
+                    // 查询目标车辆已有的费用记录
+                    val seen = expenseDao.getAll()
+                        .filter { it.vehicleId == targetVehicleId }
+                        .map {
+                            listOf(
+                                it.timestamp,
+                                it.amount,
+                                it.category,
+                                it.note
+                            )
+                        }
                         .toMutableSet()
+
                     var importCount = 0
+
                     recordsToImport.forEach { source ->
-                        // 👇 修复：导入也走归一化和校验
+
+                        // 防止记录与本次导入指定车辆不一致
+                        require(source.vehicleId == targetVehicleId) {
+                            "导入记录与目标车辆不一致"
+                        }
+
+                        // 非停车分类不允许处于激活状态
                         val normalized = if (source.category != CATEGORY_PARKING) {
                             source.copy(isActive = false)
                         } else {
                             source
                         }
+
                         validateExpenseRecord(normalized)
 
-                        val key = listOf(normalized.timestamp, normalized.amount, normalized.category, normalized.note)
+                        val key = listOf(
+                            normalized.timestamp,
+                            normalized.amount,
+                            normalized.category,
+                            normalized.note
+                        )
+
                         if (seen.add(key)) {
-                            val toInsert = normalized.copy(id = 0L, vehicleId = vehicle.id)
-                            if (toInsert.category == CATEGORY_PARKING && toInsert.isActive) expenseDao.insertParkingAsActive(toInsert)
-                            else expenseDao.insert(toInsert)
+
+                            val toInsert = normalized.copy(
+                                id = 0L,
+                                vehicleId = targetVehicleId
+                            )
+
+                            if (
+                                toInsert.category == CATEGORY_PARKING &&
+                                toInsert.isActive
+                            ) {
+                                expenseDao.insertParkingAsActive(toInsert)
+                            } else {
+                                expenseDao.insert(toInsert)
+                            }
+
                             importCount++
                         }
                     }
+
                     importCount
                 }
+
                 Result.success(count)
-            } catch (e: CancellationException) { throw e
+
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "导入费用失败", e)
                 Result.failure(e)
             }
+
             onResult(res)
         }
     }
-
     // =========================================================
     // 辅助工具
     // =========================================================

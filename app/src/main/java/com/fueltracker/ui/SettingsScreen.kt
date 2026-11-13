@@ -259,8 +259,8 @@ fun SettingsScreen(
             parser = { ctx, fileUri, id ->
                 XiaoxiongCsvImporter.parseFuelCsv(ctx, fileUri, id)
             },
-            saveRecords = { records, callback ->
-                viewModel.importFuelRecords(records, callback)
+            saveRecords = { targetVehicleId, records, callback ->
+                viewModel.importFuelRecords(targetVehicleId, records, callback)
             }
         )
     }
@@ -276,8 +276,8 @@ fun SettingsScreen(
             parser = { ctx, fileUri, id ->
                 XiaoxiongCsvImporter.parseExpenseCsv(ctx, fileUri, id)
             },
-            saveRecords = { records, callback ->
-                viewModel.importExpenseRecords(records, callback)
+            saveRecords = { targetVehicleId, records, callback ->
+                viewModel.importExpenseRecords(targetVehicleId, records, callback)
             }
         )
     }
@@ -1200,7 +1200,7 @@ private fun <T> launchCsvImport(
     uri: Uri?,
     typeName: String,
     parser: suspend (Context, Uri, Long) -> Result<List<T>>,
-    saveRecords: (List<T>, (Result<Int>) -> Unit) -> Unit
+    saveRecords: (Long, List<T>, (Result<Int>) -> Unit) -> Unit
 ) {
     val fileUri = uri ?: return
 
@@ -1235,7 +1235,7 @@ private fun <T> launchCsvImport(
 
         parseResult.fold(
             onSuccess = { records ->
-                saveRecords(records) { result ->
+                saveRecords(vehicleId, records) { result ->
                     viewModel.viewModelScope.launch {
                         val message = result.fold(
                             onSuccess = { count ->
