@@ -21,6 +21,7 @@ import kotlin.time.Duration.Companion.seconds
 object LocationHelper {
 
     private const val TAG = "LocationHelper"
+    private const val GPS_REQUEST_TIMEOUT_SECONDS = 15L
 
     fun hasPermission(context: Context): Boolean {
         val fine = ContextCompat.checkSelfPermission(
@@ -167,13 +168,13 @@ object LocationHelper {
 
     /**
      * 主动请求指定定位服务的当前位置。
-     * 最多等待 10 秒，超时或失败返回 null。
+     * 最多等待 GPS_REQUEST_TIMEOUT_SECONDS 秒，超时或失败返回 null。
      */
     private suspend fun requestSingleLocation(
         context: Context,
         locationManager: LocationManager,
         provider: String
-    ): Location? = withTimeoutOrNull(15.seconds) {
+    ): Location? = withTimeoutOrNull(GPS_REQUEST_TIMEOUT_SECONDS.seconds) {
         suspendCancellableCoroutine { continuation ->
             val cancellationSignal = CancellationSignal()
 
