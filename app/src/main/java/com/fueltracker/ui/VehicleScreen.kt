@@ -145,10 +145,16 @@ fun VehicleScreen(
     }
 
     // 初始/当前状态
-    // 初始数据仅在添加车辆时录入，编辑车辆资料不改写历史初始化记录。
-    var initialOdometer by remember(vehicle) { mutableStateOf("") }
-    var initialFuel by remember(vehicle) { mutableStateOf("") }
-    var fuelUnit by remember(vehicle) { mutableStateOf("L") }
+// 初始数据仅在添加车辆时录入，编辑车辆资料不改写历史初始化记录。
+    var initialOdometer by rememberSaveable(vehicle?.id) {
+        mutableStateOf("")
+    }
+    var initialFuel by rememberSaveable(vehicle?.id) {
+        mutableStateOf("")
+    }
+    var fuelUnit by rememberSaveable(vehicle?.id) {
+        mutableStateOf("L")
+    }
 
     // UI 状态
     var showCarPicker by remember { mutableStateOf(false) }
