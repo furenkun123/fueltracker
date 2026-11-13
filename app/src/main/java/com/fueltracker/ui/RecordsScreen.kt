@@ -27,8 +27,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -55,10 +57,11 @@ import com.fueltracker.ui.theme.adaptiveBackgroundTitleStyle
 import com.fueltracker.util.ConsumptionResult
 import com.fueltracker.util.FuelCalculator
 import com.fueltracker.util.IntervalConfidence
-import com.fueltracker.util.OutlierSensitivity
 import com.fueltracker.util.OutlierSensitivityPreferences
 import com.fueltracker.viewmodel.MainViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
@@ -85,10 +88,12 @@ fun RecordsScreen(
     }
     val scope = rememberCoroutineScope()
 
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = savedScroll.first,
-        initialFirstVisibleItemScrollOffset = savedScroll.second
-    )
+    val listState = key(scrollKey) {
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = savedScroll.first,
+            initialFirstVisibleItemScrollOffset = savedScroll.second
+        )
+    }
 
     LaunchedEffect(listState, scrollKey) {
         androidx.compose.runtime.snapshotFlow {
@@ -102,30 +107,111 @@ fun RecordsScreen(
     val isFloating = viewModel.isFloatingBottomBar
 
     val outlierSensitivity = OutlierSensitivityPreferences.mode
-
-    val consumptionMap = remember(records, vehicle, outlierSensitivity) {
-        FuelCalculator.calculateMap(
-            records,
-            vehicle,
-            outlierSensitivity
-        )
-    }
-    val verifiedMergedRecordIds = remember(records, vehicle) {
-        FuelCalculator.getVerifiedMergedRecordIds(records, vehicle)
-    }
-
     val filterType = viewModel.recordsFilterType
     val selectedYear = viewModel.recordsSelectedYear
     val selectedMonth = viewModel.recordsSelectedMonth
+
+// 根据筛选条件确定统计时间范围
+    val (startTime, endTime) = remember(
+        filterType,
+        selectedYear,
+        selectedMonth
+    ) {
+        val calendar = Calendar.getInstance()
+
+        when (filterType) {
+            "本月" -> {
+                calendar.set(Calendar.DAY_OF_MONTH, 1)
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+
+                val start = calendar.timeInMillis
+
+                calendar.add(Calendar.MONTH, 1)
+                val end = calendar.timeInMillis - 1
+
+                start to end
+            }
+
+            "按年月" -> {
+                calendar.set(Calendar.YEAR, selectedYear)
+                calendar.set(
+                    Calendar.MONTH,
+                    if (selectedMonth == 0) 0 else selectedMonth - 1
+                )
+                calendar.set(Calendar.DAY_OF_MONTH, 1)
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+
+                val start = calendar.timeInMillis
+
+                if (selectedMonth == 0) {
+                    calendar.add(Calendar.YEAR, 1)
+                } else {
+                    calendar.add(Calendar.MONTH, 1)
+                }
+
+                val end = calendar.timeInMillis - 1
+
+                start to end
+            }
+
+            else -> null to null
+        }
+    }
+
+// 完整历史记录只分析一次，放到后台线程
+    val calculationSummary by produceState(
+        initialValue = null as com.fueltracker.util.StatisticsSummary?,
+        records,
+        vehicle,
+        outlierSensitivity,
+        startTime,
+        endTime
+    ) {
+        value = withContext(Dispatchers.Default) {
+            FuelCalculator.calculateSummary(
+                allRecords = records,
+                vehicle = vehicle,
+                startTime = startTime,
+                endTime = endTime,
+                sensitivity = outlierSensitivity
+            )
+        }
+    }
+
+// 从同一次分析结果中提取每条记录的油耗
+    val consumptionMap = remember(calculationSummary) {
+        calculationSummary?.rangeResults
+            ?.filter { it.recordId > 0L }
+            ?.associateBy { it.recordId }
+            .orEmpty()
+    }
+
+// 疑似合并记录 ID 也直接使用同一次分析结果
+    val verifiedMergedRecordIds = remember(calculationSummary) {
+        calculationSummary?.verifiedMergedRecordIds.orEmpty()
+    }
 
     var showDatePicker by remember { mutableStateOf(false) }
 
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
 
-    val availableYears = remember(records, currentYear, selectedYear) {
-        val recordYears = records.map {
+    // 只用于界面展示的真实加油记录，排除自动生成的初始记录
+    val realRecords: List<FuelRecord> = remember(records) {
+        records.filterNot { record: FuelRecord ->
+            record.isInitialRecord
+        }
+    }
+
+    val availableYears: List<Int> = remember(realRecords, currentYear, selectedYear) {
+        val recordYears = realRecords.map { record ->
             Calendar.getInstance()
-                .apply { timeInMillis = it.timestamp }
+                .apply { timeInMillis = record.timestamp }
                 .get(Calendar.YEAR)
         }
 
@@ -134,18 +220,18 @@ fun RecordsScreen(
             .sortedDescending()
     }
 
-    val displayRecords = remember(
-        records,
+    val displayRecords: List<FuelRecord> = remember(
+        realRecords,
         filterType,
         selectedYear,
         selectedMonth
     ) {
-        val sorted = records.sortedByDescending { it.timestamp }
-
+        val sorted = realRecords.sortedByDescending { record ->
+            record.timestamp
+        }
         when (filterType) {
             "本月" -> {
                 val cNow = Calendar.getInstance()
-
                 sorted.filter { record ->
                     val c = Calendar.getInstance()
                         .apply { timeInMillis = record.timestamp }
@@ -167,7 +253,6 @@ fun RecordsScreen(
                                     )
                 }
             }
-
             else -> sorted
         }
     }
@@ -203,8 +288,7 @@ fun RecordsScreen(
             item(key = "header_card") {
                 RecordHeaderCard(
                     displayRecords = displayRecords,
-                    vehicle = vehicle,
-                    outlierSensitivity = outlierSensitivity,
+                    averageConsumption = calculationSummary?.averageConsumption,
                     filterType = filterType,
                     selectedYear = selectedYear,
                     selectedMonth = selectedMonth,
@@ -276,8 +360,7 @@ fun RecordsScreen(
 @Composable
 private fun RecordHeaderCard(
     displayRecords: List<FuelRecord>,
-    vehicle: Vehicle?,
-    outlierSensitivity: OutlierSensitivity,
+    averageConsumption: Double?,
     filterType: String,
     selectedYear: Int,
     selectedMonth: Int,
@@ -286,21 +369,7 @@ private fun RecordHeaderCard(
 ) {
     val totalMoney = remember(displayRecords) { displayRecords.sumOf { it.actualPaidAmount } }
     val totalVolume = remember(displayRecords) { displayRecords.sumOf { it.volume } }
-    val averageConsumption = remember(
-        displayRecords,
-        vehicle,
-        outlierSensitivity
-    ) {
-        if (displayRecords.isEmpty()) {
-            null
-        } else {
-            FuelCalculator.calculateSummary(
-                allRecords = displayRecords,
-                vehicle = vehicle,
-                sensitivity = outlierSensitivity
-            ).averageConsumption
-        }
-    }
+
     val customText = remember(selectedYear, selectedMonth) {
         if (selectedMonth == 0) {
             "${selectedYear}年全年 ▼"
