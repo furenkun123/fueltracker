@@ -1,29 +1,25 @@
-<!-- res/drawable/ic_fuel_monochrome.xml -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="22dp"
-    android:height="22dp"
-    android:viewportWidth="512"
-    android:viewportHeight="512">
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
 
     <group
-        android:scaleX="0.58"
-        android:scaleY="0.58"
-        android:translateX="108"
-        android:translateY="108">
+        android:translateX="27.6"
+        android:translateY="27.6"
+        android:scaleX="2.2"
+        android:scaleY="2.2">
 
-    <!-- 默认黑色，背景全透明；镂空部分也是透明的 -->
-    <path
-        android:fillColor="#FFFFF0"
-        android:fillType="evenOdd"
-        android:pathData="
-            M123,446 L123,155 L145,135 L156,135 L156,70 L220,70 L220,135 L298,70 L389,70 L389,446 Z
-            M178,92h22v22h-22z
-            M300,112h67v23h-67z
-            M145,200h222v178h-222z
-            M145,400h222v24h-222z
-            M256,226 C256,226 208,280 208,312 A48,48 0 0,0 304,312 C304,280 256,226 256,226 Z
-            M256,260 C256,260 234,292 234,312 A22,22 0 0,0 278,312 C278,292 256,260 256,260 Z" />
-
+        <path
+            android:fillColor="#FFFFF0"
+            android:fillType="evenOdd"
+            android:pathData="
+                M4.92,22 L4.92,6.52 L6.09,5.45 L6.68,5.45 L6.68,2 L10.08,2 L10.08,5.45 L14.23,2 L19.07,2 L19.07,22 Z
+                M7.85,3.2 h1.5 v1.5 h-1.5 z
+                M14.3,4.2 h3.6 v1.5 h-3.6 z
+                M6.1,8.9 h11.8 v9.5 h-11.8 z
+                M6.1,19.5 h11.8 v1.5 h-11.8 z
+                M12,10.3 C12,10.3 9.5,13.2 9.5,14.9 A2.5,2.5 0 0,0 14.5,14.9 C14.5,13.2 12,10.3 12,10.3 Z
+                M12,12.1 C12,12.1 10.8,13.8 10.8,14.9 A1.2,1.2 0 0,0 13.2,14.9 C13.2,13.8 12,12.1 12,12.1 Z" />
     </group>
-
 </vector>
