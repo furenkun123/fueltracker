@@ -75,7 +75,8 @@ data class StatisticsSummary(
     val outlierCount: Int = 0,
     val hasValidAnchor: Boolean = true,
     val isCalculationValid: Boolean = true,
-    val hasInvalidRecords: Boolean = false
+    val hasInvalidRecords: Boolean = false,
+    val verifiedMergedRecordIds: Set<Long> = emptySet()
 )
 
 // ============================================================
@@ -356,7 +357,8 @@ object FuelCalculator {
             outlierCount = rangeResults.count { it.isOutlier },
             hasValidAnchor = analysis.hasValidAnchor,
             isCalculationValid = isCalculationValid,
-            hasInvalidRecords = hasInvalidRecords
+            hasInvalidRecords = hasInvalidRecords,
+            verifiedMergedRecordIds = analysis.verifiedMergedRecordIds
         )
     }
 
@@ -374,21 +376,8 @@ object FuelCalculator {
 
         val deliveryDate = vehicle?.deliveryDate?.takeIf { it > 0L }
 
-        // 👇 新增：提取有效的初始记录
-        val initialRecord = records.asSequence()
-            .filter { it.isInitialRecord }
-            .filter { deliveryDate == null || it.timestamp >= deliveryDate }
-            .minByOrNull { it.timestamp }
-
-        val tankCapacity = vehicle?.tankCapacity?.takeIf { it.isFinite() && it > 0.0 }
-
-        // 0 km 对全新车辆是合法起点；普通加油记录仍由 validOdometer 单独校验。
-        val initialOdo = initialRecord?.odometer?.takeIf { it.isFinite() && it >= 0.0 }
-        val initialFuelCandidate = initialRecord?.initialFuel?.takeIf { it.isFinite() && it >= 0.0 }
-            ?: initialRecord?.remainingFuel?.takeIf { it.isFinite() && it >= 0.0 }
-        // 防止旧数据中的初始油量超过油箱容量，污染首个计算区间。
-        val initialFuel = initialFuelCandidate?.takeIf {
-            tankCapacity == null || it <= tankCapacity + 1e-6
+        val tankCapacity = vehicle?.tankCapacity?.takeIf {
+            it.isFinite() && it > 0.0
         }
 
         val visibleRecords = records.asSequence()
@@ -420,74 +409,6 @@ object FuelCalculator {
         val usedRecordIds = mutableSetOf<Long>()
         val verifiedMergedRecordIds = mutableSetOf<Long>()
         val state = SegmentState()
-
-        // 👇 新增：计算“初始记录 -> 第一条满箱”的初始区间
-        if (initialRecord != null && initialOdo != null && initialFuel != null && tankCapacity != null) {
-            val anchorRecord = visibleRecords[firstAnchor.index]
-            val anchorTime = anchorRecord.timestamp
-            val startTime = initialRecord.timestamp
-
-            if (initialOdo < firstAnchor.odometer && startTime < anchorTime) {
-                var intermediateFuel = initialFuel
-                var hasInvalid = false
-
-                // 累加这期间所有的加油量
-                for ((_, _, timestamp, _, _, volume, _, _, _, _, _, _, _, _, hasMissedRecord) in visibleRecords) {
-                    if (timestamp <= startTime) continue
-                    if (timestamp >= anchorTime) break
-
-                    // 如果中途有漏记，说明数据不完整，初始区间无法准确计算
-                    if (hasMissedRecord) {
-                        hasInvalid = true
-                        break
-                    }
-
-                    if (volume.isFinite() && volume > 0.0) {
-                        intermediateFuel += volume
-                        if (!intermediateFuel.isFinite()) {
-                            hasInvalid = true
-                            break
-                        }
-                    }
-                }
-
-                if (!hasInvalid) {
-                    // 初始区间耗油量 = 初始油量 + 期间加油量 - 满箱容量
-                    val fuelUsed = intermediateFuel - tankCapacity
-                    val distance = firstAnchor.odometer - initialOdo
-
-                    if (fuelUsed.isFinite() && fuelUsed > 0.0 && distance.isFinite() && distance > 0.0) {
-                        val consumption = fuelUsed / distance * 100.0
-                        // 如果算出的油耗在合理范围内，则采纳
-                        if (consumption.isFinite() && consumption in MIN_HARD_CONSUMPTION..MAX_HARD_CONSUMPTION) {
-                            val quality = IntervalQuality(
-                                startOdometerEstimated = false,
-                                intervalRecordCount = visibleRecords.count { it.timestamp in startTime..anchorTime } + 1,
-                                confidenceScore = 0.80, // 初始区间由于精度问题，给个中等置信度
-                                confidence = IntervalConfidence.MEDIUM
-                            )
-                            results.add(
-                                ConsumptionResult(
-                                    recordId = anchorRecord.id, // 结果挂在第一个满箱记录上
-                                    startOdometer = initialOdo,
-                                    endOdometer = firstAnchor.odometer,
-                                    distance = distance,
-                                    fuelUsed = fuelUsed,
-                                    consumption = consumption,
-                                    isEstimated = true,
-                                    algorithm = "INITIAL_TO_FULL",
-                                    quality = quality,
-                                    startTimestamp = startTime,
-                                    endTimestamp = anchorTime
-                                )
-                            )
-                            // 标记该满箱记录已被使用，防止后续重复计算或进入 pending
-                            usedRecordIds.add(anchorRecord.id)
-                        }
-                    }
-                }
-            }
-        }
 
         var segmentStartOdometer = firstAnchor.odometer
         var segmentStartEstimated = false
@@ -1140,9 +1061,14 @@ object FuelCalculator {
         return jump / elapsedHours > ODOMETER_JUMP_SUSPICIOUS_SPEED
     }
 
-    private fun isFuelVisible(record: FuelRecord, deliveryDate: Long?): Boolean {
+    private fun isFuelVisible(
+        record: FuelRecord,
+        deliveryDate: Long?
+    ): Boolean {
         if (record.isInitialRecord) return false
-        if (deliveryDate != null && record.timestamp < deliveryDate) return false
+        if (deliveryDate != null && record.timestamp < deliveryDate) {
+            return false
+        }
         return true
     }
 
