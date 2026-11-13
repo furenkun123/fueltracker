@@ -66,6 +66,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+import androidx.compose.runtime.saveable.rememberSaveable
 
 private fun String.toValidDouble(allowZero: Boolean = false): Double? {
     val v = toDoubleOrNull() ?: return null
@@ -109,42 +110,96 @@ fun FuelScreen(
         baseList
     }
 
-    var fuelGrade by remember(defaultFuelGrade) { mutableStateOf(defaultFuelGrade) }
-    var showFuelGradePicker by remember { mutableStateOf(false) }
-    var timestamp by remember(record) {
-        mutableLongStateOf(record?.timestamp?.takeIf { it > 0 } ?: System.currentTimeMillis())
-    }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showFuelGradePicker by remember { mutableStateOf(false) }
+    var fuelGrade by rememberSaveable(record?.id, defaultFuelGrade) {
+        mutableStateOf(defaultFuelGrade)
+    }
 
-    // 表单状态
-    var odometer by remember(record) { mutableStateOf(record?.odometer?.toString() ?: "") }
-    var volume by remember(record) { mutableStateOf(record?.volume?.toString() ?: "") }
-    var unitPrice by remember(record) { mutableStateOf(record?.unitPrice?.toString() ?: "") }
-    var totalAmount by remember(record) { mutableStateOf(record?.totalAmount?.toString() ?: "") }
-    var discount by remember(record) { mutableStateOf(record?.discount?.toString() ?: "") }
-    var amount by remember(record) { mutableStateOf(record?.actualPaidAmount?.toString() ?: "") }
-    var remainingFuel by remember(record) {
+    var timestamp by rememberSaveable(record?.id) {
+        mutableLongStateOf(
+            record?.timestamp?.takeIf { it > 0 }
+                ?: System.currentTimeMillis()
+        )
+    }
+
+// 表单状态
+    var odometer by rememberSaveable(record?.id) {
+        mutableStateOf(record?.odometer?.toString() ?: "")
+    }
+    var volume by rememberSaveable(record?.id) {
+        mutableStateOf(record?.volume?.toString() ?: "")
+    }
+    var unitPrice by rememberSaveable(record?.id) {
+        mutableStateOf(record?.unitPrice?.toString() ?: "")
+    }
+    var totalAmount by rememberSaveable(record?.id) {
+        mutableStateOf(record?.totalAmount?.toString() ?: "")
+    }
+    var discount by rememberSaveable(record?.id) {
+        mutableStateOf(record?.discount?.toString() ?: "")
+    }
+    var amount by rememberSaveable(record?.id) {
+        mutableStateOf(record?.actualPaidAmount?.toString() ?: "")
+    }
+    var remainingFuel by rememberSaveable(record?.id) {
         mutableStateOf(record?.remainingFuel?.toString() ?: "")
     }
-    var isFull by remember(record) { mutableStateOf(record?.isFull ?: false) }
-    var hasMissedRecord by remember(record) { mutableStateOf(record?.hasMissedRecord ?: false) }
-    var missedOdometer by remember(record) {
+    var isFull by rememberSaveable(record?.id) {
+        mutableStateOf(record?.isFull ?: false)
+    }
+    var hasMissedRecord by rememberSaveable(record?.id) {
+        mutableStateOf(record?.hasMissedRecord ?: false)
+    }
+    var missedOdometer by rememberSaveable(record?.id) {
         mutableStateOf(record?.missedOdometer?.toString() ?: "")
     }
-    var missedVolume by remember(record) { mutableStateOf(record?.missedVolume?.toString() ?: "") }
-    var note by remember(record) { mutableStateOf(record?.note ?: "") }
+    var missedVolume by rememberSaveable(record?.id) {
+        mutableStateOf(record?.missedVolume?.toString() ?: "")
+    }
+    var note by rememberSaveable(record?.id) {
+        mutableStateOf(record?.note ?: "")
+    }
     var isSaving by remember { mutableStateOf(false) }
 
-    var remainingFuelUsePercent by remember { mutableStateOf(false) }
+// 剩余油量单位选择也需要保留
+    var remainingFuelUsePercent by rememberSaveable(record?.id) {
+        mutableStateOf(false)
+    }
+    // 记录上一次确认的车辆 ID，旋转屏幕后也要保留
+    var lastVehicleId by rememberSaveable(record?.id) {
+        mutableStateOf<Long?>(null)
+    }
 
     LaunchedEffect(currentVehicle?.id) {
-        if (!isEditMode) {
-            odometer = ""; volume = ""; unitPrice = ""; totalAmount = ""
-            discount = ""; amount = ""; remainingFuel = ""; isFull = false
-            hasMissedRecord = false; missedOdometer = ""; missedVolume = ""; note = ""
+        val newVehicleId = currentVehicle?.id ?: return@LaunchedEffect
+
+        // 首次加载车辆时只记录 ID，不清空表单
+        if (lastVehicleId == null) {
+            lastVehicleId = newVehicleId
+            return@LaunchedEffect
+        }
+
+        // 只有真正切换了车辆，才清空新建记录表单
+        if (lastVehicleId != newVehicleId && !isEditMode) {
+            odometer = ""
+            volume = ""
+            unitPrice = ""
+            totalAmount = ""
+            discount = ""
+            amount = ""
+            remainingFuel = ""
+            isFull = false
+            hasMissedRecord = false
+            missedOdometer = ""
+            missedVolume = ""
+            note = ""
             remainingFuelUsePercent = false
         }
+
+        lastVehicleId = newVehicleId
     }
+
 
     // 解析数值
     val volumeValue by remember(volume) { derivedStateOf { volume.toValidDouble() } }
