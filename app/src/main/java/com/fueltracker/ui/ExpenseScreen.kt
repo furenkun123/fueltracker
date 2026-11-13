@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -188,12 +189,12 @@ fun ExpenseScreen(
         viewModel.getPageScrollPosition(scrollKey)
     }
 
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = savedScroll.first,
-        initialFirstVisibleItemScrollOffset = savedScroll.second
-    )
-
-
+    val listState = key(scrollKey) {
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = savedScroll.first,
+            initialFirstVisibleItemScrollOffset = savedScroll.second
+        )
+    }
 
     LaunchedEffect(listState, scrollKey) {
         androidx.compose.runtime.snapshotFlow {

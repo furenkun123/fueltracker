@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -204,10 +205,12 @@ fun HomeScreen(
         viewModel.getPageScrollPosition(scrollKey)
     }
 
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = savedScroll.first,
-        initialFirstVisibleItemScrollOffset = savedScroll.second
-    )
+    val listState = key(scrollKey) {
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = savedScroll.first,
+            initialFirstVisibleItemScrollOffset = savedScroll.second
+        )
+    }
 
     LaunchedEffect(listState, scrollKey) {
         androidx.compose.runtime.snapshotFlow {
