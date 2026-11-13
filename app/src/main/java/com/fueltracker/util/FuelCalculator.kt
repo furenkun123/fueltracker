@@ -49,6 +49,7 @@ data class IntervalQuality(
     val suspiciousOdometerJumpCount: Int = 0,
     val hardBoundaryEventCount: Int = 0,
     val hasUnresolvedFuelGap: Boolean = false,
+    val hasEstimatedFuelLevel: Boolean = false,
     val confidenceScore: Double = 1.0,
     val confidence: IntervalConfidence = IntervalConfidence.HIGH,
     val exclusionReason: String? = null
@@ -98,6 +99,7 @@ object FuelCalculator {
     private const val MIN_MAD_SAMPLE_COUNT = 5
     private const val MAD_CONSISTENCY_FACTOR = 1.4826
     private const val GLOBAL_MAD_SAMPLE_THRESHOLD = 15
+    private const val PENALTY_ESTIMATED_FUEL_LEVEL = 0.30
 
     // 剩余油量相关阈值
     private const val REMAINING_FUEL_CONSISTENCY_LOW = 0.90
@@ -169,7 +171,11 @@ object FuelCalculator {
         val verifiedMergedRecordIds: Set<Long> = emptySet()
     )
 
-    private data class AnchorInfo(val index: Int, val odometer: Double)
+    private data class AnchorInfo(
+        val index: Int,
+        val odometer: Double,
+        val initialFuel: Double? = null
+    )
     private data class WeightedValue(val value: Double, val weight: Double)
     private data class RobustBounds(val median: Double, val mad: Double, val lower: Double, val upper: Double)
 
@@ -288,7 +294,10 @@ object FuelCalculator {
             (startTime == null || timestamp >= startTime) &&
                     (endTime == null || timestamp <= endTime)
 
-        val periodRecords = visible.filter { inPeriod(it.timestamp) }
+        // 初始记录参与油耗分析，但不计入普通加油统计
+        val periodRecords = visible.filter {
+            !it.isInitialRecord && inPeriod(it.timestamp)
+        }
         val rangeResults = analysis.results.filter { inPeriod(it.endTimestamp) }
 
         val pendingRecords = periodRecords
@@ -449,7 +458,9 @@ object FuelCalculator {
         }
 
         val rejectedCount = analysis.rejected.keys.count { index ->
-            index in visible.indices && inPeriod(visible[index].timestamp)
+            index in visible.indices &&
+                    !visible[index].isInitialRecord &&
+                    inPeriod(visible[index].timestamp)
         }
 
         val anchorIndex = analysis.openAnchorIndex
@@ -524,13 +535,22 @@ object FuelCalculator {
             if (validOdometer(visibleRecords[i]) != null) nextIndex = i
         }
 
-        // 只有真实加油记录中的有效里程才能作为加油锚点；初始化里程只用于计算起始区间。
+        // 第一个有效起点可以是真实满箱记录，也可以是车辆初始记录。
         val firstAnchor = findFirstAnchor(
             visibleRecords, nextValidIndex, tankCapacity
         ) ?: run {
             val rejected = HashMap<Int, String>()
-            visibleRecords.forEachIndexed { index, record -> if (record.isFull) rejected[index] = REASON_NO_ANCHOR }
-            return Analysis(visibleRecords, emptyList(), rejected, emptySet(), null, false)
+            visibleRecords.forEachIndexed { index, record ->
+                if (record.isFull) rejected[index] = REASON_NO_ANCHOR
+            }
+            return Analysis(
+                visibleRecords,
+                emptyList(),
+                rejected,
+                emptySet(),
+                null,
+                false
+            )
         }
 
         val results = ArrayList<ConsumptionResult>()
@@ -546,26 +566,129 @@ object FuelCalculator {
         var lastReliableOdometer = segmentStartOdometer
         var lastReliableTimestamp = segmentStartTimestamp
 
+// null 表示真实满箱起点；非 null 表示初始油量估算起点。
+        var segmentStartFuelLevel: Double? = firstAnchor.initialFuel
+
         usedRecordIds.add(visibleRecords[firstAnchor.index].id)
         state.resetForStartRecord()
-        state.recordAnchorBaselineFlags(visibleRecords[firstAnchor.index], tankCapacity)
 
-        fun reanchor(index: Int, record: FuelRecord, odometer: Double) {
+        if (segmentStartFuelLevel != null) {
+            state.markEstimatedFuelLevel()
+        } else {
+            state.recordAnchorBaselineFlags(
+                visibleRecords[firstAnchor.index],
+                tankCapacity
+            )
+        }
+
+        fun reanchor(
+            index: Int,
+            record: FuelRecord,
+            odometer: Double,
+            initialFuelLevel: Double? = null
+        ) {
             segmentStartOdometer = odometer
             segmentStartEstimated = false
             segmentStartTimestamp = record.timestamp
             segmentStartIndex = index
             lastReliableOdometer = odometer
             lastReliableTimestamp = record.timestamp
+
+            segmentStartFuelLevel = initialFuelLevel
+
             usedRecordIds.add(record.id)
             state.resetForStartRecord()
-            state.recordAnchorBaselineFlags(record, tankCapacity)
+
+            if (initialFuelLevel != null) {
+                state.markEstimatedFuelLevel()
+            } else {
+                state.recordAnchorBaselineFlags(record, tankCapacity)
+            }
         }
 
         for (index in (firstAnchor.index + 1) until visibleRecords.size) {
             val record = visibleRecords[index]
             val currentOdometer = validOdometer(record)
             val odoClass = classifyOdometer(visibleRecords, index, nextValidIndex, currentOdometer, segmentStartOdometer, lastReliableOdometer, lastReliableTimestamp, record, tankCapacity)
+            // =====================================================
+// 初始记录：作为油量估算边界，不作为满箱锚点
+// =====================================================
+            if (record.isInitialRecord) {
+                val endFuelLevel = validInitialFuel(record, tankCapacity)
+
+                // 初始油量或里程无效时，不用这条记录改变计算状态
+                if (endFuelLevel == null || currentOdometer == null) {
+                    continue
+                }
+
+                val startFuelLevel = segmentStartFuelLevel ?: tankCapacity
+                val distance = currentOdometer - segmentStartOdometer
+
+                // 起点油量 + 区间加油量 - 初始记录时的油量
+                val fuelUsed = startFuelLevel
+                    ?.plus(state.pendingFuel)
+                    ?.minus(endFuelLevel)
+                    ?: Double.NaN
+
+                val consumption = calculateConsumption(fuelUsed, distance)
+
+                val odometerAccepted =
+                    odoClass == OdoClass.ACCEPT ||
+                            odoClass == OdoClass.SMALL_DIP
+
+                if (
+                    odometerAccepted &&
+                    !state.hasFuelOverflow &&
+                    distance.isFinite() &&
+                    distance > 0.0 &&
+                    consumption.isFinite() &&
+                    consumption in MIN_HARD_CONSUMPTION..MAX_HARD_CONSUMPTION
+                ) {
+                    // 终点是初始油量估算值，不能获得最高可信度
+                    state.markEstimatedFuelLevel()
+
+                    val quality = buildQuality(
+                        state,
+                        segmentStartEstimated,
+                        distance,
+                        tankCapacity,
+                        vehicle?.fuelType,
+                        consumption
+                    )
+
+                    results.add(
+                        ConsumptionResult(
+                            recordId = record.id,
+                            startOdometer = segmentStartOdometer,
+                            endOdometer = currentOdometer,
+                            distance = distance,
+                            fuelUsed = fuelUsed,
+                            consumption = consumption,
+                            isEstimated = true,
+                            algorithm = "INITIAL_FUEL_ESTIMATE",
+                            quality = quality,
+                            startTimestamp = segmentStartTimestamp,
+                            endTimestamp = record.timestamp
+                        )
+                    )
+                } else {
+                    rejected[index] = if (odometerAccepted) {
+                        REASON_HARD_BOUNDARY
+                    } else {
+                        REASON_ODOMETER_ANOMALY
+                    }
+                }
+
+                // 初始记录重新建立估算起点，不把它当成满箱记录
+                reanchor(
+                    index = index,
+                    record = record,
+                    odometer = currentOdometer,
+                    initialFuelLevel = endFuelLevel
+                )
+
+                continue
+            }
 
             if (odoClass == OdoClass.BELOW_START_REANCHOR && currentOdometer != null && isSuitableAsAnchor(record, tankCapacity)) {
                 reanchor(index, record, currentOdometer)
@@ -591,7 +714,17 @@ object FuelCalculator {
                 !isRemainingFuelSeverelyInconsistent(record, tankCapacity)
             ) {
                 val distance = currentOdometer - segmentStartOdometer
-                val totalFuel = state.pendingFuel + record.volume
+
+                val startFuelLevelSnapshot = segmentStartFuelLevel
+
+                val totalFuel = if (startFuelLevelSnapshot != null) {
+                    startFuelLevelSnapshot +
+                            state.pendingFuel +
+                            record.volume -
+                            (tankCapacity ?: Double.NaN)
+                } else {
+                    state.pendingFuel + record.volume
+                }
 
                 val candidateConsumption = calculateConsumption(totalFuel, distance)
 
@@ -690,7 +823,17 @@ object FuelCalculator {
                 continue
             }
 
-            val fuelUsed = state.pendingFuel
+            // 满箱起点：累计加油量就是消耗量。
+            // 初始油量起点：初始油量 + 累计加油量 - 油箱容量。
+            val startFuelLevelSnapshot = segmentStartFuelLevel
+
+            val fuelUsed = if (startFuelLevelSnapshot != null) {
+                startFuelLevelSnapshot +
+                        state.pendingFuel -
+                        (tankCapacity ?: Double.NaN)
+            } else {
+                state.pendingFuel
+            }
             val consumption = calculateConsumption(fuelUsed, distance)
             if (!consumption.isFinite() || consumption < MIN_HARD_CONSUMPTION || consumption > MAX_HARD_CONSUMPTION) {
                 state.markHardBoundaryEvent()
@@ -706,6 +849,11 @@ object FuelCalculator {
                     recordId = record.id, startOdometer = segmentStartOdometer, endOdometer = currentOdometer,
                     distance = distance, fuelUsed = fuelUsed, consumption = consumption,
                     isEstimated = quality.confidence != IntervalConfidence.HIGH, quality = quality,
+                    algorithm = if (state.hasEstimatedFuelLevel) {
+                        "INITIAL_FUEL_ESTIMATE"
+                    } else {
+                        "FULL_TO_FULL"
+                    },
                     startTimestamp = segmentStartTimestamp, endTimestamp = record.timestamp
                 )
             )
@@ -746,6 +894,8 @@ object FuelCalculator {
         var suspiciousOdometerJumpCount: Int = 0; private set
         var hardBoundaryEventCount: Int = 0; private set
         var hasUnresolvedFuelGap: Boolean = false; private set
+        var hasEstimatedFuelLevel: Boolean = false
+            private set
 
         fun resetForStartRecord() {
             pendingFuel = 0.0
@@ -766,6 +916,10 @@ object FuelCalculator {
             suspiciousOdometerJumpCount = 0
             hardBoundaryEventCount = 0
             hasUnresolvedFuelGap = false
+            hasEstimatedFuelLevel = false
+        }
+        fun markEstimatedFuelLevel() {
+            hasEstimatedFuelLevel = true
         }
 
         fun recordAnchorBaselineFlags(record: FuelRecord, tankCapacity: Double?) {
@@ -857,6 +1011,9 @@ object FuelCalculator {
     ): IntervalQuality {
         var penalty = 0.0
         if (startOdometerEstimated) penalty += PENALTY_ESTIMATED_START
+        if (state.hasEstimatedFuelLevel) {
+            penalty += PENALTY_ESTIMATED_FUEL_LEVEL
+        }
         penalty += min(PENALTY_MISSING_ODOMETER_CAP, PENALTY_MISSING_ODOMETER_PER * state.missingOdometerCount)
 
         val missingFuelPenalty = PENALTY_MISSED_FUEL_UNRECORDED_PER * state.missedFuelUnrecordedCount
@@ -905,6 +1062,7 @@ object FuelCalculator {
         }
 
         return IntervalQuality(
+            hasEstimatedFuelLevel = state.hasEstimatedFuelLevel,
             startOdometerEstimated = startOdometerEstimated,
             missingOdometerCount = state.missingOdometerCount,
             missedFuelUnrecordedCount = state.missedFuelUnrecordedCount,
@@ -972,21 +1130,61 @@ object FuelCalculator {
 
     private fun closer(value: Double, a: Double, b: Double): Boolean = abs(value - a) + ODOMETER_MATCH_TOLERANCE < abs(value - b)
 
+    private fun validInitialFuel(
+        record: FuelRecord,
+        tankCapacity: Double?
+    ): Double? {
+        if (!record.isInitialRecord) return null
+
+        val capacity = tankCapacity
+            ?.takeIf { it.isFinite() && it > 0.0 }
+            ?: return null
+
+        val fuel = record.initialFuel ?: return null
+
+        return fuel.takeIf {
+            it.isFinite() && it >= 0.0 && it <= capacity
+        }
+    }
     private fun findFirstAnchor(
         records: List<FuelRecord>,
         nextValidIndexArray: IntArray,
         tankCapacity: Double?
     ): AnchorInfo? {
+
         for (index in records.indices) {
             val record = records[index]
+
+            // 初始记录可以成为估算起点，但必须有有效里程和初始油量
+            if (record.isInitialRecord) {
+                val odometer = validOdometer(record) ?: continue
+                val initialFuel = validInitialFuel(record, tankCapacity) ?: continue
+
+                return AnchorInfo(
+                    index = index,
+                    odometer = odometer,
+                    initialFuel = initialFuel
+                )
+            }
+
+            // 真实满箱记录仍然是优先级相同的可靠锚点。
             if (!isSuitableAsAnchor(record, tankCapacity)) continue
 
-            // 不能把车辆初始化时的里程冒充为某条缺少里程的加油记录里程。
             val odometer = validOdometer(record) ?: continue
-            if (isIsolatedHighValue(records, nextValidIndexArray, index, odometer)) continue
+
+            if (isIsolatedHighValue(
+                    records,
+                    nextValidIndexArray,
+                    index,
+                    odometer
+                )
+            ) {
+                continue
+            }
 
             return AnchorInfo(index, odometer)
         }
+
         return null
     }
 
@@ -1194,11 +1392,10 @@ object FuelCalculator {
         record: FuelRecord,
         deliveryDate: Long?
     ): Boolean {
-        if (record.isInitialRecord) return false
-        if (deliveryDate != null && record.timestamp < deliveryDate) {
-            return false
-        }
-        return true
+        // 初始记录是当前车辆状态快照，不受提车日期过滤
+        return !(!record.isInitialRecord &&
+                deliveryDate != null &&
+                record.timestamp < deliveryDate)
     }
 
     private fun validOdometer(record: FuelRecord): Double? {

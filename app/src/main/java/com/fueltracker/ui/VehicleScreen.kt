@@ -538,17 +538,23 @@ private fun MiuixFuelInputListItem(
     onUnitToggle: () -> Unit,
     placeholder: String
 ) {
+    // 根据输入内容动态调整宽度，让单位始终紧跟数字
+    val inputWidth = (
+            (value.length.coerceAtLeast(2) * 9) + 20
+            ).coerceAtLeast(50).dp
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp), // 👈 高度与 MiuixInputItem 统一
+            .height(56.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         MiuixFieldLabel(
             text = title,
-            modifier = Modifier.width(110.dp) // 👈 复用公共标签，统一宽度
+            modifier = Modifier.width(110.dp)
         )
 
+        // 纯数字输入框
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
@@ -557,14 +563,18 @@ private fun MiuixFuelInputListItem(
                 color = MiuixTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Start
             ),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Decimal
+            ),
             modifier = Modifier
-                .weight(1f)
-                .height(56.dp)
-                .padding(start = 12.dp),
+                .width(inputWidth)
+                .height(56.dp),
             singleLine = true,
             decorationBox = { innerTextField ->
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.CenterStart
+                ) {
                     if (value.isEmpty()) {
                         Text(
                             text = placeholder,
@@ -574,34 +584,40 @@ private fun MiuixFuelInputListItem(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+
                     innerTextField()
                 }
             }
         )
 
-        // 切换小按钮
+        // 固定后缀：不属于输入框内容
+        Text(
+            text = unit,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+            modifier = Modifier.padding(start = 2.dp)
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // 单位切换按钮
         Row(
             modifier = Modifier
                 .padding(start = 8.dp, end = 16.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                .background(
+                    MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+                )
                 .clickable(onClick = onUnitToggle)
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Rounded.SwapHoriz,
-                contentDescription = "切换单位",
-                modifier = Modifier.size(14.dp),
+                contentDescription = "切换油量单位",
+                modifier = Modifier.size(16.dp),
                 tint = MiuixTheme.colorScheme.onSurfaceSecondary
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = if (unit == "L") "%" else "L",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                maxLines = 1
             )
         }
     }
