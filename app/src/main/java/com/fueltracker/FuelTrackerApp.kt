@@ -386,13 +386,11 @@ fun FuelTrackerApp(
                             0 -> { // 首页
                                 val vehicle by viewModel.currentVehicle.collectAsState()
                                 val records by viewModel.records.collectAsState()
-                                val latest by viewModel.latestConsumption.collectAsState()
 
                                 HomeScreen(
                                     viewModel = viewModel,
                                     vehicle = vehicle,
                                     records = records,
-                                    latestConsumption = latest,
                                     activeParking = activeParking,
                                     onAddVehicle = { viewModel.navigateToAddVehicle(HOME) },
                                     onAddFuel = { viewModel.navigateTo(ADD_FUEL) },

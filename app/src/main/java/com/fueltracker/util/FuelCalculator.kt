@@ -227,22 +227,79 @@ object FuelCalculator {
         sensitivity: OutlierSensitivity = OutlierSensitivityPreferences.mode
     ): StatisticsSummary {
         val analysis = analyze(allRecords, vehicle, sensitivity)
+
+        return calculateSummaryFromAnalysis(
+            analysis = analysis,
+            vehicle = vehicle,
+            startTime = startTime,
+            endTime = endTime
+        )
+    }
+
+    /**
+     * 一次分析，同时生成指定时间范围和完整历史的统计结果。
+     * 避免首页统计卡片与趋势图分别执行完整油耗分析。
+     */
+    fun calculateSummaryPair(
+        allRecords: List<FuelRecord>,
+        vehicle: Vehicle? = null,
+        startTime: Long? = null,
+        endTime: Long? = null,
+        sensitivity: OutlierSensitivity = OutlierSensitivityPreferences.mode
+    ): Pair<StatisticsSummary, StatisticsSummary> {
+
+        // 整份记录只执行一次完整算法分析
+        val analysis = analyze(allRecords, vehicle, sensitivity)
+
+        // 第一份：当前筛选时间范围的统计
+        val periodSummary = calculateSummaryFromAnalysis(
+            analysis = analysis,
+            vehicle = vehicle,
+            startTime = startTime,
+            endTime = endTime
+        )
+
+        // 第二份：完整历史统计，供趋势图和当前油耗使用
+        val fullSummary = calculateSummaryFromAnalysis(
+            analysis = analysis,
+            vehicle = vehicle,
+            startTime = null,
+            endTime = null
+        )
+
+        return periodSummary to fullSummary
+    }
+
+    /**
+     * 根据已经完成的算法分析生成统计数据。
+     * 这里不再重复执行 analyze()。
+     */
+    private fun calculateSummaryFromAnalysis(
+        analysis: Analysis,
+        vehicle: Vehicle?,
+        startTime: Long?,
+        endTime: Long?
+    ): StatisticsSummary {
+
         val visible = analysis.visible
         val tankCapacity = vehicle?.tankCapacity?.takeIf { it.isFinite() && it > 0.0 }
 
         fun inPeriod(timestamp: Long): Boolean =
-            (startTime == null || timestamp >= startTime) && (endTime == null || timestamp <= endTime)
+            (startTime == null || timestamp >= startTime) &&
+                    (endTime == null || timestamp <= endTime)
 
         val periodRecords = visible.filter { inPeriod(it.timestamp) }
         val rangeResults = analysis.results.filter { inPeriod(it.endTimestamp) }
 
-        //移除 id == 0 的误判
         val pendingRecords = periodRecords
             .filter { it.id !in analysis.usedRecordIds }
             .sortedByDescending { it.timestamp }
 
-        val missingOdometerCount = periodRecords.count { validOdometer(it) == null }
-        val totalCount = periodRecords.count { isValidVolume(it.volume, tankCapacity) }
+        val missingOdometerCount =
+            periodRecords.count { validOdometer(it) == null }
+
+        val totalCount =
+            periodRecords.count { isValidVolume(it.volume, tankCapacity) }
 
         var isCalculationValid = true
         var hasInvalidRecords = false
@@ -252,11 +309,14 @@ object FuelCalculator {
                 isCalculationValid = false
                 return a
             }
+
             val sum = a + b
+
             if (!sum.isFinite()) {
                 isCalculationValid = false
                 return a
             }
+
             return sum
         }
 
@@ -271,18 +331,47 @@ object FuelCalculator {
             val volumeValid = isValidVolume(rawVolume, tankCapacity)
 
             val rawMissedVolume = safeMissedVolume(record)
-            val missedVolumeValid = !record.hasMissedRecord || isValidVolume(rawMissedVolume, tankCapacity)
+            val missedVolumeValid =
+                !record.hasMissedRecord ||
+                        isValidVolume(rawMissedVolume, tankCapacity)
+
             val costValid = isValidMoney(record.actualPaidAmount)
-            val unitPriceValid = isValidMoney(record.unitPrice) && (record.isInitialRecord || record.unitPrice > 0)
-            val totalAmountValid = record.totalAmount == null || isValidMoney(record.totalAmount)
-            val discountValid = record.discount == null || isValidMoney(record.discount)
 
-            //完善所有关键字段的有效性检查
-            val odometerValid = record.odometer == null || (record.odometer.isFinite() && record.odometer > 0.0)
-            val remainingValid = record.remainingFuel == null || (record.remainingFuel.isFinite() && record.remainingFuel >= 0.0)
-            val missedOdoValid = !record.hasMissedRecord || (record.missedOdometer != null && record.missedOdometer.isFinite() && record.missedOdometer > 0.0)
+            val unitPriceValid =
+                isValidMoney(record.unitPrice) &&
+                        (record.isInitialRecord || record.unitPrice > 0)
 
-            if (!volumeValid || !missedVolumeValid || !costValid || !odometerValid || !remainingValid || !missedOdoValid || !unitPriceValid || !totalAmountValid || !discountValid) {
+            val totalAmountValid =
+                record.totalAmount == null || isValidMoney(record.totalAmount)
+
+            val discountValid =
+                record.discount == null || isValidMoney(record.discount)
+
+            val odometerValid =
+                record.odometer == null ||
+                        (record.odometer.isFinite() && record.odometer > 0.0)
+
+            val remainingValid =
+                record.remainingFuel == null ||
+                        (record.remainingFuel.isFinite() && record.remainingFuel >= 0.0)
+
+            val missedOdoValid =
+                !record.hasMissedRecord ||
+                        (record.missedOdometer != null &&
+                                record.missedOdometer.isFinite() &&
+                                record.missedOdometer > 0.0)
+
+            if (
+                !volumeValid ||
+                !missedVolumeValid ||
+                !costValid ||
+                !odometerValid ||
+                !remainingValid ||
+                !missedOdoValid ||
+                !unitPriceValid ||
+                !totalAmountValid ||
+                !discountValid
+            ) {
                 hasInvalidRecords = true
             }
 
@@ -301,18 +390,26 @@ object FuelCalculator {
         }
 
         var averagePrice: Double? = null
+
         if (pricedVolume > 0.0) {
             val price = pricedCost / pricedVolume
-            if (price.isFinite()) averagePrice = price else isCalculationValid = false
+
+            if (price.isFinite()) {
+                averagePrice = price
+            } else {
+                isCalculationValid = false
+            }
         }
 
         var totalDistance = 0.0
         var totalFuel = 0.0
         var physicalDistance = 0.0
         var physicalFuel = 0.0
+
         for (result in rangeResults) {
             totalDistance = safeAdd(totalDistance, result.distance)
             totalFuel = safeAdd(totalFuel, result.fuelUsed)
+
             if (isPhysicallyUsable(result)) {
                 physicalDistance = safeAdd(physicalDistance, result.distance)
                 physicalFuel = safeAdd(physicalFuel, result.fuelUsed)
@@ -320,21 +417,54 @@ object FuelCalculator {
         }
 
         var averageConsumption: Double? = null
+
         if (physicalDistance > 0.0) {
             val value = physicalFuel / physicalDistance * 100.0
-            if (value.isFinite()) averageConsumption = value else isCalculationValid = false
+
+            if (value.isFinite()) {
+                averageConsumption = value
+            } else {
+                isCalculationValid = false
+            }
         }
 
         val reliableResults = rangeResults.filter(::isReliable)
-        val robust = robustWeightedConsumption(reliableResults) { isCalculationValid = false }
-        val weightedMean = weightedArithmeticMean(reliableResults) { isCalculationValid = false }
-        val odometerSpanText = if (rangeResults.isNotEmpty()) {
-            "%.0f - %.0f km".format(Locale.US, rangeResults.minOf { it.startOdometer }, rangeResults.maxOf { it.endOdometer })
-        } else "--"
 
-        val rejectedCount = analysis.rejected.keys.count { index -> index in visible.indices && inPeriod(visible[index].timestamp) }
+        val robust = robustWeightedConsumption(reliableResults) {
+            isCalculationValid = false
+        }
+
+        val weightedMean = weightedArithmeticMean(reliableResults) {
+            isCalculationValid = false
+        }
+
+        val odometerSpanText = if (rangeResults.isNotEmpty()) {
+            "%.0f - %.0f km".format(
+                Locale.US,
+                rangeResults.minOf { it.startOdometer },
+                rangeResults.maxOf { it.endOdometer }
+            )
+        } else {
+            "--"
+        }
+
+        val rejectedCount = analysis.rejected.keys.count { index ->
+            index in visible.indices && inPeriod(visible[index].timestamp)
+        }
+
         val anchorIndex = analysis.openAnchorIndex
-        val unclosedCount = if (analysis.hasValidAnchor && anchorIndex != null && anchorIndex < visible.lastIndex && inPeriod(visible[anchorIndex].timestamp)) 1 else 0
+
+        val unclosedCount =
+            if (
+                analysis.hasValidAnchor &&
+                anchorIndex != null &&
+                anchorIndex < visible.lastIndex &&
+                inPeriod(visible[anchorIndex].timestamp)
+            ) {
+                1
+            } else {
+                0
+            }
 
         return StatisticsSummary(
             totalCount = totalCount,
@@ -361,7 +491,6 @@ object FuelCalculator {
             verifiedMergedRecordIds = analysis.verifiedMergedRecordIds
         )
     }
-
 
     // --------------------------------------------------------
     // 主算法

@@ -22,7 +22,6 @@ import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
 import com.fueltracker.util.BackupManager
 import com.fueltracker.util.ExpenseRange
-import com.fueltracker.util.FuelCalculator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,7 +33,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -360,16 +358,6 @@ class MainViewModel(
                 SharingStarted.WhileSubscribed(STOP_TIMEOUT),
                 ParkingNotificationState.NotReady
             )
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val latestConsumption: StateFlow<Double?> = currentVehicle
-        .flatMapLatest { vehicle ->
-            if (vehicle == null) flowOf(null)
-            else fuelDao.observeRecords(vehicle.id).map { list ->
-                FuelCalculator.latestReliableConsumption(records = list, vehicle = vehicle)
-            }
-        }.flowOn(Dispatchers.Default)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), null)
 
     // =========================================================
     // 核心数据校验 (业务规则闭环)

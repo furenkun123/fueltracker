@@ -93,7 +93,6 @@ fun HomeScreen(
     viewModel: MainViewModel,
     vehicle: Vehicle?,
     records: List<FuelRecord>,
-    latestConsumption: Double? = null,
     activeParking: ExpenseRecord? = null,
     onAddVehicle: () -> Unit,
     onAddFuel: () -> Unit,
@@ -107,7 +106,7 @@ fun HomeScreen(
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
 
-// 当前异常识别模式
+    // 当前异常识别模式
     val outlierSensitivity = OutlierSensitivityPreferences.mode
 
     val displayRecords = remember(records, deliveryDate) {
@@ -116,9 +115,6 @@ fun HomeScreen(
             .sortedByDescending { it.timestamp }
     }
 
-    val resolvedLatestConsumption = remember(latestConsumption, displayRecords) {
-        latestConsumption ?: displayRecords.firstOrNull { it.consumption != null }?.consumption
-    }
     val scope = rememberCoroutineScope()
 
     // 👈 统一使用 ExpenseRange
@@ -138,7 +134,8 @@ fun HomeScreen(
         computeExpenseRange(selectedRange, customYear, customMonth)
     }
 
-    val statsSummary by produceState<StatisticsSummary?>(
+    // 首页统计和趋势图共用一次完整油耗分析
+    val homeSummaries by produceState<Pair<StatisticsSummary, StatisticsSummary>?>(
         initialValue = null,
         vehicle,
         records,
@@ -146,7 +143,7 @@ fun HomeScreen(
         outlierSensitivity
     ) {
         value = withContext(Dispatchers.Default) {
-            FuelCalculator.calculateSummary(
+            FuelCalculator.calculateSummaryPair(
                 allRecords = records,
                 vehicle = vehicle,
                 startTime = statsRange.first,
@@ -156,24 +153,28 @@ fun HomeScreen(
         }
     }
 
-    // 油耗趋势图独立年份筛选
-    val selectedConsumptionYears = viewModel.homeConsumptionYears
-// 获取完整时间范围的油耗计算结果
-    val consumptionTrendSummary by produceState<StatisticsSummary?>(
-        initialValue = null,
-        vehicle,
-        records,
-        outlierSensitivity
+    // 当前筛选范围的统计结果
+    val statsSummary = homeSummaries?.first
+
+    // 完整历史统计结果
+    val consumptionTrendSummary = homeSummaries?.second
+
+    // 从完整分析结果中提取最新可靠油耗
+    val resolvedLatestConsumption = remember(
+        consumptionTrendSummary,
+        displayRecords
     ) {
-        value = withContext(Dispatchers.Default) {
-            FuelCalculator.calculateSummary(
-                allRecords = records,
-                vehicle = vehicle,
-                sensitivity = outlierSensitivity
-            )
-        }
+        consumptionTrendSummary
+            ?.rangeResults
+            ?.lastOrNull { FuelCalculator.isTrendUsable(it) }
+            ?.consumption
+            ?: displayRecords.firstOrNull { it.consumption != null }?.consumption
     }
-// 提取所有符合趋势图条件的油耗数据
+
+    // 趋势图年份筛选
+    val selectedConsumptionYears = viewModel.homeConsumptionYears
+
+    // 提取所有符合趋势图条件的油耗数据
     val consumptionTrendPoints = remember(consumptionTrendSummary) {
         consumptionTrendSummary?.rangeResults.orEmpty()
             .filter { FuelCalculator.isTrendUsable(it) }
@@ -187,7 +188,7 @@ fun HomeScreen(
             }
             .sortedBy { it.timestamp }
     }
-// 只显示存在有效油耗数据的年份
+    // 只显示存在有效油耗数据的年份
     val consumptionYears = remember(consumptionTrendPoints) {
         consumptionTrendPoints
             .map {
@@ -240,7 +241,7 @@ fun HomeScreen(
 
 
 
-// 平滑过渡，避免标题尺寸突然变化
+    // 平滑过渡，避免标题尺寸突然变化
     val collapseProgress by animateFloatAsState(
         targetValue = targetCollapseProgress,
         animationSpec = tween(durationMillis = 180),
