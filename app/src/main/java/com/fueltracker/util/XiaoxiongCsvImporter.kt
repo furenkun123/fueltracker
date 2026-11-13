@@ -26,106 +26,110 @@ object XiaoxiongCsvImporter {
         vehicleId: Long
     ): Result<List<FuelRecord>> = withContext(Dispatchers.IO) {
         try {
-            val lines = readCsvLines(context, uri)
             var skipCount = 0
-            val rows = mutableListOf<XiaoxiongFuelRow>()
+            val records = mutableListOf<FuelRecord>()
 
-            lines.forEachIndexed { index, line ->
+            forEachCsvLine(context, uri) { index, line ->
                 try {
                     val cols = splitCsvLine(line)
-                    if (cols.size < 8) throw IllegalArgumentException("列数不足")
+                    if (cols.size < 8) {
+                        throw IllegalArgumentException("列数不足")
+                    }
 
-                    val odometer = cols[1].trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+                    val date = cols[0].trim()
+
+                    val odometer = cols[1].trim().toDoubleOrNull()
+                        ?.takeIf { it.isFinite() }
                         ?: throw IllegalArgumentException("里程非法")
-                    val paidAmount = cols[4].trim().toDoubleOrNull()?.takeIf { it.isFinite() }
-                        ?: throw IllegalArgumentException("金额非法")
 
-                    // 修复：原价增加有限性和正数校验，防止 Infinity 混入
-                    val originalPriceRaw = cols[3].trim().toDoubleOrNull()
+                    val unitPriceRaw = cols[2].trim().toDoubleOrNull()
+                        ?.takeIf { it.isFinite() }
+
+                    val originalPrice = cols[3].trim().toDoubleOrNull()
                         ?.takeIf { it.isFinite() && it > 0.0 } ?: 0.0
 
-                    val unitPriceRaw = cols[2].trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+                    val paidAmount = cols[4].trim().toDoubleOrNull()
+                        ?.takeIf { it.isFinite() }
+                        ?: throw IllegalArgumentException("金额非法")
 
-                    rows.add(
-                        XiaoxiongFuelRow(
-                            date = cols[0].trim(),
+                    val fuelGrade = cols[5].trim()
+                    val isFull = parseFlag(cols[6], "加满", "没加满")
+                    val hasWarningLight = parseFlag(cols[7], "亮", "没亮")
+
+                    val timestamp = parseDate(date)
+
+                    if (timestamp == null || odometer <= 0 || paidAmount <= 0) {
+                        skipCount++
+                        return@forEachCsvLine
+                    }
+
+                    var isEstimated = false
+
+                    val unitPrice = unitPriceRaw
+                        ?.takeIf { it in 0.01..MAXSANEUNITPRICE }
+                        ?: run {
+                            isEstimated = true
+                            FALLBACKUNITPRICE
+                        }
+
+                    val validOriginalPrice = originalPrice.takeIf {
+                        it >= paidAmount - 0.01 && it > 0.0
+                    }
+
+                    val volume = if (validOriginalPrice != null) {
+                        validOriginalPrice / unitPrice
+                    } else {
+                        paidAmount / unitPrice
+                    }
+
+                    if (!volume.isFinite() || volume <= 0.0) {
+                        skipCount++
+                        return@forEachCsvLine
+                    }
+
+                    val noteParts = mutableListOf("小熊导入")
+
+                    if (isEstimated) {
+                        noteParts.add("单价异常(油量估算)")
+                    }
+
+                    if (hasWarningLight) {
+                        noteParts.add("油灯亮")
+                    }
+
+                    val finalNote = noteParts.joinToString(" · ")
+
+                    val finalDiscount = validOriginalPrice?.let { orig ->
+                        val diff = orig - paidAmount
+                        if (diff > 0.01) diff else null
+                    }
+
+                    records.add(
+                        FuelRecord(
+                            vehicleId = vehicleId,
+                            timestamp = timestamp,
                             odometer = odometer,
-                            unitPrice = unitPriceRaw ?: 0.0,
-                            originalPrice = originalPriceRaw,
-                            paidAmount = paidAmount,
-                            fuelGrade = cols[5].trim(),
-                            isFull = parseFlag(cols[6], "加满", "没加满"),
-                            hasWarningLight = parseFlag(cols[7], "亮", "没亮")
+                            volume = volume,
+                            unitPrice = unitPrice,
+                            actualPaidAmount = paidAmount,
+                            totalAmount = validOriginalPrice,
+                            discount = finalDiscount,
+                            fuelGrade = normalizeFuelGrade(fuelGrade),
+                            isFull = isFull,
+                            note = finalNote,
+                            hasMissedRecord = false
                         )
                     )
+
                 } catch (e: Exception) {
                     Log.w(TAG, "跳过第 ${index + 1} 个有效行数据: 格式异常", e)
                     skipCount++
                 }
             }
 
-            val records = rows.mapNotNull { row ->
-                val timestamp = parseDate(row.date)
-                if (timestamp == null) {
-                    skipCount++
-                    return@mapNotNull null
-                }
-                if (row.odometer <= 0 || row.paidAmount <= 0) {
-                    skipCount++
-                    return@mapNotNull null
-                }
-
-                var isEstimated = false
-                val unitPrice = row.unitPrice.takeIf { it in 0.01..MAXSANEUNITPRICE } ?: run {
-                    isEstimated = true
-                    FALLBACKUNITPRICE
-                }
-
-                // 👇 修复 1：确定有效的原价（若原价小于实付，说明数据异常，直接丢弃原价）
-                val validOriginalPrice = row.originalPrice.takeIf { it >= row.paidAmount - 0.01 && it > 0.0 }
-
-                // 👇 修复 2：优先用原价计算升数，保证 volume * unitPrice == totalAmount
-                val volume = if (validOriginalPrice != null) {
-                    validOriginalPrice / unitPrice
-                } else {
-                    row.paidAmount / unitPrice
-                }
-
-                if (!volume.isFinite() || volume <= 0.0) {
-                    skipCount++
-                    return@mapNotNull null
-                }
-
-                // 合并备注信息，避免“估算”覆盖“油灯亮”
-                val noteParts = mutableListOf("小熊导入")
-                if (isEstimated) noteParts.add("单价异常(油量估算)")
-                if (row.hasWarningLight) noteParts.add("油灯亮")
-                val finalNote = noteParts.joinToString(" · ")
-
-                // 👇 修复 3：计算优惠金额，容差设定为 0.01
-                val finalDiscount = validOriginalPrice?.let { orig ->
-                    val diff = orig - row.paidAmount
-                    if (diff > 0.01) diff else null
-                }
-
-                FuelRecord(
-                    vehicleId = vehicleId,
-                    timestamp = timestamp,
-                    odometer = row.odometer,
-                    volume = volume,
-                    unitPrice = unitPrice,
-                    actualPaidAmount = row.paidAmount,
-                    totalAmount = validOriginalPrice,
-                    discount = finalDiscount,
-                    fuelGrade = normalizeFuelGrade(row.fuelGrade),
-                    isFull = row.isFull,
-                    note = finalNote,
-                    hasMissedRecord = false
-                )
-            }
-
             Log.d(TAG, "加油解析完成: 成功 ${records.size}, 跳过 $skipCount")
             Result.success(records)
+
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -133,56 +137,55 @@ object XiaoxiongCsvImporter {
             Result.failure(e)
         }
     }
-
     suspend fun parseExpenseCsv(
         context: Context,
         uri: Uri,
         vehicleId: Long
     ): Result<List<ExpenseRecord>> = withContext(Dispatchers.IO) {
         try {
-            val lines = readCsvLines(context, uri)
             var skipCount = 0
-            val rows = mutableListOf<XiaoxiongExpenseRow>()
+            val records = mutableListOf<ExpenseRecord>()
 
-            lines.forEachIndexed { index, line ->
+            forEachCsvLine(context, uri) { index, line ->
                 try {
                     val cols = splitCsvLine(line)
-                    if (cols.size < 3) throw IllegalArgumentException("列数不足")
 
-                    val amount = cols[1].trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+                    if (cols.size < 3) {
+                        throw IllegalArgumentException("列数不足")
+                    }
+
+                    val timestamp = parseDate(cols[0].trim())
+
+                    val amount = cols[1].trim().toDoubleOrNull()
+                        ?.takeIf { it.isFinite() }
                         ?: throw IllegalArgumentException("金额非法")
 
-                    rows.add(
-                        XiaoxiongExpenseRow(
-                            date = cols[0].trim(),
+                    val category = cols[2].trim()
+
+                    if (timestamp == null || amount <= 0) {
+                        skipCount++
+                        return@forEachCsvLine
+                    }
+
+                    records.add(
+                        ExpenseRecord(
+                            vehicleId = vehicleId,
+                            timestamp = timestamp,
+                            category = category.ifBlank { "其他" },
                             amount = amount,
-                            category = cols[2].trim()
+                            note = "小熊导入"
                         )
                     )
+
                 } catch (e: Exception) {
                     Log.w(TAG, "跳过第 ${index + 1} 行费用数据: 格式异常", e)
                     skipCount++
                 }
             }
 
-            val records = rows.mapNotNull { row ->
-                val timestamp = parseDate(row.date)
-                if (timestamp == null || row.amount <= 0) {
-                    skipCount++
-                    return@mapNotNull null
-                }
-
-                ExpenseRecord(
-                    vehicleId = vehicleId,
-                    timestamp = timestamp,
-                    category = row.category.ifBlank { "其他" },
-                    amount = row.amount,
-                    note = "小熊导入"
-                )
-            }
-
             Log.d(TAG, "费用解析完成: 成功 ${records.size}, 跳过 $skipCount")
             Result.success(records)
+
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -190,15 +193,29 @@ object XiaoxiongCsvImporter {
             Result.failure(e)
         }
     }
-
-    private fun readCsvLines(context: Context, uri: Uri): List<String> {
+    /**
+     * 逐行读取 CSV。
+     *
+     * 不再将整个文件转换为 List<String>，
+     * 每读取一行就交给调用方处理。
+     */
+    private fun forEachCsvLine(
+        context: Context,
+        uri: Uri,
+        action: (Int, String) -> Unit
+    ) {
         val stream = context.contentResolver.openInputStream(uri)
             ?: throw IllegalStateException("无法打开文件")
-        return stream.bufferedReader(Charsets.UTF_8).useLines { sequence ->
-            sequence.map { it.removePrefix("\uFEFF").trim() }.filter { it.isNotEmpty() }.toList()
+
+        stream.bufferedReader(Charsets.UTF_8).useLines { sequence ->
+            sequence
+                .map { it.removePrefix("\uFEFF").trim() }
+                .filter { it.isNotEmpty() }
+                .forEachIndexed { index, line ->
+                    action(index, line)
+                }
         }
     }
-
     private fun splitCsvLine(line: String): List<String> {
         val result = mutableListOf<String>()
         val buffer = StringBuilder()
