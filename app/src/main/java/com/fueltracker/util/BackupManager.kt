@@ -8,19 +8,22 @@ import com.fueltracker.data.CustomCategoryEntity
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.math.abs
-import kotlinx.coroutines.NonCancellable
 
 object BackupManager {
 
     private const val FORMAT_VERSION = 3
+    // 备份文件最大限制：10 MB
+    private const val MAX_BACKUP_SIZE_BYTES = 10L * 1024 * 1024
     private val SUPPORTED_VERSIONS = setOf(1, 2, 3)
 
     private data class LegacyInitialData(
@@ -533,11 +536,39 @@ object BackupManager {
             } ?: throw IllegalStateException("无法创建备份文件")
         }
 
+    /**
+     * 有大小限制地读取备份文件，避免超大文件占用过多内存。
+     */
+    private fun readBackupText(context: Context, uri: Uri): String {
+        val input = context.contentResolver.openInputStream(uri)
+            ?: throw IllegalStateException("无法读取备份文件")
+
+        return input.use { stream ->
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(8 * 1024)
+            var totalBytes = 0L
+
+            while (true) {
+                val count = stream.read(buffer)
+
+                if (count == -1) break
+                if (count == 0) continue
+
+                totalBytes += count
+
+                require(totalBytes <= MAX_BACKUP_SIZE_BYTES) {
+                    "备份文件超过 10 MB，暂不支持导入"
+                }
+
+                output.write(buffer, 0, count)
+            }
+
+            String(output.toByteArray(), Charsets.UTF_8)
+        }
+    }
     suspend fun restoreFromUri(context: Context, uri: Uri) =
         withContext(Dispatchers.IO + NonCancellable) {
-            val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use {
-                it.readText()
-            } ?: throw IllegalStateException("无法读取备份文件")
+            val json = readBackupText(context, uri)
             restoreFromJson(context, json)
         }
 }
