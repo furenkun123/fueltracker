@@ -90,9 +90,12 @@ fun ExpenseEditScreen(
     var newCategoryName by remember { mutableStateOf("") }
     var editingCategory by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
+    // 新增：控制删除记录确认弹窗
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val trimmedNewName = newCategoryName.trim()
-    val isDuplicate = trimmedNewName.isNotEmpty() && trimmedNewName in allCategories
+    val isDuplicate = trimmedNewName.isNotEmpty() &&
+            allCategories.any { it.equals(trimmedNewName, ignoreCase = true) }
     val amount = amountText.toDoubleOrNull()
     val canSave = amount != null && amount > 0 && !isSaving
 
@@ -192,21 +195,51 @@ fun ExpenseEditScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            MiuixButton(
-                text = if (isEditMode) "保存修改" else "保存",
-                enabled = canSave,
-                onClick = {
-                    isSaving = true
-                    val newRecord = amount?.let { record?.copy(timestamp = timestamp, category = category, amount = it, note = note.trim()) }
-                        ?: amount?.let { ExpenseRecord(vehicleId = 0, timestamp = timestamp, category = category, amount = it, note = note.trim()) }
 
-                    val onResult: (Result<Unit>) -> Unit = { result ->
-                        isSaving = false
-                        if (result.isSuccess) onSaved() else Toast.makeText(context, "保存失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // 只在编辑模式下显示删除按钮
+                if (isEditMode) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(MiuixTheme.colorScheme.error.copy(alpha = 0.9f))
+                            .clickable { showDeleteConfirm = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "删除",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onErrorContainer
+                        )
                     }
-                    if (isEditMode) newRecord?.let { viewModel.updateExpense(it, onResult) } else newRecord?.let { viewModel.addExpense(it, onResult) }
                 }
-            )
+
+                // 保存按钮，用 Box 包裹确保 weight 生效
+                Box(modifier = Modifier.weight(1f)) {
+                    MiuixButton(
+                        text = if (isEditMode) "保存修改" else "保存",
+                        enabled = canSave,
+                        onClick = {
+                            isSaving = true
+                            val newRecord = amount?.let { record?.copy(timestamp = timestamp, category = category, amount = it, note = note.trim()) }
+                                ?: amount?.let { ExpenseRecord(vehicleId = 0, timestamp = timestamp, category = category, amount = it, note = note.trim()) }
+
+                            val onResult: (Result<Unit>) -> Unit = { result ->
+                                isSaving = false
+                                if (result.isSuccess) onSaved() else Toast.makeText(context, "保存失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                            }
+                            if (isEditMode) newRecord?.let { viewModel.updateExpense(it, onResult) } else newRecord?.let { viewModel.addExpense(it, onResult) }
+                        }
+                    )
+                }
+            }
+
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -225,16 +258,35 @@ fun ExpenseEditScreen(
     if (showAddCategoryDialog) {
         MiuixInputDialog(
             title = "新建分类", value = newCategoryName, onValueChange = { newCategoryName = it },
-            placeholder = if (isDuplicate) "该分类已存在" else "如：过路费、洗车、装饰",
+            placeholder = if (isDuplicate) "该分类已存在" else "如：过路费、装饰",
             confirmText = "创建", confirmEnabled = trimmedNewName.isNotEmpty() && !isDuplicate,
             onConfirm = {
                 if (trimmedNewName.isNotEmpty()) {
                     scope.launch {
-                        ExpenseCategoryStore.add(trimmedNewName)
-                        category = trimmedNewName
+                        try {
+                            val added = ExpenseCategoryStore.add(trimmedNewName)
+
+                            if (added) {
+                                category = trimmedNewName
+                                showAddCategoryDialog = false
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "分类已存在或无法创建",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Toast.makeText(
+                                context,
+                                "创建分类失败：${e.message ?: "未知错误"}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 }
-                showAddCategoryDialog = false
             },
             onDismiss = { showAddCategoryDialog = false }
         )
@@ -256,13 +308,58 @@ fun ExpenseEditScreen(
             },
             onDelete = {
                 scope.launch {
-                    ExpenseCategoryStore.remove(cat)
-                    // customCategories 会在 StateFlow 中自动更新，不需要手动赋值
-                    if (category == cat) category = DEFAULT_EXPENSE_CATEGORIES.first()
-                    editingCategory = null
+                    try {
+                        val removed = ExpenseCategoryStore.remove(cat)
+
+                        if (removed) {
+                            // 如果当前选中的是被删除的分类，切换到第一个默认分类
+                            if (category.equals(cat, ignoreCase = true)) {
+                                category = DEFAULT_EXPENSE_CATEGORIES.first()
+                            }
+
+                            editingCategory = null
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "删除失败：分类不存在或已被删除",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            context,
+                            "删除分类失败：${e.message ?: "未知错误"}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             },
             onDismiss = { editingCategory = null }
+        )
+    }
+    // 删除费用记录确认弹窗
+    if (showDeleteConfirm && record != null) {
+        MiuixConfirmDialog(
+            title = "删除费用记录？",
+            message = "确定删除这笔费用记录吗？删除后无法恢复。",
+            confirmText = "删除",
+            onConfirm = {
+                showDeleteConfirm = false
+                isSaving = true
+
+                // 请替换为你 ViewModel 中真实的 deleteExpense 方法名
+                viewModel.deleteExpense(record) { result ->
+                    isSaving = false
+                    if (result.isSuccess) {
+                        onSaved()
+                    } else {
+                        Toast.makeText(context, "删除失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
+            onDismiss = { showDeleteConfirm = false }
         )
     }
 }
@@ -324,8 +421,13 @@ private fun EditCategoryDialog(
     var name by remember { mutableStateOf(currentName) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val trimmed = name.trim()
-    val isDuplicate = trimmed.isNotEmpty() && trimmed != currentName && trimmed in existingNames
-    val isValid = trimmed.isNotEmpty() && trimmed != currentName && !isDuplicate
+    val isDuplicate = trimmed.isNotEmpty() &&
+            !trimmed.equals(currentName, ignoreCase = true) &&
+            existingNames.any { it.equals(trimmed, ignoreCase = true) }
+
+    val isValid = trimmed.isNotEmpty() &&
+            !trimmed.equals(currentName, ignoreCase = true) &&
+            !isDuplicate
 
     if (showDeleteConfirm) {
         MiuixConfirmDialog(
@@ -361,11 +463,16 @@ private fun EditCategoryDialog(
                         // 删除按钮
                         Box(
                             modifier = Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(22.dp))
-                                .background(MiuixTheme.colorScheme.errorContainer)
+                                .background(MiuixTheme.colorScheme.error.copy(alpha = 0.16f))
                                 .clickable { showDeleteConfirm = true },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("删除", fontSize = 14.sp, color = MiuixTheme.colorScheme.onErrorContainer)
+                            Text(
+                                "删除",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MiuixTheme.colorScheme.error
+                            )
                         }
 
                         // 取消按钮
