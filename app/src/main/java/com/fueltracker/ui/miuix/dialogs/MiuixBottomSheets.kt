@@ -28,6 +28,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 
+
 @Composable
 fun MiuixConfirmDialog(
     title: String,
@@ -47,8 +48,20 @@ fun MiuixConfirmDialog(
         onDismissRequest = onDismiss,
         backgroundColor = MiuixTheme.colorScheme.surface
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp)) {
-            Text(message, fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary, lineHeight = 22.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 28.dp)
+        ) {
+            Text(
+                text = message,
+                fontSize = 14.sp,
+                color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                lineHeight = 22.sp,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(modifier = Modifier.height(28.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(
