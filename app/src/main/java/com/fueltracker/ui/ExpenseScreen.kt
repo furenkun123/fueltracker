@@ -117,8 +117,11 @@ fun ExpenseScreen(
 
     val availableYears = remember(expenses, fuelRecords) {
         val currentYear = System.currentTimeMillis().getYear()
-        (expenses.map { it.timestamp.getYear() } + fuelRecords.map { it.timestamp.getYear() } + currentYear)
-            .distinct().sortedDescending()
+        (
+                expenses.map { it.timestamp.getYear() } +
+                        fuelRecords.filter { !it.isInitialRecord }.map { it.timestamp.getYear() } +
+                        currentYear
+                ).distinct().sortedDescending()
     }
 
     val rangeBounds = remember(selectedRange, customYear, customMonth) {
