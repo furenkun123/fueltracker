@@ -39,6 +39,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -53,10 +54,8 @@ import androidx.compose.ui.unit.sp
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
-import com.fueltracker.ui.components.ChartCard
 import com.fueltracker.ui.components.ConsumptionTrendCard
 import com.fueltracker.ui.components.ConsumptionTrendPoint
-import com.fueltracker.ui.components.CostPoint
 import com.fueltracker.ui.components.MiuixVehicleCard
 import com.fueltracker.ui.components.scrollToHideFab
 import com.fueltracker.ui.miuix.MiuixButton
@@ -75,8 +74,10 @@ import com.fueltracker.util.StatisticsSummary
 import com.fueltracker.util.computeExpenseRange
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Surface
@@ -114,12 +115,6 @@ fun HomeScreen(
             .sortedByDescending { it.timestamp }
     }
 
-    val costData = remember(displayRecords) {
-        displayRecords.asReversed()
-            .map { CostPoint(it.timestamp, it.actualPaidAmount) }
-            .filter { it.value >= 0.0 && it.value.isFinite() }
-    }
-
     val resolvedLatestConsumption = remember(latestConsumption, displayRecords) {
         latestConsumption ?: displayRecords.firstOrNull { it.consumption != null }?.consumption
     }
@@ -142,38 +137,44 @@ fun HomeScreen(
         computeExpenseRange(selectedRange, customYear, customMonth)
     }
 
-    val statsSummary = remember(
+    val statsSummary by produceState<StatisticsSummary?>(
+        initialValue = null,
         vehicle,
         records,
         statsRange,
         outlierSensitivity
     ) {
-        FuelCalculator.calculateSummary(
-            allRecords = records,
-            vehicle = vehicle,
-            startTime = statsRange.first,
-            endTime = statsRange.second,
-            sensitivity = outlierSensitivity
-        )
+        value = withContext(Dispatchers.Default) {
+            FuelCalculator.calculateSummary(
+                allRecords = records,
+                vehicle = vehicle,
+                startTime = statsRange.first,
+                endTime = statsRange.second,
+                sensitivity = outlierSensitivity
+            )
+        }
     }
 
     // 油耗趋势图独立年份筛选
     val selectedConsumptionYears = viewModel.homeConsumptionYears
 // 获取完整时间范围的油耗计算结果
-    val consumptionTrendSummary = remember(
+    val consumptionTrendSummary by produceState<StatisticsSummary?>(
+        initialValue = null,
         vehicle,
         records,
         outlierSensitivity
     ) {
-        FuelCalculator.calculateSummary(
-            allRecords = records,
-            vehicle = vehicle,
-            sensitivity = outlierSensitivity
-        )
+        value = withContext(Dispatchers.Default) {
+            FuelCalculator.calculateSummary(
+                allRecords = records,
+                vehicle = vehicle,
+                sensitivity = outlierSensitivity
+            )
+        }
     }
 // 提取所有符合趋势图条件的油耗数据
     val consumptionTrendPoints = remember(consumptionTrendSummary) {
-        consumptionTrendSummary.rangeResults
+        consumptionTrendSummary?.rangeResults.orEmpty()
             .filter { FuelCalculator.isTrendUsable(it) }
             .map {
                 ConsumptionTrendPoint(
@@ -185,7 +186,6 @@ fun HomeScreen(
             }
             .sortedBy { it.timestamp }
     }
-
 // 只显示存在有效油耗数据的年份
     val consumptionYears = remember(consumptionTrendPoints) {
         consumptionTrendPoints
@@ -331,27 +331,23 @@ fun HomeScreen(
 
                 //加油趋势（按月）
                 item {
-                    ConsumptionCard(
+                    statsSummary?.let { summary ->
+                        ConsumptionCard(
                             latestConsumption = resolvedLatestConsumption,
-                            summary = statsSummary,
+                            summary = summary,
                             selectedRange = selectedRange,
                             customYear = customYear,
                             customMonth = customMonth,
-                        onRangeSelected = {
-                            viewModel.updateHomeStatsRange(it)
+                            onRangeSelected = {
+                                viewModel.updateHomeStatsRange(it)
+                                viewModel.resetPageScrollPosition(scrollKey)
 
-                            viewModel.resetPageScrollPosition(scrollKey)
-
-                            scope.launch {
-                                listState.scrollToItem(0)
-                            }
-                        },
-                        onCustomMonthClick = { showYearMonthPicker = true }
+                                scope.launch {
+                                    listState.scrollToItem(0)
+                                }
+                            },
+                            onCustomMonthClick = { showYearMonthPicker = true }
                         )
-                }
-                if (costData.size >= 2) {
-                    item(key = "chart_cost") {
-                        ChartCard(points = costData)
                     }
                 }
 
