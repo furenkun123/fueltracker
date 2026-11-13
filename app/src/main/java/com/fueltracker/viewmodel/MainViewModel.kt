@@ -995,17 +995,18 @@ class MainViewModel(
             val res = try {
                 val count = database.withTransaction {
 
-                    // 确认导入开始时指定的车辆仍然存在
+                    // 确认导入目标车辆仍然存在
                     if (vehicleDao.getVehicleById(targetVehicleId) == null) {
                         throw IllegalStateException(
                             "导入目标车辆已不存在，请重新选择车辆后再导入"
                         )
                     }
 
-                    // 查询目标车辆已有的费用记录
-                    val seen = expenseDao.getAll()
+                    // 统计目标车辆中，每种记录已经存在的数量
+                    val existingCounts = expenseDao.getAll()
+                        .asSequence()
                         .filter { it.vehicleId == targetVehicleId }
-                        .map {
+                        .groupingBy {
                             listOf(
                                 it.timestamp,
                                 it.amount,
@@ -1013,7 +1014,10 @@ class MainViewModel(
                                 it.note
                             )
                         }
-                        .toMutableSet()
+                        .eachCount()
+
+                    // 统计本次 CSV 中，每种记录出现的次数
+                    val importedCounts = mutableMapOf<List<Any>, Int>()
 
                     var importCount = 0
 
@@ -1033,14 +1037,23 @@ class MainViewModel(
 
                         validateExpenseRecord(normalized)
 
-                        val key = listOf(
+                        // 构建记录匹配键
+                        val key: List<Any> = listOf(
                             normalized.timestamp,
                             normalized.amount,
                             normalized.category,
                             normalized.note
                         )
 
-                        if (seen.add(key)) {
+                        // 当前记录在本次 CSV 中是第几次出现
+                        val occurrence = (importedCounts[key] ?: 0) + 1
+                        importedCounts[key] = occurrence
+
+                        // 数据库中已经存在多少条相同记录
+                        val existingCount = existingCounts[key] ?: 0
+
+                        // CSV 中的出现次数超过数据库已有数量，才需要新增
+                        if (occurrence > existingCount) {
 
                             val toInsert = normalized.copy(
                                 id = 0L,
