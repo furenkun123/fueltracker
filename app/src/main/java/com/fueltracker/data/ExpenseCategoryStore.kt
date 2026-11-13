@@ -31,16 +31,15 @@ object ExpenseCategoryStore {
      * 默认费用分类。
      * 不允许作为自定义分类重复添加。
      */
-    val DEFAULT_EXPENSE_CATEGORIES = listOf(
-        "加油",
-        "停车",
-        "高速",
-        "保养",
-        "保险",
-        "维修",
-        "洗车",
-        "其他"
-    )
+    /**
+     * 禁止自定义分类使用的名称。
+     *
+     * 普通默认分类统一引用 ExpenseRecord.kt 中的定义。
+     * "加油"单独保留，因为加油记录由 FuelRecord 管理，
+     * 不应该允许用户创建同名的普通费用分类。
+     */
+    val DEFAULT_EXPENSE_CATEGORIES =
+        com.fueltracker.data.DEFAULT_EXPENSE_CATEGORIES + "加油"
 
     private val appScope =
         CoroutineScope(SupervisorJob() + Dispatchers.IO)
