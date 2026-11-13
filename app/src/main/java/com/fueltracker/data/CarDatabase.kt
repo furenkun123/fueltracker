@@ -45,7 +45,7 @@ class CarDatabase private constructor(private val appContext: Context) {
                 c
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Throwable) {
+            } catch (e: Exception) {
                 Log.e("CarDatabase", "解析 $ASSET 失败: ${e.message}", e)
                 null
             }
