@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,7 +43,11 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fueltracker.AppScreen.ADD_EXPENSE
 import com.fueltracker.AppScreen.ADD_FUEL
 import com.fueltracker.AppScreen.ADD_PARKING
@@ -223,6 +229,48 @@ fun FuelTrackerApp(
                     showParkingNotification(s)
                 }
             }
+        }
+    }
+    // 从系统设置返回时，重新检查通知权限并恢复停车通知
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    val currentParkingNotificationState by rememberUpdatedState(
+        parkingNotificationState
+    )
+
+    val currentShowParkingNotification by rememberUpdatedState(
+        showParkingNotification
+    )
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val state = currentParkingNotificationState
+                        as? ParkingNotificationState.Visible
+
+                if (state != null) {
+                    val hasRuntimePermission =
+                        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                                ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.POST_NOTIFICATIONS
+                                ) == PackageManager.PERMISSION_GRANTED
+
+                    val notificationsEnabled =
+                        NotificationManagerCompat.from(context)
+                            .areNotificationsEnabled()
+
+                    if (hasRuntimePermission && notificationsEnabled) {
+                        currentShowParkingNotification(state)
+                    }
+                }
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
