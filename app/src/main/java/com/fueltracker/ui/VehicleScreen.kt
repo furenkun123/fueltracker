@@ -70,6 +70,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowListPopup
 import java.util.Calendar
 import java.util.Locale
+import androidx.compose.runtime.saveable.rememberSaveable
 
 // 预设选择列表
 private val FuelTypeOptions = listOf("汽油", "柴油", "插电混动", "油电混动", "增程式")
@@ -111,16 +112,37 @@ fun VehicleScreen(
         carDatabase.ensureCatalogLoaded()
         allBrands = carDatabase.brandsByLetter().flatMap { (l, brands) -> brands.map { CarBrand(it, l) } }
     }
-
-    // 基础信息
-    var brand by remember(vehicle) { mutableStateOf(vehicle?.brand ?: "") }
-    var series by remember(vehicle) { mutableStateOf(vehicle?.series ?: "") }
-    var model by remember(vehicle) { mutableStateOf(vehicle?.model ?: "") }
-    var year by remember(vehicle) { mutableStateOf(vehicle?.year?.let { "${it}年" } ?: "${Calendar.getInstance().get(Calendar.YEAR)}年") }
-    var fuelType by remember(vehicle) { mutableStateOf(vehicle?.fuelType ?: "汽油") }
-    var fuelGrade by remember(vehicle) { mutableStateOf(vehicle?.fuelGrade ?: "95#") }
-    var tankCapacity by remember(vehicle) { mutableStateOf(vehicle?.tankCapacity?.takeIf { it > 0 }?.toString()?.removeSuffix(".0") ?: "") }
-    var deliveryDateMillis by remember(vehicle) { mutableStateOf(vehicle?.deliveryDate) }
+    // 基础信息：旋转屏幕后保留表单内容
+    var brand by rememberSaveable(vehicle?.id) {
+        mutableStateOf(vehicle?.brand ?: "")
+    }
+    var series by rememberSaveable(vehicle?.id) {
+        mutableStateOf(vehicle?.series ?: "")
+    }
+    var model by rememberSaveable(vehicle?.id) {
+        mutableStateOf(vehicle?.model ?: "")
+    }
+    var year by rememberSaveable(vehicle?.id) {
+        mutableStateOf(
+            vehicle?.year?.let { "${it}年" }
+                ?: "${Calendar.getInstance().get(Calendar.YEAR)}年"
+        )
+    }
+    var fuelType by rememberSaveable(vehicle?.id) {
+        mutableStateOf(vehicle?.fuelType ?: "汽油")
+    }
+    var fuelGrade by rememberSaveable(vehicle?.id) {
+        mutableStateOf(vehicle?.fuelGrade ?: "95#")
+    }
+    var tankCapacity by rememberSaveable(vehicle?.id) {
+        mutableStateOf(
+            vehicle?.tankCapacity?.takeIf { it > 0 }
+                ?.toString()?.removeSuffix(".0") ?: ""
+        )
+    }
+    var deliveryDateMillis by rememberSaveable(vehicle?.id) {
+        mutableStateOf(vehicle?.deliveryDate)
+    }
 
     // 初始/当前状态
     // 初始数据仅在添加车辆时录入，编辑车辆资料不改写历史初始化记录。
