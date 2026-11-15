@@ -114,10 +114,15 @@ fun ExpenseScreen(
     val customYear = viewModel.expensesCustomYear
     val customMonth = viewModel.expensesCustomMonth
     val scope = rememberCoroutineScope()
+    val dateBoundaryKey = rememberDateBoundaryKey()
 
     var showYearMonthPicker by remember { mutableStateOf(false) }
 
-    val availableYears = remember(expenses, fuelRecords) {
+    val availableYears = remember(
+        expenses,
+        fuelRecords,
+        dateBoundaryKey
+    ) {
         val currentYear = System.currentTimeMillis().getYear()
         (
                 expenses.map { it.timestamp.getYear() } +
@@ -126,7 +131,12 @@ fun ExpenseScreen(
                 ).distinct().sortedDescending()
     }
 
-    val rangeBounds = remember(selectedRange, customYear, customMonth) {
+    val rangeBounds = remember(
+        selectedRange,
+        customYear,
+        customMonth,
+        dateBoundaryKey
+    ) {
         computeExpenseRange(selectedRange, customYear, customMonth)
     }
 
@@ -136,7 +146,13 @@ fun ExpenseScreen(
         else -> selectedRange.label
     }
 
-    val summary = remember(expenses, fuelRecords, rangeBounds, rangeLabel) {
+    val summary = remember(
+        expenses,
+        fuelRecords,
+        rangeBounds,
+        rangeLabel,
+        dateBoundaryKey
+    ) {
         computeSummary(expenses, fuelRecords, rangeBounds, rangeLabel)
     }
 

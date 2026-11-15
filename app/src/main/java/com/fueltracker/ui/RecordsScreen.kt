@@ -110,12 +110,14 @@ fun RecordsScreen(
     val filterType = viewModel.recordsFilterType
     val selectedYear = viewModel.recordsSelectedYear
     val selectedMonth = viewModel.recordsSelectedMonth
+    val dateBoundaryKey = rememberDateBoundaryKey()
 
 // 根据筛选条件确定统计时间范围
     val (startTime, endTime) = remember(
         filterType,
         selectedYear,
-        selectedMonth
+        selectedMonth,
+        dateBoundaryKey
     ) {
         val calendar = Calendar.getInstance()
 

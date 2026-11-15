@@ -103,6 +103,7 @@ fun HomeScreen(
     onCollapseProgressChange: (Float) -> Unit = {},
     onOpenSettings: () -> Unit
 ) {
+    val dateBoundaryKey = rememberDateBoundaryKey()
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
 
@@ -129,8 +130,12 @@ fun HomeScreen(
             .distinct().sortedDescending()
     }
 
-    // 👈 统一使用 computeExpenseRange
-    val statsRange = remember(selectedRange, customYear, customMonth) {
+    val statsRange = remember(
+        selectedRange,
+        customYear,
+        customMonth,
+        dateBoundaryKey
+    ) {
         computeExpenseRange(selectedRange, customYear, customMonth)
     }
 
