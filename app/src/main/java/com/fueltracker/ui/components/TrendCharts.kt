@@ -5,7 +5,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,15 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -34,15 +29,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueltracker.ui.miuix.MiuixCard
 import com.fueltracker.ui.miuix.MiuixFilterChip
-import kotlinx.coroutines.flow.firstOrNull
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Calendar
-
-data class CostPoint(
-    val timestamp: Long,
-    val value: Double
-)
 
 data class ConsumptionTrendPoint(
     val timestamp: Long,
@@ -54,8 +43,6 @@ data class ConsumptionTrendPoint(
 // =================================================
 // 趋势图
 // =================================================
-
-private data class MonthCostPoint(val year: Int, val month: Int, val value: Double)
 
 private data class MonthlyConsumptionPoint(
     val year: Int,
@@ -73,133 +60,6 @@ private val consumptionYearColors = listOf(
     Color(0xFFE36B82),
     Color(0xFF20A6B8)
 )
-
-@Composable
-fun ChartCard(points: List<CostPoint>) {
-    val monthlyPoints = remember(points) {
-        val grouped = mutableMapOf<Pair<Int, Int>, Double>()
-        points.forEach {
-            if (!it.value.isFinite()) return@forEach
-            val c = Calendar.getInstance().apply { timeInMillis = it.timestamp }
-            val key = c.get(Calendar.YEAR) to (c.get(Calendar.MONTH) + 1)
-            grouped[key] = (grouped[key] ?: 0.0) + it.value
-        }
-        grouped.map { MonthCostPoint(it.key.first, it.key.second, it.value) }
-            .filter { it.value > 0.0 && it.value.isFinite() }
-            .sortedWith(compareBy({ it.year }, { it.month }))
-    }
-    if (monthlyPoints.isEmpty()) return
-
-    val values = remember(monthlyPoints) { monthlyPoints.map { it.value } }
-    val maxValue = values.maxOrNull() ?: return
-    val yMax = maxValue * 1.15
-    if (!yMax.isFinite() || yMax <= 0.0) return
-
-    val primaryColor = MiuixTheme.colorScheme.primary
-    val onSurfaceColor = MiuixTheme.colorScheme.onSurface
-    val onSurfaceVariantColor = MiuixTheme.colorScheme.onSurfaceSecondary
-
-    val textMeasurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-    val scrollState = rememberScrollState()
-
-    val baseValueLabelStyle = remember(onSurfaceColor) {
-        TextStyle(color = onSurfaceColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-    }
-    val baseTimeLabelStyle = remember(onSurfaceVariantColor) {
-        TextStyle(color = onSurfaceVariantColor, fontSize = 8.sp)
-    }
-
-    val valueLabelLayouts = remember(values, textMeasurer, baseValueLabelStyle) {
-        values.map { textMeasurer.measure("%.0f".format(it), baseValueLabelStyle) }
-    }
-    val isSameYear = remember(monthlyPoints) { monthlyPoints.map { it.year }.distinct().size <= 1 }
-    val timeLabelLayouts = remember(monthlyPoints, isSameYear, textMeasurer, baseTimeLabelStyle) {
-        monthlyPoints.map {
-            textMeasurer.measure(
-                if (isSameYear) "${it.month}月" else "%02d/%02d".format(it.year % 100, it.month),
-                baseTimeLabelStyle
-            )
-        }
-    }
-
-    val topPaddingDp = remember(valueLabelLayouts, density) {
-        with(density) {
-            ((valueLabelLayouts.maxOfOrNull { it.size.height } ?: 0).toDp() + 4.dp)
-                .coerceAtLeast(16.dp)
-        }
-    }
-    val chartAreaHeight = 94.dp
-    val timeAxisHeight = 18.dp
-    val canvasHeight = topPaddingDp + chartAreaHeight + timeAxisHeight
-
-    val visibleCount = 10
-
-    LaunchedEffect(monthlyPoints.size) {
-        if (monthlyPoints.size > visibleCount) {
-            snapshotFlow { scrollState.maxValue }
-                .firstOrNull { it > 0 }
-                ?.let { scrollState.scrollTo(it) }
-        }
-    }
-
-    MiuixCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("加油趋势 (按月 · 元)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val itemWidth = maxWidth / visibleCount
-                val chartWidth = if (monthlyPoints.size <= visibleCount) maxWidth else itemWidth * monthlyPoints.size
-                Box(modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState)) {
-                    Canvas(modifier = Modifier.width(chartWidth).height(canvasHeight)) {
-                        val slotWidth = size.width / monthlyPoints.size
-                        val barWidth = (slotWidth * 0.5f).coerceIn(4.dp.toPx(), 40.dp.toPx())
-                        val chartHeight = size.height - topPaddingDp.toPx() - timeAxisHeight.toPx()
-                        val timeLabelY = topPaddingDp.toPx() + chartHeight + 4.dp.toPx()
-
-                        monthlyPoints.forEachIndexed { index, point ->
-                            val barCenterX = index * slotWidth + slotWidth / 2f
-                            val barLeft = barCenterX - barWidth / 2f
-                            val barHeight = (chartHeight * (point.value / yMax).toFloat().coerceIn(0f, 1f))
-                                .coerceAtLeast(2.dp.toPx())
-                            val barTop = topPaddingDp.toPx() + (chartHeight - barHeight)
-
-                            drawRoundRect(
-                                color = primaryColor.copy(alpha = 0.85f),
-                                topLeft = Offset(barLeft, barTop),
-                                size = Size(barWidth, barHeight),
-                                cornerRadius = CornerRadius(4.dp.toPx())
-                            )
-
-                            val vLayout = valueLabelLayouts[index]
-                            if (vLayout.size.width <= size.width) {
-                                drawText(
-                                    vLayout,
-                                    topLeft = Offset(
-                                        (barCenterX - vLayout.size.width / 2f)
-                                            .coerceIn(0f, size.width - vLayout.size.width),
-                                        barTop - vLayout.size.height - 2.dp.toPx()
-                                    )
-                                )
-                            }
-
-                            val tLayout = timeLabelLayouts[index]
-                            if (tLayout.size.width <= size.width) {
-                                drawText(
-                                    tLayout,
-                                    topLeft = Offset(
-                                        (barCenterX - tLayout.size.width / 2f)
-                                            .coerceIn(0f, size.width - tLayout.size.width),
-                                        timeLabelY
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun ConsumptionTrendCard(
