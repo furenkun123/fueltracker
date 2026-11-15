@@ -836,7 +836,7 @@ fun FuelScreen(
     if (showDeleteDialog && onDelete != null) {
         MiuixConfirmDialog(
             title = "删除记录",
-            message = "确定删除该条加油记录吗？删除后相关油耗计算将重新推导。",
+            message = "确定删除该条加油记录吗？\n 删除后相关油耗计算将重新推导。",
             confirmText = "删除",
             onConfirm = {
                 showDeleteDialog = false
@@ -1477,7 +1477,7 @@ private fun InitialRecordEditScreen(
                     cornerRadius = 20.dp
                 ) {
                     Text(
-                        text = "初始油量填写的是加油完成后的实际油量。本次加油量和金额作为同一条初始记录中的交易信息保存，不要再把加油量叠加到初始油量上。",
+                        text = "初始油量填写的是加油完成后的实际油量。\n 本次加油量和金额作为同一条初始记录中的交易信息保存，不要再把加油量叠加到初始油量上。",
                         modifier = Modifier.padding(16.dp),
                         fontSize = 13.sp,
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
@@ -1517,7 +1517,7 @@ private fun InitialRecordEditScreen(
     if (showConfirmDialog) {
         MiuixConfirmDialog(
             title = "确认修改初始记录",
-            message = "初始时间、里程或初始油量变化后，相关历史油耗计算可能发生变化。开启本次加油交易时，交易金额会保存在这条初始记录中；关闭交易开关时，这笔交易信息会被清空。",
+            message = "初始时间、里程或初始油量变化后，相关历史油耗计算可能发生变化。\n 开启本次加油交易时，交易金额会保存在这条初始记录中；关闭交易开关时，这笔交易信息会被清空。",
             confirmText = "确认修改",
             confirmColor = MiuixTheme.colorScheme.primary,
             onConfirm = {

@@ -502,7 +502,7 @@ fun HomeScreen(
 @Composable
 private fun EmptyVehicleCard(onAddVehicle: () -> Unit) {
     MiuixCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("还没有车辆", style = MiuixTheme.textStyles.title4, fontWeight = FontWeight.Bold)
             Text("添加你的车辆后开始记录油耗", style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceSecondary)
             MiuixButton(text = "添加车辆", onClick = onAddVehicle)
@@ -511,11 +511,51 @@ private fun EmptyVehicleCard(onAddVehicle: () -> Unit) {
 }
 
 @Composable
-private fun StatItem(title: String, value: String, modifier: Modifier = Modifier) {
+private fun StatItem(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
     Column(modifier = modifier) {
-        Text(title, fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
+        Text(
+            title,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurfaceSecondary
+        )
+
         Spacer(modifier = Modifier.height(3.dp))
-        Text(value, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MiuixTheme.colorScheme.onSurface)
+
+        val unitRegex = Regex("""\s*(L/100km|元/L|km|L|次)$""")
+        val match = unitRegex.find(value)
+
+        if (match != null) {
+            val number = value.substring(0, match.range.first)
+            val unit = match.groupValues[1]
+
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = number,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
+
+                Text(
+                    text = unit,
+                    fontSize = 12.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                    modifier = Modifier.padding(start = 3.dp, bottom = 1.dp)
+                )
+            }
+        } else {
+            Text(
+                text = value,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MiuixTheme.colorScheme.onSurface
+            )
+        }
     }
 }
 
@@ -542,7 +582,7 @@ private fun ConsumptionCard(
             Column {
                 Text(
                     text = "当前油耗",
-                    fontSize = 13.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
                     color = MiuixTheme.colorScheme.onSurface
                 )
@@ -562,8 +602,7 @@ private fun ConsumptionCard(
                     Text(
                         text = "L/100km",
                         fontSize = 12.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        modifier = Modifier.padding(bottom = 5.dp)
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
                 }
             }
@@ -586,7 +625,7 @@ private fun ConsumptionCard(
             ) {
                 Text(
                     text = "油耗统计",
-                    fontSize = 15.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     softWrap = false
@@ -653,7 +692,7 @@ private fun FabActionItem(icon: String, label: String, onClick: () -> Unit) {
         Row(modifier = Modifier.padding(start = 12.dp, end = 18.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(icon, fontSize = 18.sp)
             Spacer(Modifier.width(6.dp))
-            Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(label, fontSize = 16.sp, fontWeight = FontWeight.Medium)
         }
     }
 }

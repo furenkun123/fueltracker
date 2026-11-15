@@ -184,7 +184,7 @@ fun ConsumptionTrendCard(
         ) {
             Text(
                 text = "油耗趋势",
-                fontSize = 13.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold
             )
 

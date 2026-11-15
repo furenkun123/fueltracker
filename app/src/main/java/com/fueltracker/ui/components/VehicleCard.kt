@@ -1,105 +1,53 @@
 package com.fueltracker.ui.components
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.fueltracker.data.Vehicle
 import com.fueltracker.ui.miuix.MiuixCard
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+/**
+ * 首页车辆信息卡片
+ * 只展示品牌、车系、年款和车型。
+ */
 @Composable
 fun MiuixVehicleCard(
     vehicle: Vehicle,
-    modifier: Modifier = Modifier,
-    onSwitchClick: (() -> Unit)? = null,
-    onClick: (() -> Unit)? = null
+    modifier: Modifier = Modifier
 ) {
-    val cardModifier = modifier
-        .fillMaxWidth()
-        .padding(horizontal = 16.dp)
-
-    if (onClick != null) {
-        MiuixCard(
-            onClick = onClick,
-            modifier = cardModifier
-        ) {
-            MiuixVehicleCardContent(vehicle, onSwitchClick)
-        }
-    } else {
-        MiuixCard(modifier = cardModifier) {
-            MiuixVehicleCardContent(vehicle, onSwitchClick)
-        }
-    }
-}
-
-@Composable
-private fun MiuixVehicleCardContent(
-    vehicle: Vehicle,
-    onSwitchClick: (() -> Unit)?
-) {
-    Column(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+    MiuixCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(
+                horizontal = 16.dp,
+                vertical = 14.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "${vehicle.brand} ${vehicle.series}",
-                    style = MiuixTheme.textStyles.subtitle,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurface
-                )
-            }
+            Text(
+                text = "${vehicle.brand} ${vehicle.series}",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurface
+            )
 
-            if (onSwitchClick != null) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onSwitchClick() }
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "切换",
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.primary
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "切换车辆",
-                        tint = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
+            Text(
+                text = "${vehicle.year}款 ${vehicle.model}",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MiuixTheme.colorScheme.onSurfaceSecondary
+            )
         }
-
-        Text(
-            text = "${vehicle.year}款 ${vehicle.model}",
-            style = MiuixTheme.textStyles.body2,
-            color = MiuixTheme.colorScheme.onSurfaceSecondary
-        )
     }
 }
