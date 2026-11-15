@@ -433,10 +433,10 @@ fun VehicleScreen(
             MiuixSectionHeader(title = "初始数据（必填）")
             MiuixGroupCard {
                 MiuixInputItem(
-                    label = "当前里程",
+                    label = "当前里程 (km)",
                     value = initialOdometer,
                     onValueChange = { initialOdometer = it },
-                    placeholder = "必填，单位：km",
+                    placeholder = "必填",
                     keyboardType = KeyboardType.Decimal
                 )
                 if (initialOdometer.isNotBlank() && (parsedOdometer == null || parsedOdometer < 0.0)) {
@@ -469,15 +469,14 @@ fun VehicleScreen(
                     },
                     placeholder = "必填"
                 )
-                MiuixGroupCard {
-                    Column {
-                        Row(
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
                                     hasInitialRefueling = !hasInitialRefueling
                                 }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(vertical = 12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -647,7 +646,7 @@ fun VehicleScreen(
                                             }
                                         }
                                     }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    .padding(vertical = 12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -674,10 +673,10 @@ fun VehicleScreen(
                             }
 
                             Text(
-                                text = "当前油量填写的是本次加油完成后的油量。勾选加满后，会自动将当前油量设为油箱容量。",
+                                text = "当前油量填写的是本次加油完成后的油量。\n勾选加满后，会自动将当前油量设为油箱容量。",
                                 fontSize = 12.sp,
                                 color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                modifier = Modifier.padding(vertical = 8.dp)
                             )
 
                             if (!isInitialRefuelingValid) {
@@ -685,11 +684,10 @@ fun VehicleScreen(
                                     text = "请检查加油量、单价和金额。加油量 × 单价应等于原价，原价 − 优惠应等于实付。",
                                     fontSize = 12.sp,
                                     color = MiuixTheme.colorScheme.error,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    modifier = Modifier.padding(vertical = 8.dp)
                                 )
                             }
                         }
-                    }
                 }
                 if (initialFuel.isNotBlank() && !isFuelValid) {
                     Text(
@@ -865,10 +863,11 @@ private fun MiuixFuelInputListItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         MiuixFieldLabel(
-            text = title,
+            text = "$title ($unit)",
             modifier = Modifier.width(110.dp)
         )
-
+        // 与普通 MiuixInputItem 保持相同的输入起始位置
+        Spacer(modifier = Modifier.width(12.dp))
         // 纯数字输入框
         BasicTextField(
             value = value,
@@ -905,14 +904,6 @@ private fun MiuixFuelInputListItem(
             }
         )
 
-        // 固定后缀：不属于输入框内容
-        Text(
-            text = unit,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-            color = MiuixTheme.colorScheme.onSurfaceSecondary,
-            modifier = Modifier.padding(start = 2.dp)
-        )
 
         Spacer(modifier = Modifier.weight(1f))
 

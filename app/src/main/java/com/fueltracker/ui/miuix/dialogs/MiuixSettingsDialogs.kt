@@ -34,6 +34,12 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.style.TextDecoration
 
 // ============================================================
 // 公共弹窗外壳
@@ -262,12 +268,11 @@ fun MiuixPrivacyDialog(onDismiss: () -> Unit) {
             PrivacyInfoSection(
                 title = "十二、开发者与联系渠道",
                 body = """
-                应用名称：FuelTracker（随记油耗）
-                开发者：FuelTracker 项目个人维护者。
-                项目主页：
-                https://github.com/furenkun123/fueltracker
-                隐私问题、功能反馈及数据处理相关问题，可以通过 GitHub 项目反馈渠道联系维护者。
-                请勿在公开反馈中上传包含真实车辆、位置、费用或其他个人信息的备份文件。
+            应用名称：FuelTracker（随记油耗）
+            开发者：[酷安@丶安静的梦](https://www.coolapk.com/u/732187)
+            项目主页：[fueltracker](https://github.com/furenkun123/fueltracker)
+            隐私问题、功能反馈及数据处理相关问题，可以通过 GitHub 项目反馈渠道、酷安、QQ群联系维护者。
+            请勿在公开反馈中上传包含真实车辆、位置、费用或其他个人信息的备份文件。
             """.trimIndent()
             )
         )
@@ -303,6 +308,57 @@ fun MiuixPrivacyDialog(onDismiss: () -> Unit) {
         }
     }
 }
+@Composable
+private fun PrivacyBodyText(body: String) {
+    val linkColor = MiuixTheme.colorScheme.primary
+
+    val annotatedBody = remember(body, linkColor) {
+        buildAnnotatedString {
+            val linkRegex = Regex(
+                """\[([^]]+)]\((https?://[^)\s]+)\)"""
+            )
+
+            val linkStyles = TextLinkStyles(
+                style = SpanStyle(
+                    color = linkColor,
+                    textDecoration = TextDecoration.Underline
+                )
+            )
+
+            var lastIndex = 0
+
+            linkRegex.findAll(body).forEach { match ->
+                // 添加链接之前的普通文字
+                append(body.substring(lastIndex, match.range.first))
+
+                val linkText = match.groupValues[1]
+                val linkUrl = match.groupValues[2]
+
+                // 添加可点击链接
+                withLink(
+                    LinkAnnotation.Url(
+                        url = linkUrl,
+                        styles = linkStyles
+                    )
+                ) {
+                    append(linkText)
+                }
+
+                lastIndex = match.range.last + 1
+            }
+
+            // 添加剩余普通文字
+            append(body.substring(lastIndex))
+        }
+    }
+
+    Text(
+        text = annotatedBody,
+        fontSize = 13.sp,
+        color = MiuixTheme.colorScheme.onSurfaceSecondary,
+        lineHeight = 21.sp
+    )
+}
 
 // ============================================================
 // 隐私政策小节
@@ -327,12 +383,7 @@ private fun PrivacySection(
 
         Spacer(Modifier.height(6.dp))
 
-        Text(
-            text = body,
-            fontSize = 13.sp,
-            color = MiuixTheme.colorScheme.onSurfaceSecondary,
-            lineHeight = 21.sp
-        )
+        PrivacyBodyText(body)
     }
 }
 
@@ -441,11 +492,11 @@ fun MiuixInstructionsDialog(onDismiss: () -> Unit) {
             InstructionItem(
                 title = "油耗算法切换（谨慎调整）",
                 body = """
-        1. 支持在设置中切换油耗偏离值识别模式，建议一般用户保持“标准模式”。
-        2. 标准模式：采用默认异常识别规则，适合日常连续记录，推荐一般用户使用。
-        3. 宽松模式：放宽异常数据识别条件，适合凭记忆补录、导入历史记录或数据波动较大的情况。
-        4. 切换模式不会改变加油记录本身，也不会改变满箱法等基础计算流程，主要影响异常数据的识别与处理。不同模式下的油耗统计结果可能存在差异，确有必要时再调整。
-    """.trimIndent()
+                1. 支持在设置中切换油耗偏离值识别模式，建议一般用户保持“标准模式”。
+                2. 标准模式：采用默认异常识别规则，适合日常连续记录，推荐一般用户使用。
+                3. 宽松模式：放宽异常数据识别条件，适合凭记忆补录、导入历史记录或数据波动较大的情况。
+                4. 切换模式不会改变加油记录本身，也不会改变满箱法等基础计算流程，主要影响异常数据的识别与处理。不同模式下的油耗统计结果可能存在差异，确有必要时再调整。
+                """.trimIndent()
             ),
             InstructionItem(
                 title = "使用建议",
