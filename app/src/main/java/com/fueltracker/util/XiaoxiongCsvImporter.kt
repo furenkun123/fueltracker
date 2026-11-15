@@ -137,6 +137,7 @@ object XiaoxiongCsvImporter {
             Result.failure(e)
         }
     }
+
     suspend fun parseExpenseCsv(
         context: Context,
         uri: Uri,
@@ -193,6 +194,7 @@ object XiaoxiongCsvImporter {
             Result.failure(e)
         }
     }
+
     /**
      * 逐行读取 CSV。
      *
@@ -216,6 +218,7 @@ object XiaoxiongCsvImporter {
                 }
         }
     }
+
     private fun splitCsvLine(line: String): List<String> {
         val result = mutableListOf<String>()
         val buffer = StringBuilder()
@@ -230,9 +233,11 @@ object XiaoxiongCsvImporter {
                         inQuotes = !inQuotes
                     }
                 }
+
                 ',' if !inQuotes -> {
                     result.add(buffer.toString()); buffer.clear()
                 }
+
                 else -> buffer.append(c)
             }
             i++
@@ -270,30 +275,30 @@ object XiaoxiongCsvImporter {
             .replace("＃", "#")
             .replace(Regex("\\s+"), "")
 
-        if (value.isBlank()) return "92号"
+        if (value.isBlank()) return "92#"
 
-        // 汽油标号
+        // 汽油标号统一为 92#、95# 等格式
         val gasolineRegex = Regex(
             "^(89|90|92|93|95|97|98)[号#]?(?:汽油)?$"
         )
 
         val gasolineMatch = gasolineRegex.matchEntire(value)
         if (gasolineMatch != null) {
-            return "${gasolineMatch.groupValues[1]}号"
+            return "${gasolineMatch.groupValues[1]}#"
         }
 
-        // 柴油标号
+        // 柴油标号统一为 0# 柴油、-10# 柴油等格式
         val dieselRegex = Regex(
             "^(-?\\d{1,2})[号#]?柴油$"
         )
 
         val dieselMatch = dieselRegex.matchEntire(value)
         if (dieselMatch != null) {
-            return "${dieselMatch.groupValues[1]}号柴油"
+            return "${dieselMatch.groupValues[1]}# 柴油"
         }
 
-        // 空白或无法识别的内容统一归为 92 号
-        Log.w(TAG, "无法识别小熊油耗燃油标号，按 92 号处理：$raw")
-        return "92号"
+        // 空白或无法识别的内容统一归为 92#
+        Log.w(TAG, "无法识别小熊油耗燃油标号，按 92# 处理：$raw")
+        return "92#"
     }
 }

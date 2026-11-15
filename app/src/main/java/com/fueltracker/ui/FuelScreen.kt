@@ -77,6 +77,38 @@ private fun formatMoney(value: Double): String = if (!value.isFinite()) "" else 
 private fun formatVolume(value: Double): String = if (!value.isFinite()) "" else String.format(Locale.US, "%.3f", value).trimEnd('0').trimEnd('.')
 private fun formatPercent(value: Double): String = if (!value.isFinite()) "" else String.format(Locale.US, "%.1f", value).trimEnd('0').trimEnd('.')
 
+private fun normalizeFuelGradeForFuelForm(raw: String): String {
+    val trimmed = raw.trim().replace("＃", "#")
+
+    if (trimmed.isBlank()) return "92#"
+
+    val compact = trimmed.replace(Regex("\\s+"), "")
+
+    // 柴油标号
+    val dieselMatch = Regex(
+        """^(-?\d{1,2})[号#]?柴油$"""
+    ).matchEntire(compact)
+
+    if (dieselMatch != null) {
+        return "${dieselMatch.groupValues[1]}# 柴油"
+    }
+
+    // 汽油标号
+    val gasolineMatch = Regex(
+        """^(89|90|92|93|95|97|98)[号#]?(?:汽油)?$"""
+    ).matchEntire(compact)
+
+    if (gasolineMatch != null) {
+        return "${gasolineMatch.groupValues[1]}#"
+    }
+
+    return when {
+        trimmed.endsWith("#") -> trimmed
+        trimmed.contains("柴油") -> trimmed
+        else -> "${trimmed}#"
+    }
+}
+
 @Composable
 fun FuelScreen(
     viewModel: MainViewModel,
@@ -110,11 +142,10 @@ fun FuelScreen(
 
     val defaultFuelGrade = remember(currentVehicle, record) {
         val rawGrade = record?.fuelGrade?.takeIf { it.isNotBlank() }
-            ?: currentVehicle?.fuelGrade?.takeIf { it.isNotBlank() } ?: "92#"
-        val trimmed = rawGrade.trim()
-        if (trimmed.endsWith("#") || trimmed.contains("柴油")) trimmed else "${trimmed}#"
+            ?: currentVehicle?.fuelGrade?.takeIf { it.isNotBlank() }
+            ?: "92#"
+        normalizeFuelGradeForFuelForm(rawGrade)
     }
-
     val fuelGradeOptions = remember(defaultFuelGrade) {
         val baseList = mutableListOf("89#", "92#", "95#", "98#", "0# 柴油", "-10# 柴油")
         if (defaultFuelGrade !in baseList) baseList.add(0, defaultFuelGrade)
