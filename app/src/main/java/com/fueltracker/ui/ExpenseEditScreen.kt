@@ -79,11 +79,24 @@ fun ExpenseEditScreen(
     }
     val customCategories = customCategoriesState!!
 
-    val allCategories = remember(customCategories) { DEFAULT_EXPENSE_CATEGORIES + customCategories }
-
     // 费用表单：旋转屏幕后保留未保存的输入
     var category by rememberSaveable(record?.id) {
         mutableStateOf(record?.category ?: DEFAULT_EXPENSE_CATEGORIES.first())
+    }
+    // 始终保留当前记录的分类，兼容历史分类和未注册分类
+    val allCategories = remember(customCategories, category) {
+        val registeredCategories = DEFAULT_EXPENSE_CATEGORIES + customCategories
+
+        if (
+            category.isNotBlank() &&
+            registeredCategories.none {
+                it.equals(category, ignoreCase = true)
+            }
+        ) {
+            registeredCategories + category
+        } else {
+            registeredCategories
+        }
     }
     var amountText by rememberSaveable(record?.id) {
         mutableStateOf(
