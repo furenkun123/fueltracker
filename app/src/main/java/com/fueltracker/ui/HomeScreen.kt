@@ -140,11 +140,21 @@ fun HomeScreen(
 
     var showYearMonthPicker by remember { mutableStateOf(false) }
 
-    val availableYears = remember(records, customYear) {
-        (records.map { Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.YEAR) } + customYear)
-            .distinct().sortedDescending()
-    }
+    val availableYears = remember(records, customYear, dateBoundaryKey) {
+        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
 
+        (
+                records
+                    .filterNot { it.isInitialRecord }
+                    .map {
+                        Calendar.getInstance()
+                            .apply { timeInMillis = it.timestamp }
+                            .get(Calendar.YEAR)
+                    } +
+                        currentYear +
+                        customYear
+                ).distinct().sortedDescending()
+    }
     val statsRange = remember(
         selectedRange,
         customYear,

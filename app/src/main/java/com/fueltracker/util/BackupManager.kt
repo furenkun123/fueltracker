@@ -15,6 +15,10 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.OutputStreamWriter
+import java.nio.ByteBuffer
+import java.nio.CharBuffer
+import java.nio.charset.CodingErrorAction
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -650,14 +654,53 @@ object BackupManager {
             customCategories
         }
 
+    private fun utf8ByteSize(text: String): Long {
+        val encoder = Charsets.UTF_8.newEncoder()
+            .onMalformedInput(CodingErrorAction.REPLACE)
+            .onUnmappableCharacter(CodingErrorAction.REPLACE)
+
+        val input = CharBuffer.wrap(text)
+        val buffer = ByteBuffer.allocate(8 * 1024)
+
+        var totalBytes = 0L
+
+        while (true) {
+            val result = encoder.encode(input, buffer, true)
+
+            totalBytes += buffer.position().toLong()
+            buffer.clear()
+
+            if (result.isError) result.throwException()
+            if (result.isUnderflow) break
+        }
+
+        while (true) {
+            val result = encoder.flush(buffer)
+
+            totalBytes += buffer.position().toLong()
+            buffer.clear()
+
+            if (result.isError) result.throwException()
+            if (result.isUnderflow) break
+        }
+
+        return totalBytes
+    }
     suspend fun writeBackupToUri(context: Context, uri: Uri) =
         withContext(Dispatchers.IO) {
             val json = createBackupJson(context)
-            val bytes = json.toByteArray(Charsets.UTF_8)
-            context.contentResolver.openOutputStream(uri)?.use { stream ->
-                stream.write(bytes)
-                stream.flush()
-            } ?: throw IllegalStateException("无法创建备份文件")
+
+            // 检查实际 UTF-8 字节数，不额外创建完整 byte[]
+            require(utf8ByteSize(json) <= MAX_BACKUP_SIZE_BYTES) {
+                "备份文件超过 10 MB，无法生成当前版本可导入的备份"
+            }
+
+            val output = context.contentResolver.openOutputStream(uri)
+                ?: throw IllegalStateException("无法创建备份文件")
+
+            OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
+                writer.write(json)
+            }
         }
 
     /**
