@@ -784,6 +784,9 @@ class MainViewModel(
     fun addFuelRecord(record: FuelRecord, onComplete: (Result<Unit>) -> Unit = {}) {
         viewModelScope.launch {
             val result = try {
+                require(!record.isInitialRecord) {
+                    "车辆初始记录只能在添加车辆时创建，不能作为普通加油记录新增"
+                }
                 validateFuelRecord(record)
                 val vehicle = getCurrentVehicleFromDatabase() ?: throw IllegalStateException("没有当前车辆")
                 val targetVehicleId = vehicle.id
@@ -1177,6 +1180,9 @@ class MainViewModel(
                         // 防止记录与本次导入指定车辆不一致
                         require(source.vehicleId == targetVehicleId) {
                             "导入记录与目标车辆不一致"
+                        }
+                        require(!source.isInitialRecord) {
+                            "导入文件不能包含车辆初始记录"
                         }
 
                         validateFuelRecord(source)
