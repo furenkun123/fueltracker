@@ -1,5 +1,6 @@
 package com.fueltracker.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -10,6 +11,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -104,8 +106,21 @@ fun HomeScreen(
     onOpenSettings: () -> Unit
 ) {
     val dateBoundaryKey = rememberDateBoundaryKey()
+
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
+
+// 菜单展开时，返回键优先收起菜单
+    BackHandler(enabled = fabExpanded) {
+        fabExpanded = false
+    }
+
+// FAB 因滚动隐藏时，自动收起菜单
+    LaunchedEffect(viewModel.isFabVisible) {
+        if (!viewModel.isFabVisible) {
+            fabExpanded = false
+        }
+    }
 
     // 当前异常识别模式
     val outlierSensitivity = OutlierSensitivityPreferences.mode
@@ -375,6 +390,21 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+        // 菜单展开时，点击其他空白区域即可收起
+        if (fabExpanded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember {
+                            MutableInteractionSource()
+                        },
+                        indication = null
+                    ) {
+                        fabExpanded = false
+                    }
+            )
         }
 
         // 3. FAB：仍然独立悬浮在右下角
