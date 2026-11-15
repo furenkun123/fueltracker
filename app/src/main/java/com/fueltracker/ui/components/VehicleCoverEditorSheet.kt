@@ -156,9 +156,8 @@ fun VehicleCoverEditorSheet(
                             .fillMaxWidth()
                             .height(150.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                MiuixTheme.colorScheme.surfaceVariant
-                            )
+                            .clickable(onClick = onPickImage)
+                            .background(MiuixTheme.colorScheme.surfaceVariant)
                     ) {
                         if (previewBitmap != null) {
                             Image(
@@ -231,31 +230,19 @@ fun VehicleCoverEditorSheet(
                             .fillMaxWidth()
                             .height(150.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                MiuixTheme.colorScheme.surfaceVariant
-                            ),
+                            .clickable(onClick = onPickImage)
+                            .background(MiuixTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "尚未添加车辆封面",
+                            text = "点击添加车辆封面",
                             fontSize = 14.sp,
                             color = MiuixTheme.colorScheme.onSurfaceSecondary
                         )
                     }
                 }
 
-                if (coverUri == null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        CoverActionButton(
-                            text = "选择图片",
-                            color = MiuixTheme.colorScheme.primary,
-                            onClick = onPickImage
-                        )
-                    }
-                } else {
+                if (coverUri != null) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly,
