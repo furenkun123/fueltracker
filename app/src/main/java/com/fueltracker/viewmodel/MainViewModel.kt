@@ -666,22 +666,83 @@ class MainViewModel(
     fun updateVehicle(vehicle: Vehicle, onComplete: (Result<Unit>) -> Unit = {}) {
         viewModelScope.launch {
             val prev = _currentVehicleOverride.value
+
             val result = try {
-                require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) { "车辆品牌和车型不能为空" }
-                require(vehicle.fuelType.isNotBlank()) { "能源类型不能为空" }
+                require(vehicle.brand.isNotBlank() && vehicle.model.isNotBlank()) {
+                    "车辆品牌和车型不能为空"
+                }
+                require(vehicle.fuelType.isNotBlank()) {
+                    "能源类型不能为空"
+                }
+                require(vehicle.fuelType != "纯电动") {
+                    "当前版本不支持纯电动车辆"
+                }
+                require(vehicle.fuelGrade.isNotBlank()) {
+                    "燃油标号不能为空"
+                }
+                require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) {
+                    "油箱容量必须大于 0 的有限数值"
+                }
 
-                require(vehicle.fuelType != "纯电动") { "当前版本不支持纯电动车辆" }
-                require(vehicle.fuelGrade.isNotBlank()) { "燃油标号不能为空" }
-                require(vehicle.tankCapacity.isFinite() && vehicle.tankCapacity > 0.0) { "油箱容量必须大于 0 的有限数值" }
+                // 校验初始记录与新油箱容量是否兼容，并在同一事务中更新车辆
+                val updated = database.withTransaction {
+                    val old = vehicleDao.getVehicleById(vehicle.id)
+                        ?: throw IllegalArgumentException("车辆不存在")
 
-                val old = vehicleDao.getVehicleById(vehicle.id) ?: throw IllegalArgumentException("车辆不存在")
-                val updated = vehicle.copy(isCurrent = old.isCurrent)
+                    val initialRecords = fuelDao.getRecordsByVehicleId(vehicle.id)
+                        .filter { it.isInitialRecord }
+
+                    require(initialRecords.size <= 1) {
+                        "该车辆存在多条初始记录，无法修改车辆资料"
+                    }
+
+                    initialRecords.singleOrNull()?.let { initial ->
+                        val initialFuel = initial.initialFuel ?: initial.remainingFuel
+                        ?: throw IllegalArgumentException("车辆初始油量缺失，无法修改油箱容量")
+
+                        require(
+                            initialFuel.isFinite() &&
+                                    initialFuel >= 0.0 &&
+                                    initialFuel <= vehicle.tankCapacity + 1e-6
+                        ) {
+                            "新的油箱容量不能小于车辆初始油量"
+                        }
+
+                        require(initial.volume.isFinite() && initial.volume >= 0.0) {
+                            "初始加油量数据异常"
+                        }
+
+                        if (initial.volume > 0.0) {
+                            require(initial.volume <= vehicle.tankCapacity + 1e-6) {
+                                "新的油箱容量不能小于初始加油量"
+                            }
+                        } else {
+                            require(!initial.isFull) {
+                                "未记录初始加油交易，不能标记为已加满"
+                            }
+                        }
+
+                        if (initial.isFull) {
+                            require(abs(initialFuel - vehicle.tankCapacity) <= 0.01) {
+                                "初始记录标记为已加满，新的油箱容量必须与初始油量一致"
+                            }
+                        }
+                    }
+
+                    val updatedVehicle = vehicle.copy(isCurrent = old.isCurrent)
+
+                    if (vehicleDao.update(updatedVehicle) != 1) {
+                        throw IllegalStateException("更新失败，车辆可能已被删除")
+                    }
+
+                    updatedVehicle
+                }
+
+                // 数据库提交成功后，再更新当前车辆状态
                 if (currentVehicle.value?.id == vehicle.id || prev?.id == vehicle.id) {
                     _currentVehicleOverride.value = updated
                 }
-                if (vehicleDao.update(updated) != 1) {
-                    throw IllegalStateException("更新失败，车辆可能已被删除")
-                }
+
                 Result.success(Unit)
             } catch (e: CancellationException) {
                 throw e
@@ -690,10 +751,10 @@ class MainViewModel(
                 _currentVehicleOverride.value = prev
                 Result.failure(e)
             }
+
             onComplete(result)
         }
     }
-
     fun deleteVehicle(vehicle: Vehicle) {
         viewModelScope.launch {
             val oldOverride = _currentVehicleOverride.value
@@ -771,8 +832,23 @@ class MainViewModel(
                     require(fuel <= ownerVehicle.tankCapacity) {
                         "初始油量不能超过油箱容量"
                     }
-                }
 
+                    if (record.volume == 0.0) {
+                        require(!record.isFull) {
+                            "未记录初始加油时，不能标记为已加满"
+                        }
+                    } else {
+                        require(record.volume <= ownerVehicle.tankCapacity + 1e-6) {
+                            "初始加油量不能超过油箱容量"
+                        }
+
+                        if (record.isFull) {
+                            require(abs(fuel - ownerVehicle.tankCapacity) <= 0.01) {
+                                "已勾选加满，初始油量必须等于油箱容量"
+                            }
+                        }
+                    }
+                }
                 // 👇 DAO 必须返回 Int
                 if (fuelDao.update(record) != 1) {
                     throw IllegalStateException("更新失败，记录可能已被删除")
@@ -787,27 +863,35 @@ class MainViewModel(
         }
     }
 
-    fun deleteRecord(record: FuelRecord, onComplete: (Result<Unit>) -> Unit = {}) {
+    fun deleteRecord(
+        record: FuelRecord,
+        onComplete: (Result<Unit>) -> Unit = {}
+    ) {
         viewModelScope.launch {
             val result = try {
-                val existing = fuelDao.getRecordById(record.id) ?: throw IllegalArgumentException("记录不存在")
-                // 👇 DAO 必须返回 Int
-                if (fuelDao.delete(existing) != 1) {
-                    throw IllegalStateException("删除失败")
-                }
+                val existing = fuelDao.getRecordById(record.id)
+                    ?: throw IllegalArgumentException("记录不存在")
+
+                // 必须先判断记录类型，再执行数据库删除
                 require(!existing.isInitialRecord) {
                     "车辆初始记录不能删除"
                 }
+
+                if (fuelDao.delete(existing) != 1) {
+                    throw IllegalStateException("删除失败")
+                }
+
                 Result.success(Unit)
-            } catch (e: CancellationException) { throw e
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "deleteRecord failed", e)
                 Result.failure(e)
             }
+
             onComplete(result)
         }
     }
-
     // =========================================================
     // 费用操作
     // =========================================================

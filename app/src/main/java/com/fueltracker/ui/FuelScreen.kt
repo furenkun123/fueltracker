@@ -989,6 +989,14 @@ private fun InitialRecordEditScreen(
                                 isAmountConsistent &&
                                 isProductConsistent
                         )
+    // 已勾选加满时，初始油量必须等于油箱容量
+    val isFullConsistent =
+        !hasInitialRefueling ||
+                !isFull ||
+                (
+                        initialFuelValue != null &&
+                                abs(initialFuelValue - capacity) <= 0.01
+                        )
 
     // 实际保存的交易字段
     // 关闭交易开关时，将交易数据恢复为初始记录的空交易状态
@@ -1023,6 +1031,7 @@ private fun InitialRecordEditScreen(
                 timestamp > 0L &&
                 fuelGrade.isNotBlank() &&
                 isTransactionValid &&
+                isFullConsistent &&
                 hasChanges &&
                 !isSaving
 
@@ -1387,6 +1396,19 @@ private fun InitialRecordEditScreen(
                                     text = "本次加油已加满"
                                 ) {
                                     isFull = it
+
+                                    // 勾选加满时，自动将初始油量设置为油箱容量
+                                    if (it && capacity > 0.0) {
+                                        initialFuel = formatVolume(capacity)
+                                    }
+                                }
+
+                                if (isFull && !isFullConsistent) {
+                                    Text(
+                                        text = "已勾选加满，但初始油量必须等于油箱容量（${formatVolume(capacity)} L）",
+                                        fontSize = 12.sp,
+                                        color = MiuixTheme.colorScheme.error
+                                    )
                                 }
 
                                 if (

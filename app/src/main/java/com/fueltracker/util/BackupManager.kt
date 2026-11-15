@@ -77,8 +77,35 @@ object BackupManager {
             val initial = initialRecords.single()
             require(initial.odometer != null) { "数据库中的车辆初始化记录缺少当前里程，无法备份" }
             val initialFuel = initial.initialFuel ?: initial.remainingFuel
-            require(initialFuel != null && initialFuel <= owner.tankCapacity + 1e-6) {
+            ?: throw IllegalStateException("数据库中的车辆初始化油量缺失，无法备份")
+
+            require(
+                initialFuel.isFinite() &&
+                        initialFuel >= 0.0 &&
+                        initialFuel <= owner.tankCapacity + 1e-6
+            ) {
                 "数据库中的车辆初始化油量缺失或超过油箱容量，无法备份"
+            }
+
+            // 没有初始加油交易时，不能标记为已加满
+            if (initial.volume == 0.0) {
+                require(!initial.isFull) {
+                    "未记录初始加油交易，却标记为已加满，无法备份"
+                }
+            }
+
+            // 初始交易量不能超过油箱容量
+            if (initial.volume > 0.0) {
+                require(initial.volume <= owner.tankCapacity + 1e-6) {
+                    "初始加油量超过油箱容量，无法备份"
+                }
+            }
+
+            // 标记为已加满时，初始油量必须等于油箱容量
+            if (initial.isFull) {
+                require(abs(initialFuel - owner.tankCapacity) <= 0.01) {
+                    "初始记录标记为已加满，但初始油量与油箱容量不一致，无法备份"
+                }
             }
         }
         require(vehicles.all { initialRecordsByVehicle.containsKey(it.id) }) {
@@ -487,8 +514,36 @@ object BackupManager {
                 val initial = initialRecords.single()
                 require(initial.odometer != null) { "车辆初始化记录缺少当前里程" }
                 val initialFuel = initial.initialFuel ?: initial.remainingFuel
-                require(initialFuel != null) { "车辆初始化记录缺少当前剩余油量" }
-                require(initialFuel <= owner.tankCapacity + 1e-6) { "车辆初始化油量超过油箱容量" }
+                ?: throw IllegalArgumentException("车辆初始化记录缺少当前剩余油量")
+
+                require(
+                    initialFuel.isFinite() &&
+                            initialFuel >= 0.0 &&
+                            initialFuel <= owner.tankCapacity + 1e-6
+                ) {
+                    "车辆初始化油量超过油箱容量或数据无效"
+                }
+
+                // 没有初始加油交易时，不能标记为已加满
+                if (initial.volume == 0.0) {
+                    require(!initial.isFull) {
+                        "备份数据异常：未记录初始加油交易，却标记为已加满"
+                    }
+                }
+
+                // 初始交易量不能超过油箱容量
+                if (initial.volume > 0.0) {
+                    require(initial.volume <= owner.tankCapacity + 1e-6) {
+                        "备份数据异常：初始加油量超过油箱容量"
+                    }
+                }
+
+                // 标记为已加满时，初始油量必须等于油箱容量
+                if (initial.isFull) {
+                    require(abs(initialFuel - owner.tankCapacity) <= 0.01) {
+                        "备份数据异常：初始记录标记为已加满，但油量与油箱容量不一致"
+                    }
+                }
             }
             require(vehicles.all { initialRecordsByVehicle.containsKey(it.id) }) {
                 "备份文件损坏：有车辆缺少初始化记录"
