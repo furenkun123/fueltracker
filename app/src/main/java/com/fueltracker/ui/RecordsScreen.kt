@@ -201,15 +201,17 @@ fun RecordsScreen(
 
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
 
-    // 只用于界面展示的真实加油记录，排除自动生成的初始记录
-    val realRecords: List<FuelRecord> = remember(records) {
-        records.filterNot { record: FuelRecord ->
-            record.isInitialRecord
+    // 参与加油统计：普通加油记录 + 初始记录中真实发生的加油交易
+    val transactionRecords: List<FuelRecord> = remember(records) {
+        records.filter { record ->
+            !record.isInitialRecord ||
+                    (record.volume.isFinite() && record.volume > 0.0)
         }
     }
 
-    val availableYears: List<Int> = remember(realRecords, currentYear, selectedYear) {
-        val recordYears = realRecords.map { record ->
+// 年份选择同时考虑初始记录
+    val availableYears: List<Int> = remember(records, currentYear, selectedYear) {
+        val recordYears = records.map { record ->
             Calendar.getInstance()
                 .apply { timeInMillis = record.timestamp }
                 .get(Calendar.YEAR)
@@ -219,16 +221,14 @@ fun RecordsScreen(
             .distinct()
             .sortedDescending()
     }
-
     val displayRecords: List<FuelRecord> = remember(
-        realRecords,
+        transactionRecords,
         filterType,
         selectedYear,
         selectedMonth
     ) {
-        val sorted = realRecords.sortedByDescending { record ->
-            record.timestamp
-        }
+        val sorted = transactionRecords.sortedByDescending { it.timestamp }
+
         when (filterType) {
             "本月" -> {
                 val cNow = Calendar.getInstance()
@@ -247,12 +247,50 @@ fun RecordsScreen(
                         .apply { timeInMillis = record.timestamp }
 
                     c.get(Calendar.YEAR) == selectedYear &&
-                            (
-                                    selectedMonth == 0 ||
-                                            c.get(Calendar.MONTH) + 1 == selectedMonth
-                                    )
+                            (selectedMonth == 0 ||
+                                    c.get(Calendar.MONTH) + 1 == selectedMonth)
                 }
             }
+
+            else -> sorted
+        }
+    }
+
+// 时间线：普通加油记录 + 初始记录
+    val displayTimelineRecords: List<FuelRecord> = remember(
+        records,
+        filterType,
+        selectedYear,
+        selectedMonth
+    ) {
+        val sorted = records.sortedWith(
+            compareByDescending<FuelRecord> { it.timestamp }
+                .thenByDescending { it.id }
+        )
+
+        when (filterType) {
+            "本月" -> {
+                val cNow = Calendar.getInstance()
+                sorted.filter { record ->
+                    val c = Calendar.getInstance()
+                        .apply { timeInMillis = record.timestamp }
+
+                    c.get(Calendar.YEAR) == cNow.get(Calendar.YEAR) &&
+                            c.get(Calendar.MONTH) == cNow.get(Calendar.MONTH)
+                }
+            }
+
+            "按年月" -> {
+                sorted.filter { record ->
+                    val c = Calendar.getInstance()
+                        .apply { timeInMillis = record.timestamp }
+
+                    c.get(Calendar.YEAR) == selectedYear &&
+                            (selectedMonth == 0 ||
+                                    c.get(Calendar.MONTH) + 1 == selectedMonth)
+                }
+            }
+
             else -> sorted
         }
     }
@@ -308,10 +346,14 @@ fun RecordsScreen(
 
             item(key = "spacer") { Spacer(modifier = Modifier.height(8.dp)) }
 
-            if (displayRecords.isEmpty()) {
-                item(key = "empty_state") { EmptyRecordsState(modifier = Modifier.fillMaxWidth().height(300.dp)) }
+            if (displayTimelineRecords.isEmpty()) {
+                item(key = "empty_state") {
+                    EmptyRecordsState(
+                        modifier = Modifier.fillMaxWidth().height(300.dp)
+                    )
+                }
             } else {
-                items(displayRecords, key = { it.id }) { record ->
+                items(displayTimelineRecords, key = { it.id }) { record ->
                     FuelRecordCard(
                         record = record,
                         calculationResult = consumptionMap[record.id],
@@ -472,6 +514,13 @@ private fun FuelRecordCard(
                         color = MiuixTheme.colorScheme.onSurfaceSecondary,
                         modifier = Modifier.padding(top = 2.dp)
                     )
+                    if (record.isInitialRecord) {
+                        TagChip(
+                            "初始记录",
+                            MiuixTheme.colorScheme.primary,
+                            MiuixTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        )
+                    }
 
                     if (record.fuelGrade.isNotBlank()) {
                         TagChip(
@@ -528,17 +577,59 @@ private fun FuelRecordCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text("¥", fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
-                        Text("%.2f".format(record.actualPaidAmount), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    if (record.isInitialRecord) {
+                        Text(
+                            text = record.initialFuel
+                                ?.takeIf { it.isFinite() }
+                                ?.let { "%.2f L".format(it) }
+                                ?: "未记录",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = "初始油量",
+                            fontSize = 12.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary
+                        )
+
+                        // 将来初始记录包含加油交易时，也显示这笔交易信息
+                        if (record.volume.isFinite() && record.volume > 0.0) {
+                            Text(
+                                text = "本次加油 %.2f L · 实付 ¥%.2f".format(
+                                    record.volume,
+                                    record.actualPaidAmount
+                                ),
+                                fontSize = 12.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceSecondary
+                            )
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                "¥",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                            Text(
+                                "%.2f".format(record.actualPaidAmount),
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Text(
+                            text = "%.2f L · 单价 %.2f元/L".format(
+                                record.volume,
+                                record.unitPrice
+                            ),
+                            fontSize = 12.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    Text(
-                        text = "%.2f L · 单价 %.2f元/L".format(record.volume, record.unitPrice),
-                        fontSize = 12.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -580,7 +671,15 @@ private fun FuelRecordCard(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if ((record.odometer ?: 0.0) > 0) {
-                        Text("仪表盘里程: ${record.odometer!!.toInt()} km", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceSecondary)
+                        Text(
+                            text = if (record.isInitialRecord) {
+                                "初始里程: ${record.odometer!!.toInt()} km"
+                            } else {
+                                "仪表盘里程: ${record.odometer!!.toInt()} km"
+                            },
+                            fontSize = 11.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary
+                        )
                     }
                     record.remainingFuel?.takeIf { it.isFinite() }?.let {
                         Text(

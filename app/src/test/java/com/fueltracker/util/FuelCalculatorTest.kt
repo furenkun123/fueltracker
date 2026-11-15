@@ -225,4 +225,162 @@ class FuelCalculatorTest {
         assertEquals(10.0, results[1].consumption, 0.000001)
         assertTrue(results[1].isEstimated)
     }
+    @Test
+    fun initialRefuelingIsCountedInSummaryButNotRepeatedInConsumption() {
+        val vehicle = Vehicle(
+            id = 1L,
+            brand = "测试品牌",
+            series = "测试车系",
+            model = "测试车型",
+            year = 2024,
+            tankCapacity = 50.0,
+            fuelType = "汽油",
+            fuelGrade = "92#"
+        )
+
+        val day = 86_400_000L
+
+        val records = listOf(
+            FuelRecord(
+                id = 1L,
+                vehicleId = 1L,
+                timestamp = day,
+                odometer = 10_000.0,
+                volume = 8.0,
+                totalAmount = 60.0,
+                actualPaidAmount = 60.0,
+                unitPrice = 7.5,
+                isInitialRecord = true,
+                initialFuel = 30.0
+            ),
+            FuelRecord(
+                id = 2L,
+                vehicleId = 1L,
+                timestamp = day * 2,
+                odometer = 10_100.0,
+                volume = 5.0,
+                actualPaidAmount = 37.5,
+                unitPrice = 7.5,
+                isFull = false
+            ),
+            FuelRecord(
+                id = 3L,
+                vehicleId = 1L,
+                timestamp = day * 3,
+                odometer = 10_200.0,
+                volume = 25.0,
+                actualPaidAmount = 187.5,
+                unitPrice = 7.5,
+                isFull = true
+            )
+        )
+
+        val results = FuelCalculator.calculateAll(records, vehicle)
+
+        assertEquals(1, results.size)
+
+        // 初始油量已经包含初始记录的 8 L。
+        // 后续只计算 30 + 5 + 25 - 50 = 10 L。
+        assertEquals(10.0, results.single().fuelUsed, 0.000001)
+
+        val summary = FuelCalculator.calculateSummary(records, vehicle)
+
+        // 初始交易 + 后续两笔加油
+        assertEquals(3, summary.totalCount)
+        assertEquals(38.0, summary.totalVolume, 0.000001)
+        assertEquals(285.0, summary.totalCost, 0.000001)
+        assertEquals(7.5, summary.averagePrice!!, 0.000001)
+    }
+    @Test
+    fun initialRefuelingIsIncludedInHistoricalConsumptionInterval() {
+        val vehicle = Vehicle(
+            id = 1L,
+            brand = "测试品牌",
+            series = "测试车系",
+            model = "测试车型",
+            year = 2024,
+            tankCapacity = 50.0,
+            fuelType = "汽油",
+            fuelGrade = "92#"
+        )
+
+        val day = 86_400_000L
+
+        val records = listOf(
+            FuelRecord(
+                id = 1L,
+                vehicleId = 1L,
+                timestamp = day,
+                odometer = 9_000.0,
+                volume = 30.0,
+                actualPaidAmount = 225.0,
+                unitPrice = 7.5,
+                isFull = true
+            ),
+            FuelRecord(
+                id = 2L,
+                vehicleId = 1L,
+                timestamp = day * 2,
+                odometer = 9_050.0,
+                volume = 10.0,
+                actualPaidAmount = 75.0,
+                unitPrice = 7.5,
+                isFull = false
+            ),
+            FuelRecord(
+                id = 3L,
+                vehicleId = 1L,
+                timestamp = day * 3,
+                odometer = 9_100.0,
+                volume = 8.0,
+                totalAmount = 60.0,
+                actualPaidAmount = 60.0,
+                unitPrice = 7.5,
+                isInitialRecord = true,
+                initialFuel = 30.0
+            ),
+            FuelRecord(
+                id = 4L,
+                vehicleId = 1L,
+                timestamp = day * 4,
+                odometer = 9_150.0,
+                volume = 5.0,
+                actualPaidAmount = 37.5,
+                unitPrice = 7.5,
+                isFull = false
+            ),
+            FuelRecord(
+                id = 5L,
+                vehicleId = 1L,
+                timestamp = day * 5,
+                odometer = 9_200.0,
+                volume = 25.0,
+                actualPaidAmount = 187.5,
+                unitPrice = 7.5,
+                isFull = true
+            )
+        )
+
+        val results = FuelCalculator.calculateAll(records, vehicle)
+
+        assertEquals(2, results.size)
+
+        // 历史满箱 -> 初始记录：
+        // 50 + 10 + 8 - 30 = 38 L
+        assertEquals(38.0, results[0].fuelUsed, 0.000001)
+        assertEquals(38.0, results[0].consumption, 0.000001)
+
+        // 初始记录 -> 后续满箱：
+        // 30 + 5 + 25 - 50 = 10 L
+        // 初始记录中的 8 L 不应再次累计。
+        assertEquals(10.0, results[1].fuelUsed, 0.000001)
+        assertEquals(10.0, results[1].consumption, 0.000001)
+
+        val summary = FuelCalculator.calculateSummary(records, vehicle)
+
+        assertEquals(5, summary.totalCount)
+        assertEquals(78.0, summary.totalVolume, 0.000001)
+        assertEquals(585.0, summary.totalCost, 0.000001)
+        assertEquals(7.5, summary.averagePrice!!, 0.000001)
+    }
 }

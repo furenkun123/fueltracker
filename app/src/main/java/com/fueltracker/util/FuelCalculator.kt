@@ -294,9 +294,10 @@ object FuelCalculator {
             (startTime == null || timestamp >= startTime) &&
                     (endTime == null || timestamp <= endTime)
 
-        // 初始记录参与油耗分析，但不计入普通加油统计
+        // 纯初始状态不计入加油统计；初始记录中有实际加油量时，作为一笔交易统计
         val periodRecords = visible.filter {
-            !it.isInitialRecord && inPeriod(it.timestamp)
+            (!it.isInitialRecord || it.volume != 0.0) &&
+                    inPeriod(it.timestamp)
         }
         val rangeResults = analysis.results.filter { inPeriod(it.endTimestamp) }
 
@@ -624,9 +625,21 @@ object FuelCalculator {
                 val startFuelLevel = segmentStartFuelLevel ?: tankCapacity
                 val distance = currentOdometer - segmentStartOdometer
 
-                // 起点油量 + 区间加油量 - 初始记录时的油量
+                // 初始记录中的本次加油，也属于历史满箱到初始状态之间的加油量。
+                // 但如果加油量无效，则标记区间存在未解决的油量问题。
+                val initialRefuelingVolume = when {
+                    record.volume == 0.0 -> 0.0
+                    isValidVolume(record.volume, tankCapacity) -> record.volume
+                    else -> {
+                        state.markUnresolvedFuelGap()
+                        0.0
+                    }
+                }
+
+                // 起点油量 + 区间普通加油量 + 初始记录本次加油量 - 初始时实际油量
                 val fuelUsed = startFuelLevel
                     ?.plus(state.pendingFuel)
+                    ?.plus(initialRefuelingVolume)
                     ?.minus(endFuelLevel)
                     ?: Double.NaN
 

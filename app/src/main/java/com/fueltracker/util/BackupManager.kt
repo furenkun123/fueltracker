@@ -99,20 +99,34 @@ object BackupManager {
             requireNullableFiniteNonNegative(record.missedVolume, "漏记加油量")
             requireNullableFiniteNonNegative(record.consumption, "加油油耗")
 
-            if (record.isInitialRecord) {
-                require(
-                    record.volume == 0.0 &&
-                            record.unitPrice == 0.0 &&
-                            record.actualPaidAmount == 0.0
-                ) {
-                    "数据库存在初始化记录数值不为 0，无法备份"
+            if (record.isInitialRecord && record.volume == 0.0) {
+                // 纯初始状态：不能包含实际交易金额
+                require(record.unitPrice == 0.0) {
+                    "未记录初始加油时，单价必须为 0"
+                }
+                require(record.actualPaidAmount == 0.0) {
+                    "未记录初始加油时，实付金额必须为 0"
+                }
+                require(record.totalAmount == null || record.totalAmount == 0.0) {
+                    "未记录初始加油时，原价必须为空或 0"
+                }
+                require(record.discount == null || record.discount == 0.0) {
+                    "未记录初始加油时，优惠金额必须为空或 0"
                 }
             } else {
+                // 普通加油记录和包含初始加油交易的记录
                 require(record.volume > 0.0) {
-                    "数据库存在普通加油记录加油量为 0，无法备份"
+                    "加油量必须大于 0"
                 }
                 require(record.unitPrice > 0.0) {
-                    "数据库存在普通加油记录单价为 0，无法备份"
+                    "单价必须大于 0"
+                }
+            }
+
+// 初始记录包含交易时，必须有有效原价
+            if (record.isInitialRecord && record.volume > 0.0) {
+                require(record.totalAmount != null && record.totalAmount > 0.0) {
+                    "初始加油交易必须提供有效原价"
                 }
             }
 
@@ -152,12 +166,11 @@ object BackupManager {
                         "数据库存在原价不等于实付金额的记录，无法备份"
                     }
                 }
-                if (!record.isInitialRecord) {
+                if (record.volume > 0.0) {
                     require(abs((record.volume * record.unitPrice) - total) <= 0.1) {
                         "数据库存在加油量乘单价不等于原价的记录，无法备份"
                     }
-                }
-            }
+                }            }
         }
 
         expenses.forEach { expense ->
@@ -333,13 +346,22 @@ object BackupManager {
                 requireFiniteNonNegative(volume, "加油量")
                 requireFiniteNonNegative(unitPrice, "加油单价")
                 requireFiniteNonNegative(actualPaidAmount, "加油实付金额")
-                if (isInitial) {
-                    require(volume == 0.0) { "初始化记录的加油量必须为 0" }
-                    require(unitPrice == 0.0) { "初始化记录的单价必须为 0" }
-                    require(actualPaidAmount == 0.0) { "初始化记录的金额必须为 0" }
+                if (isInitial && volume == 0.0) {
+                    // 纯初始状态
+                    require(unitPrice == 0.0) {
+                        "未记录初始加油时，单价必须为 0"
+                    }
+                    require(actualPaidAmount == 0.0) {
+                        "未记录初始加油时，实付金额必须为 0"
+                    }
                 } else {
-                    require(volume > 0.0) { "普通加油记录的加油量必须大于 0" }
-                    require(unitPrice > 0.0) { "普通加油记录的单价必须大于 0" }
+                    // 普通交易或初始记录内的加油交易
+                    require(volume > 0.0) {
+                        "加油量必须大于 0"
+                    }
+                    require(unitPrice > 0.0) {
+                        "单价必须大于 0"
+                    }
                 }
 
                 val odometer = json.getNullableDouble("odometer")
@@ -365,6 +387,18 @@ object BackupManager {
                 val discount = json.getNullableDouble("discount")
                 requireNullableFiniteNonNegative(total, "原价")
                 requireNullableFiniteNonNegative(discount, "优惠金额")
+                if (isInitial && volume == 0.0) {
+                    require(total == null || total == 0.0) {
+                        "未记录初始加油时，原价必须为空或 0"
+                    }
+                    require(discount == null || discount == 0.0) {
+                        "未记录初始加油时，优惠金额必须为空或 0"
+                    }
+                } else if (isInitial) {
+                    require(total != null && total > 0.0) {
+                        "初始加油交易必须提供有效原价"
+                    }
+                }
 
                 if (discount != null && total == null) throw IllegalArgumentException("存在优惠金额时必须提供原价")
                 if (total != null) {
@@ -374,8 +408,10 @@ object BackupManager {
                     } else {
                         require(abs(total - actualPaidAmount) <= 0.05) { "原价应等于实付金额" }
                     }
-                    if (!isInitial) {
-                        require(abs((volume * unitPrice) - total) <= 0.1) { "加油量乘以单价应近似等于原价" }
+                    if (volume > 0.0) {
+                        require(abs((volume * unitPrice) - total) <= 0.1) {
+                            "加油量乘以单价应近似等于原价"
+                        }
                     }
                 }
 

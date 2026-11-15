@@ -21,7 +21,16 @@ data class MonthTrendPoint(val year: Int, val month: Int, val value: Double)
 data class StructureItem(val name: String, val amount: Double, val ratio: Float)
 
 fun inRange(timestamp: Long, start: Long?, end: Long?) =
-    (start == null || timestamp >= start) && (end == null || timestamp <= end)
+    (start == null || timestamp >= start) && (end == null || timestamp <= end)/**
+ * 判断加油记录是否包含真实交易。
+ * 普通加油记录正常计入；
+ * 初始记录只有包含有效加油量时才计入。
+ */
+fun FuelRecord.isFuelTransaction(): Boolean {
+    return !isInitialRecord ||
+            (volume.isFinite() && volume > 0.0)
+}
+
 
 fun computeExpenseRange(range: ExpenseRange, customYear: Int, customMonth: Int): Pair<Long?, Long?> {
     if (range == ExpenseRange.ALL) return null to null
@@ -58,7 +67,9 @@ fun computeSummary(
 
     // 数据过滤依然使用完整的时间范围（确保本月哪怕有未来录入的数据也被包含在内）
     val filteredExpenses = expenses.filter { inRange(it.timestamp, start, end) }
-    val filteredFuel = fuelRecords.filter { !it.isInitialRecord && inRange(it.timestamp, start, end) }
+    val filteredFuel = fuelRecords.filter {
+        it.isFuelTransaction() && inRange(it.timestamp, start, end)
+    }
     val total = filteredExpenses.sumOf { it.amount } + filteredFuel.sumOf { it.actualPaidAmount }
     val count = filteredExpenses.size + filteredFuel.size
 
@@ -112,7 +123,8 @@ fun buildMonthTrend(
         grouped[key] = (grouped[key] ?: 0.0) + amount
     }
 
-    fuelRecords.filter { !it.isInitialRecord }.forEach { accumulate(it.timestamp, it.actualPaidAmount) }
+    fuelRecords.filter { it.isFuelTransaction() }
+        .forEach { accumulate(it.timestamp, it.actualPaidAmount) }
     expenses.forEach { accumulate(it.timestamp, it.amount) }
 
     return grouped.entries
@@ -129,8 +141,15 @@ fun buildStructureData(
     val (start, end) = rangeBounds
     val map = mutableMapOf<String, Double>()
 
-    fuelRecords.filter { !it.isInitialRecord && inRange(it.timestamp, start, end) }
-        .sumOf { it.actualPaidAmount }.takeIf { it > 0 }?.let { map["加油"] = it }
+    fuelRecords.filter {
+        it.isFuelTransaction() && inRange(it.timestamp, start, end)
+    }.sumOf {
+        it.actualPaidAmount
+    }.takeIf {
+        it > 0
+    }?.let {
+        map["加油"] = it
+    }
 
     expenses.filter { inRange(it.timestamp, start, end) }.groupBy { it.category }.forEach { (cat, list) ->
         map[cat] = (map[cat] ?: 0.0) + list.sumOf { it.amount }

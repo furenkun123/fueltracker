@@ -62,6 +62,7 @@ import com.fueltracker.util.computeExpenseRange
 import com.fueltracker.util.computeSummary
 import com.fueltracker.util.getYear
 import com.fueltracker.util.inRange
+import com.fueltracker.util.isFuelTransaction
 import com.fueltracker.util.toDateTimeTextWithYear
 import com.fueltracker.util.toMoneyText
 import com.fueltracker.viewmodel.MainViewModel
@@ -120,7 +121,7 @@ fun ExpenseScreen(
         val currentYear = System.currentTimeMillis().getYear()
         (
                 expenses.map { it.timestamp.getYear() } +
-                        fuelRecords.filter { !it.isInitialRecord }.map { it.timestamp.getYear() } +
+                        fuelRecords.filter { it.isFuelTransaction() }.map { it.timestamp.getYear() } +
                         currentYear
                 ).distinct().sortedDescending()
     }
@@ -144,7 +145,7 @@ fun ExpenseScreen(
     val trendYears = remember(expenses, fuelRecords) {
         (
                 expenses.map { it.timestamp.getYear() } +
-                        fuelRecords.filter { !it.isInitialRecord }.map { it.timestamp.getYear() }
+                        fuelRecords.filter { it.isFuelTransaction() }.map { it.timestamp.getYear() }
                 ).distinct().sortedDescending()
     }
 
@@ -165,8 +166,11 @@ fun ExpenseScreen(
         val includeExpense = selectedCategory == null || selectedCategory != CATEGORY_FUEL
 
         if (includeFuel) {
-            fuelRecords.filter { !it.isInitialRecord && inRange(it.timestamp, start, end) }
-                .forEach { list.add(ExpenseListItem.Fuel(it)) }
+            fuelRecords.filter {
+                it.isFuelTransaction() && inRange(it.timestamp, start, end)
+            }.forEach {
+                list.add(ExpenseListItem.Fuel(it))
+            }
         }
         if (includeExpense) {
             expenses.filter { inRange(it.timestamp, start, end) && (selectedCategory == null || it.category == selectedCategory) }
@@ -180,7 +184,8 @@ fun ExpenseScreen(
         buildMonthTrend(expenses, fuelRecords, selectedTrendYear)
     }
 
-    val isEmpty = expenses.isEmpty() && fuelRecords.none { !it.isInitialRecord }
+    val isEmpty = expenses.isEmpty() &&
+            fuelRecords.none { it.isFuelTransaction() }
 
     val currentVehicle by viewModel.currentVehicle.collectAsState()
     val scrollKey = "expenses:${currentVehicle?.id ?: "none"}"

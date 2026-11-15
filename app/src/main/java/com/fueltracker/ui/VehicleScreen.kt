@@ -71,6 +71,8 @@ import top.yukonga.miuix.kmp.window.WindowListPopup
 import java.util.Calendar
 import java.util.Locale
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.fueltracker.ui.miuix.MiuixSwitch
+import kotlin.math.abs
 
 // 预设选择列表
 private val FuelTypeOptions = listOf("汽油", "柴油", "插电混动", "油电混动", "增程式")
@@ -155,6 +157,34 @@ fun VehicleScreen(
     var fuelUnit by rememberSaveable(vehicle?.id) {
         mutableStateOf("L")
     }
+    // 是否同时记录车辆录入时的真实加油交易
+    var hasInitialRefueling by rememberSaveable(vehicle?.id) {
+        mutableStateOf(false)
+    }
+
+    var initialRefuelVolume by rememberSaveable(vehicle?.id) {
+        mutableStateOf("")
+    }
+
+    var initialRefuelUnitPrice by rememberSaveable(vehicle?.id) {
+        mutableStateOf("")
+    }
+
+    var initialRefuelTotalAmount by rememberSaveable(vehicle?.id) {
+        mutableStateOf("")
+    }
+
+    var initialRefuelDiscount by rememberSaveable(vehicle?.id) {
+        mutableStateOf("")
+    }
+
+    var initialRefuelPaidAmount by rememberSaveable(vehicle?.id) {
+        mutableStateOf("")
+    }
+
+    var initialRefuelingIsFull by rememberSaveable(vehicle?.id) {
+        mutableStateOf(false)
+    }
 
     // UI 状态
     var showCarPicker by remember { mutableStateOf(false) }
@@ -181,6 +211,38 @@ fun VehicleScreen(
     val parsedCapacity = tankCapacity.toDoubleOrNull()
     val parsedOdometer = initialOdometer.toDoubleOrNull()
     val parsedFuel = initialFuel.toDoubleOrNull()
+    val parsedInitialRefuelVolume = initialRefuelVolume.toDoubleOrNull()
+    val parsedInitialRefuelUnitPrice = initialRefuelUnitPrice.toDoubleOrNull()
+    val parsedInitialRefuelTotalAmount = initialRefuelTotalAmount.toDoubleOrNull()
+    val parsedInitialRefuelDiscount =
+        if (initialRefuelDiscount.isBlank()) 0.0
+        else initialRefuelDiscount.toDoubleOrNull()
+
+    val parsedInitialRefuelPaidAmount = initialRefuelPaidAmount.toDoubleOrNull()
+
+    val isInitialRefuelingValid = !hasInitialRefueling || run {
+
+        parsedInitialRefuelVolume != null &&
+                parsedInitialRefuelVolume.isFinite() &&
+                parsedInitialRefuelVolume > 0.0 &&
+                parsedCapacity != null &&
+                parsedInitialRefuelVolume <= parsedCapacity &&
+                parsedInitialRefuelUnitPrice != null &&
+                parsedInitialRefuelUnitPrice.isFinite() &&
+                parsedInitialRefuelUnitPrice > 0.0 &&
+                parsedInitialRefuelTotalAmount != null &&
+                parsedInitialRefuelTotalAmount.isFinite() &&
+                parsedInitialRefuelTotalAmount > 0.0 &&
+                parsedInitialRefuelDiscount != null &&
+                parsedInitialRefuelDiscount.isFinite() &&
+                parsedInitialRefuelDiscount >= 0.0 &&
+                parsedInitialRefuelDiscount <= parsedInitialRefuelTotalAmount &&
+                parsedInitialRefuelPaidAmount != null &&
+                parsedInitialRefuelPaidAmount.isFinite() &&
+                parsedInitialRefuelPaidAmount > 0.0 &&
+                abs(parsedInitialRefuelVolume * parsedInitialRefuelUnitPrice - parsedInitialRefuelTotalAmount) <= 0.1 &&
+                abs(parsedInitialRefuelTotalAmount - parsedInitialRefuelDiscount - parsedInitialRefuelPaidAmount) <= 0.05
+    }
 
     val isSupportedFuelType = fuelType in FuelTypeOptions
     val isCapacityValid = parsedCapacity != null && parsedCapacity.isFinite() && parsedCapacity > 0.0
@@ -198,8 +260,14 @@ fun VehicleScreen(
             )
 
     val isFuelGradeValid = fuelGrade.isNotBlank()
-    val canSave = brand.isNotBlank() && model.isNotBlank() && isSupportedFuelType &&
-            isFuelGradeValid && isCapacityValid && isOdometerValid && isFuelValid
+    val canSave = brand.isNotBlank() &&
+            model.isNotBlank() &&
+            isSupportedFuelType &&
+            isFuelGradeValid &&
+            isCapacityValid &&
+            isOdometerValid &&
+            isFuelValid &&
+            isInitialRefuelingValid
 
     if (showCarPicker) {
         BackHandler { showCarPicker = false }
@@ -401,6 +469,228 @@ fun VehicleScreen(
                     },
                     placeholder = "必填"
                 )
+                MiuixGroupCard {
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    hasInitialRefueling = !hasInitialRefueling
+                                }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "同时记录本次加油",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MiuixTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "刚才加油了？开启后可同时记录金额和加油量",
+                                    fontSize = 12.sp,
+                                    color = MiuixTheme.colorScheme.onSurfaceSecondary
+                                )
+                            }
+
+                            MiuixSwitch(
+                                checked = hasInitialRefueling,
+                                onCheckedChange = { hasInitialRefueling = it }
+                            )
+                        }
+
+                        if (hasInitialRefueling) {
+                            HorizontalDivider(
+                                color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                thickness = 0.5.dp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+
+                            MiuixInputItem(
+                                label = "加油量 (L)",
+                                value = initialRefuelVolume,
+                                onValueChange = { newValue ->
+                                    initialRefuelVolume = newValue
+
+                                    val volume = newValue.toDoubleOrNull()
+                                    val price = initialRefuelUnitPrice.toDoubleOrNull()
+
+                                    if (volume != null && price != null) {
+                                        val total = volume * price
+                                        if (total.isFinite()) {
+                                            initialRefuelTotalAmount =
+                                                String.format(Locale.US, "%.2f", total)
+
+                                            val discount =
+                                                initialRefuelDiscount.toDoubleOrNull() ?: 0.0
+
+                                            initialRefuelPaidAmount =
+                                                String.format(
+                                                    Locale.US,
+                                                    "%.2f",
+                                                    (total - discount).coerceAtLeast(0.0)
+                                                )
+                                        }
+                                    }
+                                },
+                                placeholder = "例如：30",
+                                keyboardType = KeyboardType.Decimal
+                            )
+
+                            MiuixInputItem(
+                                label = "单价 (元/L)",
+                                value = initialRefuelUnitPrice,
+                                onValueChange = { newValue ->
+                                    initialRefuelUnitPrice = newValue
+
+                                    val volume = initialRefuelVolume.toDoubleOrNull()
+                                    val price = newValue.toDoubleOrNull()
+
+                                    if (volume != null && price != null) {
+                                        val total = volume * price
+                                        if (total.isFinite()) {
+                                            initialRefuelTotalAmount =
+                                                String.format(Locale.US, "%.2f", total)
+
+                                            val discount =
+                                                initialRefuelDiscount.toDoubleOrNull() ?: 0.0
+
+                                            initialRefuelPaidAmount =
+                                                String.format(
+                                                    Locale.US,
+                                                    "%.2f",
+                                                    (total - discount).coerceAtLeast(0.0)
+                                                )
+                                        }
+                                    }
+                                },
+                                placeholder = "例如：7.00",
+                                keyboardType = KeyboardType.Decimal
+                            )
+
+                            MiuixInputItem(
+                                label = "原价 (元)",
+                                value = initialRefuelTotalAmount,
+                                onValueChange = { newValue ->
+                                    initialRefuelTotalAmount = newValue
+
+                                    val total = newValue.toDoubleOrNull()
+                                    val discount =
+                                        initialRefuelDiscount.toDoubleOrNull() ?: 0.0
+
+                                    if (total != null && total.isFinite()) {
+                                        initialRefuelPaidAmount =
+                                            String.format(
+                                                Locale.US,
+                                                "%.2f",
+                                                (total - discount).coerceAtLeast(0.0)
+                                            )
+                                    }
+                                },
+                                placeholder = "自动计算，也可修改",
+                                keyboardType = KeyboardType.Decimal
+                            )
+
+                            MiuixInputItem(
+                                label = "优惠 (元)",
+                                value = initialRefuelDiscount,
+                                onValueChange = { newValue ->
+                                    initialRefuelDiscount = newValue
+
+                                    val total = initialRefuelTotalAmount.toDoubleOrNull()
+                                    val discount =
+                                        if (newValue.isBlank()) 0.0
+                                        else newValue.toDoubleOrNull()
+
+                                    if (total != null && discount != null &&
+                                        total.isFinite() && discount.isFinite()
+                                    ) {
+                                        initialRefuelPaidAmount =
+                                            String.format(
+                                                Locale.US,
+                                                "%.2f",
+                                                (total - discount).coerceAtLeast(0.0)
+                                            )
+                                    }
+                                },
+                                placeholder = "没有优惠可留空",
+                                keyboardType = KeyboardType.Decimal
+                            )
+
+                            MiuixInputItem(
+                                label = "实际支付 (元)",
+                                value = initialRefuelPaidAmount,
+                                onValueChange = { initialRefuelPaidAmount = it },
+                                placeholder = "自动计算，也可修改",
+                                keyboardType = KeyboardType.Decimal
+                            )
+
+                            HorizontalDivider(
+                                color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                thickness = 0.5.dp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        initialRefuelingIsFull = !initialRefuelingIsFull
+
+                                        if (initialRefuelingIsFull && parsedCapacity != null) {
+                                            initialFuel = if (fuelUnit == "L") {
+                                                String.format(Locale.US, "%.2f", parsedCapacity)
+                                            } else {
+                                                "100"
+                                            }
+                                        }
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "本次加油已加满",
+                                    fontSize = 15.sp,
+                                    color = MiuixTheme.colorScheme.onSurface
+                                )
+
+                                MiuixSwitch(
+                                    checked = initialRefuelingIsFull,
+                                    onCheckedChange = { checked ->
+                                        initialRefuelingIsFull = checked
+
+                                        if (checked && parsedCapacity != null) {
+                                            initialFuel = if (fuelUnit == "L") {
+                                                String.format(Locale.US, "%.2f", parsedCapacity)
+                                            } else {
+                                                "100"
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+
+                            Text(
+                                text = "当前油量填写的是本次加油完成后的油量。勾选加满后，会自动将当前油量设为油箱容量。",
+                                fontSize = 12.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+
+                            if (!isInitialRefuelingValid) {
+                                Text(
+                                    text = "请检查加油量、单价和金额。加油量 × 单价应等于原价，原价 − 优惠应等于实付。",
+                                    fontSize = 12.sp,
+                                    color = MiuixTheme.colorScheme.error,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
                 if (initialFuel.isNotBlank() && !isFuelValid) {
                     Text(
                         text = if (fuelUnit == "L") "剩余油量不能超过油箱容量" else "百分比必须在 0～100 之间",
@@ -448,6 +738,31 @@ fun VehicleScreen(
                         baseVehicle.copy(isCurrent = true),
                         currentOdometer = finalOdometer,
                         currentFuel = finalFuel,
+
+                        initialRefuelingVolume = if (hasInitialRefueling) {
+                            parsedInitialRefuelVolume ?: 0.0
+                        } else 0.0,
+
+                        initialRefuelingUnitPrice = if (hasInitialRefueling) {
+                            parsedInitialRefuelUnitPrice ?: 0.0
+                        } else 0.0,
+
+                        initialRefuelingTotalAmount = if (hasInitialRefueling) {
+                            parsedInitialRefuelTotalAmount
+                        } else null,
+
+                        initialRefuelingDiscount = if (
+                            hasInitialRefueling && initialRefuelDiscount.isNotBlank()
+                        ) {
+                            parsedInitialRefuelDiscount
+                        } else null,
+
+                        initialRefuelingPaidAmount = if (hasInitialRefueling) {
+                            parsedInitialRefuelPaidAmount ?: 0.0
+                        } else 0.0,
+
+                        initialRefuelingIsFull = hasInitialRefueling && initialRefuelingIsFull,
+
                         onComplete = onResult
                     )
                 }

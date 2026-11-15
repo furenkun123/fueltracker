@@ -371,55 +371,110 @@ class MainViewModel(
     }
 
     private fun validateFuelRecord(record: FuelRecord) {
-        require(record.timestamp > 0L) { "加油时间无效" }
+        require(record.timestamp > 0L) { "记录时间无效" }
 
         requireNullableNonNegative(record.odometer, "里程")
         requireNullableNonNegative(record.remainingFuel, "剩余油量")
         requireNullableNonNegative(record.initialFuel, "初始油量")
         requireNullableNonNegative(record.consumption, "油耗")
 
-        if (record.isInitialRecord) {
-            require(record.volume == 0.0) { "初始化记录的加油量必须为 0" }
-            require(record.unitPrice == 0.0) { "初始化记录的单价必须为 0" }
-            require(record.actualPaidAmount == 0.0) { "初始化记录的金额必须为 0" }
+        require(record.volume.isFinite() && record.volume >= 0.0) {
+            "加油量必须是有效的非负数"
+        }
+
+        if (record.isInitialRecord && record.volume == 0.0) {
+            // 纯初始状态：没有同时记录加油交易
+            require(record.unitPrice == 0.0) {
+                "未记录初始加油时，单价必须为 0"
+            }
+            require(record.actualPaidAmount == 0.0) {
+                "未记录初始加油时，实付金额必须为 0"
+            }
+            require(record.totalAmount == null || record.totalAmount == 0.0) {
+                "未记录初始加油时，原价必须为空"
+            }
+            require(record.discount == null || record.discount == 0.0) {
+                "未记录初始加油时，优惠金额必须为空"
+            }
         } else {
-            require(record.volume > 0.0) { "加油量必须大于 0" }
-            require(record.unitPrice > 0.0) { "单价必须大于 0" }
+            // 普通加油记录，或者包含真实加油交易的初始记录
+            require(record.volume > 0.0) {
+                "加油量必须大于 0"
+            }
+            require(record.unitPrice.isFinite() && record.unitPrice > 0.0) {
+                "单价必须大于 0"
+            }
             requireNonNegative(record.actualPaidAmount, "实付金额")
+
+            if (record.isInitialRecord) {
+                require(record.totalAmount != null && record.totalAmount > 0.0) {
+                    "初始加油原价必须大于 0"
+                }
+            }
         }
 
         if (record.hasMissedRecord) {
-            require(record.missedOdometer != null && record.missedOdometer.isFinite() && record.missedOdometer > 0.0) { "漏记里程必须大于 0" }
-            require(record.missedVolume != null && record.missedVolume.isFinite() && record.missedVolume > 0.0) { "漏记加油量必须大于 0" }
+            require(
+                record.missedOdometer != null &&
+                        record.missedOdometer.isFinite() &&
+                        record.missedOdometer > 0.0
+            ) {
+                "漏记里程必须大于 0"
+            }
+
+            require(
+                record.missedVolume != null &&
+                        record.missedVolume.isFinite() &&
+                        record.missedVolume > 0.0
+            ) {
+                "漏记加油量必须大于 0"
+            }
+
             if (record.odometer != null) {
-                require(record.missedOdometer < record.odometer) { "漏记里程必须小于当前里程" }
+                require(record.missedOdometer < record.odometer) {
+                    "漏记里程必须小于当前里程"
+                }
             }
         } else {
-            require(record.missedOdometer == null && record.missedVolume == null) { "未勾选漏记时，漏记字段必须为空" }
+            require(
+                record.missedOdometer == null &&
+                        record.missedVolume == null
+            ) {
+                "未勾选漏记时，漏记字段必须为空"
+            }
         }
 
         requireNullableNonNegative(record.totalAmount, "原价")
         requireNullableNonNegative(record.discount, "优惠金额")
 
         val total = record.totalAmount
-        val disc = record.discount
+        val discount = record.discount
         val paid = record.actualPaidAmount
 
         if (total != null) {
-            if (disc != null) {
-                require(disc <= total) { "优惠金额不能超过原价" }
-                require(abs((total - disc) - paid) <= 0.05) { "原价减去优惠金额应等于实付金额" }
+            if (discount != null) {
+                require(discount <= total) {
+                    "优惠金额不能超过原价"
+                }
+                require(abs((total - discount) - paid) <= 0.05) {
+                    "原价减去优惠金额应等于实付金额"
+                }
             } else {
-                require(abs(total - paid) <= 0.05) { "原价应等于实付金额" }
+                require(abs(total - paid) <= 0.05) {
+                    "原价应等于实付金额"
+                }
             }
+        }
 
-            if (!record.isInitialRecord) {
-                val expectedTotal = record.volume * record.unitPrice
-                require(abs(expectedTotal - total) <= 0.1) { "加油量乘以单价应近似等于原价" }
+        // 只要存在真实加油交易，就必须校验油量和单价
+        if (record.volume > 0.0) {
+            val expectedTotal = record.volume * record.unitPrice
+
+            require(abs(expectedTotal - (total ?: 0.0)) <= 0.1) {
+                "加油量乘以单价应近似等于原价"
             }
         }
     }
-
     private fun validateExpenseRecord(record: ExpenseRecord) {
         require(record.timestamp > 0L) { "费用时间无效" }
         require(record.category.isNotBlank()) { "费用分类不能为空" }
@@ -454,6 +509,12 @@ class MainViewModel(
         vehicle: Vehicle,
         currentOdometer: Double,
         currentFuel: Double?,
+        initialRefuelingVolume: Double = 0.0,
+        initialRefuelingUnitPrice: Double = 0.0,
+        initialRefuelingTotalAmount: Double? = null,
+        initialRefuelingDiscount: Double? = null,
+        initialRefuelingPaidAmount: Double = 0.0,
+        initialRefuelingIsFull: Boolean = false,
         onComplete: (Result<Unit>) -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -471,6 +532,75 @@ class MainViewModel(
                         currentFuel >= 0.0 && currentFuel <= vehicle.tankCapacity) {
                     "当前剩余油量必须填写，且不能超过油箱容量"
                 }
+                require(
+                    initialRefuelingVolume.isFinite() &&
+                            initialRefuelingVolume >= 0.0
+                ) {
+                    "初始加油量无效"
+                }
+
+                val hasInitialRefueling = initialRefuelingVolume > 0.0
+
+                if (hasInitialRefueling) {
+                    require(initialRefuelingVolume <= vehicle.tankCapacity) {
+                        "初始加油量不能超过油箱容量"
+                    }
+
+                    require(
+                        initialRefuelingUnitPrice.isFinite() &&
+                                initialRefuelingUnitPrice > 0.0
+                    ) {
+                        "初始加油单价必须大于 0"
+                    }
+
+                    val total = initialRefuelingTotalAmount
+                        ?: throw IllegalArgumentException("初始加油原价不能为空")
+
+                    val discount = initialRefuelingDiscount ?: 0.0
+
+                    require(total.isFinite() && total > 0.0) {
+                        "初始加油原价必须大于 0"
+                    }
+
+                    require(discount.isFinite() && discount >= 0.0 && discount <= total) {
+                        "初始加油优惠金额无效"
+                    }
+
+                    require(
+                        initialRefuelingPaidAmount.isFinite() &&
+                                initialRefuelingPaidAmount > 0.0
+                    ) {
+                        "初始加油实付金额必须大于 0"
+                    }
+
+                    require(
+                        abs(total - discount - initialRefuelingPaidAmount) <= 0.05
+                    ) {
+                        "初始加油原价减优惠金额应等于实付金额"
+                    }
+
+                    require(
+                        abs(initialRefuelingVolume * initialRefuelingUnitPrice - total) <= 0.1
+                    ) {
+                        "初始加油量乘以单价应等于原价"
+                    }
+
+                    if (initialRefuelingIsFull) {
+                        require(abs(currentFuel - vehicle.tankCapacity) <= 0.01) {
+                            "已勾选加满，当前油量必须等于油箱容量"
+                        }
+                    }
+                } else {
+                    require(
+                        initialRefuelingUnitPrice == 0.0 &&
+                                initialRefuelingTotalAmount == null &&
+                                initialRefuelingDiscount == null &&
+                                initialRefuelingPaidAmount == 0.0 &&
+                                !initialRefuelingIsFull
+                    ) {
+                        "未启用初始加油时，不应包含交易数据"
+                    }
+                }
 
                 val insertedVehicle = vehicle.copy(isCurrent = true)
                 val newId = database.withTransaction {
@@ -485,14 +615,19 @@ class MainViewModel(
                             timestamp = initialTimestamp,
                             fuelGrade = insertedVehicle.fuelGrade,
                             odometer = currentOdometer,
-                            volume = 0.0,
-                            actualPaidAmount = 0.0,
-                            unitPrice = 0.0,
+
+                            // 初始记录可以同时包含真实加油交易
+                            volume = if (hasInitialRefueling) initialRefuelingVolume else 0.0,
+                            totalAmount = if (hasInitialRefueling) initialRefuelingTotalAmount else null,
+                            discount = if (hasInitialRefueling) initialRefuelingDiscount else null,
+                            actualPaidAmount = if (hasInitialRefueling) initialRefuelingPaidAmount else 0.0,
+                            unitPrice = if (hasInitialRefueling) initialRefuelingUnitPrice else 0.0,
+
+                            isFull = hasInitialRefueling && initialRefuelingIsFull,
                             isInitialRecord = true,
                             initialFuel = currentFuel,
                             note = "车辆初始记录"
-                        )
-                    )
+                        )                    )
                     id
                 }
 
@@ -612,9 +747,31 @@ class MainViewModel(
                 require(record.id > 0L) { "加油记录 ID 无效" }
                 validateFuelRecord(record)
 
-                val existing = fuelDao.getRecordById(record.id) ?: throw IllegalArgumentException("记录不存在")
-                require(record.vehicleId == existing.vehicleId) { "不能通过编辑更改所属车辆" }
-                requireVehicleExists(existing.vehicleId)
+                val existing = fuelDao.getRecordById(record.id)
+                    ?: throw IllegalArgumentException("记录不存在")
+
+                require(record.vehicleId == existing.vehicleId) {
+                    "不能通过编辑更改所属车辆"
+                }
+
+                require(record.isInitialRecord == existing.isInitialRecord) {
+                    "不能改变记录类型"
+                }
+
+                require(record.isInitialRecord == existing.isInitialRecord) {
+                    "不能改变记录类型"
+                }
+
+                val ownerVehicle = requireVehicleExists(existing.vehicleId)
+
+                if (existing.isInitialRecord) {
+                    val fuel = record.initialFuel
+                        ?: throw IllegalArgumentException("初始油量不能为空")
+
+                    require(fuel <= ownerVehicle.tankCapacity) {
+                        "初始油量不能超过油箱容量"
+                    }
+                }
 
                 // 👇 DAO 必须返回 Int
                 if (fuelDao.update(record) != 1) {
@@ -637,6 +794,9 @@ class MainViewModel(
                 // 👇 DAO 必须返回 Int
                 if (fuelDao.delete(existing) != 1) {
                     throw IllegalStateException("删除失败")
+                }
+                require(!existing.isInitialRecord) {
+                    "车辆初始记录不能删除"
                 }
                 Result.success(Unit)
             } catch (e: CancellationException) { throw e

@@ -85,6 +85,17 @@ fun FuelScreen(
     onSaved: () -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
+    // 初始记录使用专用编辑界面，不走普通加油记录表单
+    if (record?.isInitialRecord == true) {
+        InitialRecordEditScreen(
+            viewModel = viewModel,
+            record = record,
+            onBack = onBack,
+            onSaved = onSaved
+        )
+        return
+    }
+
     val isEditMode = record != null
     val vehicle by viewModel.currentVehicle.collectAsState()
     val context = LocalContext.current
@@ -824,7 +835,715 @@ fun FuelScreen(
     }
 }
 
-// ✅ 勾选框替换为 Miuix Switch
+@Composable
+private fun InitialRecordEditScreen(
+    viewModel: MainViewModel,
+    record: FuelRecord,
+    onBack: () -> Unit,
+    onSaved: () -> Unit
+) {
+    val vehicle by viewModel.currentVehicle.collectAsState()
+    val context = LocalContext.current
+
+    val capacity = vehicle?.tankCapacity ?: 0.0
+    val isVehicleMatched = vehicle?.id == record.vehicleId
+
+    var timestamp by rememberSaveable(record.id) {
+        mutableLongStateOf(record.timestamp)
+    }
+
+    var odometer by rememberSaveable(record.id) {
+        mutableStateOf(record.odometer?.toString() ?: "")
+    }
+
+    var initialFuel by rememberSaveable(record.id) {
+        mutableStateOf(record.initialFuel?.toString() ?: "")
+    }
+
+    // 油品标号
+    val defaultFuelGrade = remember(record) {
+        val raw = record.fuelGrade.takeIf { it.isNotBlank() } ?: "92#"
+        val trimmed = raw.trim()
+        if (trimmed.endsWith("#") || trimmed.contains("柴油")) {
+            trimmed
+        } else {
+            "${trimmed}#"
+        }
+    }
+
+    val fuelGradeOptions = remember(defaultFuelGrade) {
+        val list = mutableListOf("89#", "92#", "95#", "98#", "0# 柴油", "-10# 柴油")
+        if (defaultFuelGrade !in list) list.add(0, defaultFuelGrade)
+        list
+    }
+
+    var fuelGrade by rememberSaveable(record.id, defaultFuelGrade) {
+        mutableStateOf(defaultFuelGrade)
+    }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showFuelGradePicker by remember { mutableStateOf(false) }
+    var showConfirmDialog by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    // 是否在初始记录中同时保存本次加油交易
+    var hasInitialRefueling by rememberSaveable(record.id) {
+        mutableStateOf(record.volume > 0.0)
+    }
+
+    // 初始加油交易字段
+    var volume by rememberSaveable(record.id) {
+        mutableStateOf(record.volume.takeIf { it > 0.0 }?.toString() ?: "")
+    }
+
+    var unitPrice by rememberSaveable(record.id) {
+        mutableStateOf(record.unitPrice.takeIf { it > 0.0 }?.toString() ?: "")
+    }
+
+    var totalAmount by rememberSaveable(record.id) {
+        mutableStateOf(record.totalAmount?.toString() ?: "")
+    }
+
+    var discount by rememberSaveable(record.id) {
+        mutableStateOf(record.discount?.toString() ?: "")
+    }
+
+    var amount by rememberSaveable(record.id) {
+        mutableStateOf(
+            record.actualPaidAmount.takeIf { record.volume > 0.0 }?.toString() ?: ""
+        )
+    }
+
+    var isFull by rememberSaveable(record.id) {
+        mutableStateOf(record.isFull)
+    }
+
+    val dateFormatter = remember {
+        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+    }
+
+    // 解析初始状态
+    val odometerValue = odometer.toDoubleOrNull()
+        ?.takeIf { it.isFinite() && it >= 0.0 }
+
+    val initialFuelValue = initialFuel.toDoubleOrNull()
+        ?.takeIf {
+            it.isFinite() &&
+                    it >= 0.0 &&
+                    capacity > 0.0 &&
+                    it <= capacity
+        }
+
+    // 解析交易数据
+    val volumeValue = volume.toDoubleOrNull()
+        ?.takeIf { it.isFinite() && it > 0.0 }
+
+    val unitPriceValue = unitPrice.toDoubleOrNull()
+        ?.takeIf { it.isFinite() && it > 0.0 }
+
+    val totalAmountValue = totalAmount.toDoubleOrNull()
+        ?.takeIf { it.isFinite() && it > 0.0 }
+
+    val discountValue = if (discount.isBlank()) {
+        0.0
+    } else {
+        discount.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+    }
+
+    val amountValue = amount.toDoubleOrNull()
+        ?.takeIf { it.isFinite() && it >= 0.0 }
+
+    // 交易数据校验
+    val isVolumeValid =
+        volumeValue != null &&
+                (capacity <= 0.0 || volumeValue <= capacity)
+
+    val isDiscountValid =
+        discount.isBlank() ||
+                (
+                        discountValue != null &&
+                                totalAmountValue != null &&
+                                discountValue <= totalAmountValue
+                        )
+
+    val isAmountConsistent =
+        totalAmountValue != null &&
+                discountValue != null &&
+                amountValue != null &&
+                abs(totalAmountValue - discountValue - amountValue) <= 0.05
+
+    val isProductConsistent =
+        volumeValue != null &&
+                unitPriceValue != null &&
+                totalAmountValue != null &&
+                abs(volumeValue * unitPriceValue - totalAmountValue) <= 0.1
+
+    val isTransactionValid =
+        !hasInitialRefueling ||
+                (
+                        isVolumeValid &&
+                                unitPriceValue != null &&
+                                totalAmountValue != null &&
+                                amountValue != null &&
+                                isDiscountValid &&
+                                isAmountConsistent &&
+                                isProductConsistent
+                        )
+
+    // 实际保存的交易字段
+    // 关闭交易开关时，将交易数据恢复为初始记录的空交易状态
+    val savedVolume = if (hasInitialRefueling) volumeValue ?: 0.0 else 0.0
+    val savedUnitPrice = if (hasInitialRefueling) unitPriceValue ?: 0.0 else 0.0
+    val savedTotalAmount = if (hasInitialRefueling) totalAmountValue else null
+    val savedDiscount = if (hasInitialRefueling && discount.isNotBlank()) {
+        discountValue
+    } else {
+        null
+    }
+    val savedAmount = if (hasInitialRefueling) amountValue ?: 0.0 else 0.0
+    val savedIsFull = hasInitialRefueling && isFull
+
+    // 判断是否真的修改了内容
+    val hasChanges =
+        timestamp != record.timestamp ||
+                odometerValue != record.odometer ||
+                initialFuelValue != record.initialFuel ||
+                fuelGrade != record.fuelGrade ||
+                savedVolume != record.volume ||
+                savedUnitPrice != record.unitPrice ||
+                savedTotalAmount != record.totalAmount ||
+                savedDiscount != record.discount ||
+                savedAmount != record.actualPaidAmount ||
+                savedIsFull != record.isFull
+
+    val isFormValid =
+        isVehicleMatched &&
+                odometerValue != null &&
+                initialFuelValue != null &&
+                timestamp > 0L &&
+                fuelGrade.isNotBlank() &&
+                isTransactionValid &&
+                hasChanges &&
+                !isSaving
+
+    // 输入联动计算
+    fun onVolumeChange(newValue: String) {
+        volume = newValue
+
+        val v = newValue.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
+
+        val p = unitPrice.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
+
+        if (v != null && p != null) {
+            val total = v * p
+            if (total.isFinite()) {
+                totalAmount = formatMoney(total)
+                amount = formatMoney(total - (discountValue ?: 0.0))
+            }
+        }
+    }
+
+    fun onUnitPriceChange(newValue: String) {
+        unitPrice = newValue
+
+        val p = newValue.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
+
+        val v = volume.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
+
+        if (p != null && v != null) {
+            val total = v * p
+            if (total.isFinite()) {
+                totalAmount = formatMoney(total)
+                amount = formatMoney(total - (discountValue ?: 0.0))
+            }
+        }
+    }
+
+    fun onTotalAmountChange(newValue: String) {
+        totalAmount = newValue
+
+        val total = newValue.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it >= 0.0 }
+            ?: return
+
+        amount = formatMoney(total - (discountValue ?: 0.0))
+
+        val p = unitPrice.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
+
+        val v = volume.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
+
+        if (p != null) {
+            val calculatedVolume = total / p
+            if (calculatedVolume.isFinite() && calculatedVolume > 0.0) {
+                volume = formatVolume(calculatedVolume)
+            }
+        } else if (v != null) {
+            val calculatedPrice = total / v
+            if (calculatedPrice.isFinite() && calculatedPrice > 0.0) {
+                unitPrice = formatMoney(calculatedPrice)
+            }
+        }
+    }
+
+    fun onDiscountChange(newValue: String) {
+        discount = newValue
+
+        val total = totalAmount.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it >= 0.0 }
+            ?: return
+
+        val disc = if (newValue.isBlank()) {
+            0.0
+        } else {
+            newValue.toDoubleOrNull()
+                ?.takeIf { it.isFinite() && it >= 0.0 }
+                ?: return
+        }
+
+        amount = formatMoney(total - disc)
+    }
+
+    fun onAmountChange(newValue: String) {
+        amount = newValue
+
+        val paid = newValue.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it >= 0.0 }
+            ?: return
+
+        val total = paid + (discountValue ?: 0.0)
+        if (!total.isFinite()) return
+
+        totalAmount = formatMoney(total)
+
+        val p = unitPrice.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
+
+        val v = volume.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
+
+        if (p != null) {
+            val calculatedVolume = total / p
+            if (calculatedVolume.isFinite() && calculatedVolume > 0.0) {
+                volume = formatVolume(calculatedVolume)
+            }
+        } else if (v != null) {
+            val calculatedPrice = total / v
+            if (calculatedPrice.isFinite() && calculatedPrice > 0.0) {
+                unitPrice = formatMoney(calculatedPrice)
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+            .navigationBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(
+                top = WindowInsets.statusBars.asPaddingValues()
+                    .calculateTopPadding() + 16.dp,
+                bottom = 24.dp,
+                start = 16.dp,
+                end = 16.dp
+            ),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+        ) {
+            MiuixBackButton(onClick = onBack)
+            Spacer(Modifier.width(8.dp))
+
+            Text(
+                text = "编辑初始记录",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = adaptiveBackgroundTitleColor(
+                    MiuixTheme.colorScheme.onBackground
+                ),
+                style = adaptiveBackgroundTitleStyle()
+            )
+        }
+
+        when {
+            vehicle == null -> {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            !isVehicleMatched -> {
+                MiuixCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = 20.dp
+                ) {
+                    Text(
+                        text = "当前车辆与这条初始记录不一致，请先切换到所属车辆后再编辑。",
+                        modifier = Modifier.padding(16.dp),
+                        color = MiuixTheme.colorScheme.error
+                    )
+                }
+            }
+
+            else -> {
+                // 初始状态
+                MiuixCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = 20.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "初始状态",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            MiuixTextField(
+                                value = dateFormatter.format(Date(timestamp)),
+                                onValueChange = {},
+                                label = "初始时间",
+                                isRequired = true,
+                                readOnly = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .clickable(
+                                        interactionSource = remember {
+                                            MutableInteractionSource()
+                                        },
+                                        indication = null
+                                    ) {
+                                        showDatePicker = true
+                                    }
+                            )
+                        }
+
+                        MiuixTextField(
+                            value = odometer,
+                            onValueChange = { odometer = it },
+                            label = "初始里程",
+                            isRequired = true,
+                            suffix = "km",
+                            keyboardType = KeyboardType.Decimal,
+                            isError = odometer.isNotBlank() && odometerValue == null,
+                            errorMessage = "请输入有效的非负里程"
+                        )
+
+                        MiuixTextField(
+                            value = initialFuel,
+                            onValueChange = { initialFuel = it },
+                            label = "初始油量",
+                            isRequired = true,
+                            suffix = "L",
+                            keyboardType = KeyboardType.Decimal,
+                            isError = initialFuel.isNotBlank() && initialFuelValue == null,
+                            errorMessage = "油量不能小于 0 或超过油箱容量"
+                        )
+
+                        Text(
+                            text = "初始油量表示建立初始记录时，油箱内实际剩余的油量。",
+                            fontSize = 12.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary
+                        )
+                    }
+                }
+
+                // 油品标号
+                MiuixCard(
+                    onClick = { showFuelGradePicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = 20.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MiuixFieldLabel(
+                            text = "油品标号",
+                            isRequired = true
+                        )
+
+                        Text(
+                            text = fuelGrade,
+                            fontSize = 15.sp,
+                            color = MiuixTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                // 初始记录中的本次加油交易
+                MiuixCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = 20.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        MiuixSwitchRow(
+                            checked = hasInitialRefueling,
+                            text = "同时记录本次加油交易"
+                        ) {
+                            hasInitialRefueling = it
+                        }
+
+                        if (hasInitialRefueling) {
+                            Column(
+                                modifier = Modifier.padding(
+                                    horizontal = 16.dp,
+                                    vertical = 8.dp
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    MiuixTextField(
+                                        value = volume,
+                                        onValueChange = { onVolumeChange(it) },
+                                        label = "本次加油量",
+                                        modifier = Modifier.weight(1f),
+                                        isRequired = true,
+                                        suffix = "L",
+                                        isError = volume.isNotBlank() && !isVolumeValid,
+                                        errorMessage = "加油量无效或超出油箱容量",
+                                        keyboardType = KeyboardType.Decimal
+                                    )
+
+                                    MiuixTextField(
+                                        value = unitPrice,
+                                        onValueChange = { onUnitPriceChange(it) },
+                                        label = "单价",
+                                        modifier = Modifier.weight(1f),
+                                        isRequired = true,
+                                        suffix = "元/L",
+                                        keyboardType = KeyboardType.Decimal
+                                    )
+                                }
+
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    MiuixTextField(
+                                        value = totalAmount,
+                                        onValueChange = { onTotalAmountChange(it) },
+                                        label = "原价",
+                                        modifier = Modifier.weight(1f),
+                                        isRequired = true,
+                                        suffix = "元",
+                                        keyboardType = KeyboardType.Decimal
+                                    )
+
+                                    MiuixTextField(
+                                        value = discount,
+                                        onValueChange = { onDiscountChange(it) },
+                                        label = "优惠金额",
+                                        modifier = Modifier.weight(1f),
+                                        suffix = "元",
+                                        keyboardType = KeyboardType.Decimal,
+                                        isError = discount.isNotBlank() && !isDiscountValid,
+                                        errorMessage = "优惠金额不能超过原价"
+                                    )
+                                }
+
+                                MiuixTextField(
+                                    value = amount,
+                                    onValueChange = { onAmountChange(it) },
+                                    label = "实际支付",
+                                    isRequired = true,
+                                    suffix = "元",
+                                    keyboardType = KeyboardType.Decimal
+                                )
+
+                                MiuixSwitchRow(
+                                    checked = isFull,
+                                    text = "本次加油已加满"
+                                ) {
+                                    isFull = it
+                                }
+
+                                if (
+                                    totalAmountValue != null &&
+                                    discountValue != null &&
+                                    amountValue != null &&
+                                    !isAmountConsistent
+                                ) {
+                                    Text(
+                                        text = "原价减去优惠金额应等于实付金额",
+                                        fontSize = 12.sp,
+                                        color = MiuixTheme.colorScheme.error
+                                    )
+                                }
+
+                                if (
+                                    volumeValue != null &&
+                                    unitPriceValue != null &&
+                                    totalAmountValue != null &&
+                                    !isProductConsistent
+                                ) {
+                                    Text(
+                                        text = "加油量 × 单价应等于原价",
+                                        fontSize = 12.sp,
+                                        color = MiuixTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                MiuixCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = 20.dp
+                ) {
+                    Text(
+                        text = "初始油量填写的是加油完成后的实际油量。本次加油量和金额作为同一条初始记录中的交易信息保存，不要再把加油量叠加到初始油量上。",
+                        modifier = Modifier.padding(16.dp),
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    )
+                }
+
+                // 保存按钮
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .clip(RoundedCornerShape(25.dp))
+                        .background(
+                            if (isFormValid) {
+                                MiuixTheme.colorScheme.primary
+                            } else {
+                                MiuixTheme.colorScheme.primary.copy(alpha = 0.4f)
+                            }
+                        )
+                        .clickable(enabled = isFormValid) {
+                            showConfirmDialog = true
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "保存修改",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MiuixTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+        }
+    }
+
+    // 修改确认
+    if (showConfirmDialog) {
+        MiuixConfirmDialog(
+            title = "确认修改初始记录",
+            message = "初始时间、里程或初始油量变化后，相关历史油耗计算可能发生变化。开启本次加油交易时，交易金额会保存在这条初始记录中；关闭交易开关时，这笔交易信息会被清空。",
+            confirmText = "确认修改",
+            confirmColor = MiuixTheme.colorScheme.primary,
+            onConfirm = {
+                showConfirmDialog = false
+                isSaving = true
+
+                val updatedRecord = record.copy(
+                    timestamp = timestamp,
+                    fuelGrade = fuelGrade,
+                    odometer = odometerValue,
+                    initialFuel = initialFuelValue,
+                    volume = savedVolume,
+                    unitPrice = savedUnitPrice,
+                    totalAmount = savedTotalAmount,
+                    discount = savedDiscount,
+                    actualPaidAmount = savedAmount,
+                    isFull = savedIsFull
+                )
+
+                try {
+                    viewModel.updateFuelRecord(updatedRecord) { result ->
+                        isSaving = false
+
+                        if (result.isSuccess) {
+                            onSaved()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "修改失败：${result.exceptionOrNull()?.message ?: "未知错误"}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    isSaving = false
+                    Toast.makeText(
+                        context,
+                        "修改失败：${e.message ?: "未知错误"}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            },
+            onDismiss = {
+                showConfirmDialog = false
+            }
+        )
+    }
+
+    if (showDatePicker) {
+        MiuixDatePickerDialog(
+            initialTimestamp = timestamp,
+            title = "选择初始时间",
+            onSelected = { selectedTimestamp ->
+                timestamp = selectedTimestamp
+                showDatePicker = false
+            },
+            onDismiss = {
+                showDatePicker = false
+            }
+        )
+    }
+
+    if (showFuelGradePicker) {
+        HyperFuelGradePickerDialog(
+            currentValue = fuelGrade,
+            options = fuelGradeOptions,
+            onSelected = {
+                fuelGrade = it
+                showFuelGradePicker = false
+            },
+            onDismiss = {
+                showFuelGradePicker = false
+            }
+        )
+    }
+}
+
+
+
 @Composable
 private fun MiuixSwitchRow(checked: Boolean, text: String, onCheckedChange: (Boolean) -> Unit) {
     Row(
