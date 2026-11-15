@@ -31,6 +31,7 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.fueltracker.ui.theme.VehicleCoverPreferences
 
 class MainActivity : ComponentActivity() {
 
@@ -41,6 +42,7 @@ class MainActivity : ComponentActivity() {
 
         ThemePreferences.init(applicationContext)
         BackgroundPreferences.init(applicationContext)
+        VehicleCoverPreferences.init(applicationContext)
         OutlierSensitivityPreferences.init(applicationContext)
 
         // 启用 Edge-to-Edge

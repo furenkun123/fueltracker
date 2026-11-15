@@ -20,6 +20,7 @@ import com.fueltracker.data.ExpenseDao
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
+import com.fueltracker.ui.theme.VehicleCoverPreferences
 import com.fueltracker.util.BackupManager
 import com.fueltracker.util.ExpenseRange
 import kotlinx.coroutines.CancellationException
@@ -769,6 +770,11 @@ class MainViewModel(
                     if (isCur && nextV != null) vehicleDao.setCurrentVehicle(nextV.id)
                     Pair(isCur, nextV)
                 }
+                // 数据库删除成功后，清理该车辆的封面及图片权限
+                VehicleCoverPreferences.clearVehicleSettings(
+                    getApplication<Application>().applicationContext,
+                    vehicle.id
+                )
                 if (wasCurrent) _currentVehicleOverride.value = next?.copy(isCurrent = true)
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {

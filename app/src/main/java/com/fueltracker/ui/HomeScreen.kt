@@ -88,6 +88,13 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Calendar
 import kotlin.time.Duration.Companion.seconds
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import com.fueltracker.ui.components.VehicleCoverEditorSheet
+import com.fueltracker.ui.theme.VehicleCoverPreferences
+import android.net.Uri
 
 
 @Composable
@@ -106,6 +113,25 @@ fun HomeScreen(
     onOpenSettings: () -> Unit
 ) {
     val dateBoundaryKey = rememberDateBoundaryKey()
+    val context = LocalContext.current
+
+// 车辆封面编辑面板
+    var showVehicleCoverEditor by remember(vehicle?.id) {
+        mutableStateOf(false)
+    }
+
+    // 暂存用户刚选择的图片，不立即替换现有封面
+    var pendingCoverUri by remember(vehicle?.id) {
+        mutableStateOf<Uri?>(null)
+    }
+
+    val vehicleCoverPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            pendingCoverUri = uri
+        }
+    }
 
     val deliveryDate = vehicle?.deliveryDate
     var fabExpanded by remember { mutableStateOf(false) }
@@ -349,7 +375,12 @@ fun HomeScreen(
                 }
             } else {
                 item {
-                    MiuixVehicleCard(vehicle)
+                    MiuixVehicleCard(
+                        vehicle = vehicle,
+                        onLongClick = {
+                            showVehicleCoverEditor = true
+                        }
+                    )
                 }
 
                 if (activeParking != null) {
@@ -490,6 +521,78 @@ fun HomeScreen(
                 }
 
                 showYearMonthPicker = false
+            }
+        )
+    }
+    if (showVehicleCoverEditor && vehicle != null) {
+        VehicleCoverEditorSheet(
+            vehicle = vehicle,
+            coverUri = VehicleCoverPreferences.getCoverUri(vehicle.id),
+            showInfoOnCover = VehicleCoverPreferences.shouldShowInfo(vehicle.id),
+
+            pendingCoverUri = pendingCoverUri,
+
+            onCancelPendingCover = {
+                pendingCoverUri = null
+            },
+
+            onSavePendingCover = { uri, transform ->
+                try {
+                    VehicleCoverPreferences.setCover(
+                        context,
+                        vehicle.id,
+                        uri
+                    )
+
+                    VehicleCoverPreferences.setCropTransform(
+                        context,
+                        vehicle.id,
+                        transform
+                    )
+
+                    pendingCoverUri = null
+
+                    Toast.makeText(
+                        context,
+                        "车辆封面已更新",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    true
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        context,
+                        "保存封面失败：${e.localizedMessage ?: "无法读取图片"}",
+                        Toast.LENGTH_LONG
+                    ).show()
+
+                    false
+                }
+            },
+
+            onPickImage = {
+                vehicleCoverPickerLauncher.launch(
+                    arrayOf("image/*")
+                )
+            },
+
+            onClearImage = {
+                VehicleCoverPreferences.clearCover(
+                    context,
+                    vehicle.id
+                )
+            },
+
+            onShowInfoChange = { show ->
+                VehicleCoverPreferences.setShowInfo(
+                    context,
+                    vehicle.id,
+                    show
+                )
+            },
+
+            onDismiss = {
+                showVehicleCoverEditor = false
             }
         )
     }
