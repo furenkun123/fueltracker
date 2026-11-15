@@ -1041,7 +1041,12 @@ fun SettingsScreen(
     selectedRestoreUri?.let { uri ->
         MiuixConfirmDialog(
             title = "确认恢复备份？",
-            message = "恢复备份将覆盖当前的所有车辆和加油记录，此操作无法撤销。是否继续？",
+            message = "恢复备份将替换当前的以下数据：\n\n" +
+                    "• 所有车辆资料\n" +
+                    "• 所有加油记录\n" +
+                    "• 所有费用记录（包括停车记录及当前停车状态）\n" +
+                    "• 自定义费用分类（旧版备份未包含分类数据时，将清空当前自定义分类）\n\n" +
+                    "此操作无法撤销，是否继续？",
             confirmText = "覆盖并恢复",
             onConfirm = {
                 selectedRestoreUri = null
