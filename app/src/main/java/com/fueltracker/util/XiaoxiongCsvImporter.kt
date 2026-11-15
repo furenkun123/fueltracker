@@ -11,12 +11,19 @@ import kotlinx.coroutines.withContext
 import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.io.FilterInputStream
+import java.io.IOException
+import java.io.InputStream
 
 object XiaoxiongCsvImporter {
 
     private const val TAG = "XiaoxiongCsv"
     private const val FALLBACKUNITPRICE = 8.0
     private const val MAXSANEUNITPRICE = 50.0
+
+    // CSV 导入资源保护
+    private const val MAX_CSV_SIZE_BYTES = 20L * 1024 * 1024
+    private const val MAX_CSV_ROWS = 50_000
 
     private val DatePatterns = listOf("yyyy/MM/dd", "yyyy-MM-dd", "yyyy/M/d", "yyyy-M-d")
 
@@ -209,13 +216,83 @@ object XiaoxiongCsvImporter {
         val stream = context.contentResolver.openInputStream(uri)
             ?: throw IllegalStateException("无法打开文件")
 
-        stream.bufferedReader(Charsets.UTF_8).useLines { sequence ->
-            sequence
-                .map { it.removePrefix("\uFEFF").trim() }
-                .filter { it.isNotEmpty() }
-                .forEachIndexed { index, line ->
-                    action(index, line)
+        LimitedInputStream(
+            stream,
+            MAX_CSV_SIZE_BYTES
+        ).bufferedReader(Charsets.UTF_8).useLines { sequence ->
+
+            var rowCount = 0
+
+            sequence.forEach { rawLine ->
+                val line = rawLine.removePrefix("\uFEFF").trim()
+
+                if (line.isNotEmpty()) {
+                    if (rowCount >= MAX_CSV_ROWS) {
+                        throw IllegalArgumentException(
+                            "CSV 行数超过 50,000 行，已停止导入"
+                        )
+                    }
+
+                    action(rowCount, line)
+                    rowCount++
                 }
+            }
+        }
+    }
+    private class LimitedInputStream(
+        input: InputStream,
+        private val maxBytes: Long
+    ) : FilterInputStream(input) {
+
+        private var bytesRead = 0L
+
+        override fun read(): Int {
+            if (bytesRead >= maxBytes) {
+                return checkEndOfStream()
+            }
+
+            val value = super.read()
+
+            if (value != -1) {
+                bytesRead++
+            }
+
+            return value
+        }
+
+        override fun read(
+            buffer: ByteArray,
+            offset: Int,
+            length: Int
+        ): Int {
+            if (length == 0) return 0
+
+            if (bytesRead >= maxBytes) {
+                return checkEndOfStream()
+            }
+
+            val remaining = maxBytes - bytesRead
+            val allowedLength = minOf(length.toLong(), remaining).toInt()
+
+            val count = super.read(
+                buffer,
+                offset,
+                allowedLength
+            )
+
+            if (count > 0) {
+                bytesRead += count
+            }
+
+            return count
+        }
+
+        private fun checkEndOfStream(): Int {
+            return if (super.read() == -1) {
+                -1
+            } else {
+                throw IOException("CSV 文件超过 20 MB，已停止导入")
+            }
         }
     }
 
