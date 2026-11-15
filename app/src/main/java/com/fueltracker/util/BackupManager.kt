@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.room.withTransaction
 import com.fueltracker.data.AppDatabase
 import com.fueltracker.data.CustomCategoryEntity
+import com.fueltracker.data.ExpenseCategoryStore
 import com.fueltracker.data.ExpenseRecord
 import com.fueltracker.data.FuelRecord
 import com.fueltracker.data.Vehicle
@@ -582,16 +583,48 @@ object BackupManager {
             }
             requireUniqueIds(expenses.map { it.id }, "费用记录")
 
-            val customCategories = if (root.has("customCategories") && !root.isNull("customCategories")) {
-                val arr = root.optJSONArray("customCategories") ?: throw IllegalArgumentException("customCategories 字段类型错误")
+            val customCategories = if (
+                root.has("customCategories") && !root.isNull("customCategories")
+            ) {
+                val arr = root.optJSONArray("customCategories")
+                    ?: throw IllegalArgumentException("customCategories 字段类型错误")
+
+                val categoryNames = mutableSetOf<String>()
+
                 (0 until arr.length()).map { idx ->
                     val item = arr.opt(idx)
-                    if (item !is String) throw IllegalArgumentException("customCategories[$idx] 不是字符串")
+
+                    if (item !is String) {
+                        throw IllegalArgumentException(
+                            "customCategories[$idx] 不是字符串"
+                        )
+                    }
+
                     val name = item.trim()
-                    require(name.isNotEmpty()) { "customCategories[$idx] 为空" }
+
+                    require(name.isNotEmpty()) {
+                        "customCategories[$idx] 为空"
+                    }
+
+                    // 不允许自定义分类重复（忽略大小写）
+                    require(categoryNames.add(name.lowercase(Locale.ROOT))) {
+                        "备份文件损坏：自定义费用分类重复：$name"
+                    }
+
+                    // 不允许自定义分类与默认分类重名
+                    require(
+                        ExpenseCategoryStore.DEFAULT_EXPENSE_CATEGORIES.none {
+                            it.equals(name, ignoreCase = true)
+                        }
+                    ) {
+                        "备份文件损坏：自定义费用分类与默认分类重名：$name"
+                    }
+
                     name
                 }
-            } else null
+            } else {
+                null
+            }
 
             val validVehicleIds = vehicles.map { it.id }.toSet()
             if (records.any { it.vehicleId !in validVehicleIds }) throw IllegalArgumentException("备份文件损坏：加油记录引用了不存在的车辆")
