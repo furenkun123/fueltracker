@@ -184,38 +184,12 @@ object FuelCalculator {
     // --------------------------------------------------------
 
     @JvmOverloads
-    fun latestReliableConsumption(records: List<FuelRecord>, vehicle: Vehicle? = null): Double? =
-        calculateAll(records, vehicle).lastOrNull(::isReliable)?.consumption
-
-    @JvmOverloads
-    fun calculateMap(
-        records: List<FuelRecord>,
-        vehicle: Vehicle? = null,
-        sensitivity: OutlierSensitivity = OutlierSensitivityPreferences.mode
-    ): Map<Long, ConsumptionResult> {
-        val map = LinkedHashMap<Long, ConsumptionResult>()
-        for (result in calculateAll(records, vehicle, sensitivity)) {
-            if (result.recordId > 0L) map[result.recordId] = result
-        }
-        return map
-    }
-
-    @JvmOverloads
     fun calculateAll(
         records: List<FuelRecord>,
         vehicle: Vehicle? = null,
         sensitivity: OutlierSensitivity = OutlierSensitivityPreferences.mode
     ): List<ConsumptionResult> =
         analyze(records, vehicle, sensitivity).results
-
-    @JvmOverloads
-    fun getVerifiedMergedRecordIds(
-        records: List<FuelRecord>,
-        vehicle: Vehicle? = null,
-        sensitivity: OutlierSensitivity = OutlierSensitivityPreferences.mode
-    ): Set<Long> {
-        return analyze(records, vehicle, sensitivity).verifiedMergedRecordIds
-    }
 
     //判断油耗区间是否适合用于趋势展示。
     // 与现有统计可靠性判断保持一致。
