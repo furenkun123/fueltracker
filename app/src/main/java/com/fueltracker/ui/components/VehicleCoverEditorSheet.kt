@@ -211,7 +211,7 @@ fun VehicleCoverEditorSheet(
                             ) {
                                 Text(
                                     text = "${vehicle.brand} ${vehicle.series}",
-                                    fontSize = 15.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Color.White.copy(alpha = 0.92f)
                                 )
